@@ -3,6 +3,7 @@ package path
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -299,31 +300,6 @@ func TestKBRoot(t *testing.T) {
 		}
 	})
 
-	// Test case: KB root found with .akb.yaml file
-	t.Run("finds .akb.yaml file", func(t *testing.T) {
-		workDir, err := os.MkdirTemp(tmpDir, "work2")
-		if err != nil {
-			t.Fatalf("failed to create work dir: %v", err)
-		}
-
-		akbFile := filepath.Join(workDir, ".akb.yaml")
-		if err := os.WriteFile(akbFile, []byte("{}"), 0644); err != nil {
-			t.Fatalf("failed to create .akb.yaml: %v", err)
-		}
-
-		if err := os.Chdir(workDir); err != nil {
-			t.Fatalf("failed to chdir: %v", err)
-		}
-
-		root, err := KBRoot()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if root != workDir {
-			t.Fatalf("expected %q but got %q", workDir, root)
-		}
-	})
-
 	// Test case: KB root NOT found
 	t.Run("not found returns error", func(t *testing.T) {
 		workDir, err := os.MkdirTemp(tmpDir, "work3")
@@ -338,6 +314,9 @@ func TestKBRoot(t *testing.T) {
 		_, err = KBRoot()
 		if err == nil {
 			t.Fatalf("expected error but got nil")
+		}
+		if !strings.Contains(err.Error(), "not in a knowledge base") {
+			t.Errorf("error should contain 'not in a knowledge base', got: %v", err)
 		}
 	})
 

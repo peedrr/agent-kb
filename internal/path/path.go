@@ -86,7 +86,7 @@ func ResolveRawPath(kbRoot, inputPath string) (string, error) {
 	return filepath.Join(kbRoot, "raw", cleanPath), nil
 }
 
-// KBRoot finds the KB root by walking up from cwd looking for .akb directory or .akb.yaml file.
+// KBRoot finds the KB root by walking up from cwd looking for .akb directory.
 func KBRoot() (string, error) {
 	// Start from current working directory
 	dir, err := os.Getwd()
@@ -102,12 +102,6 @@ func KBRoot() (string, error) {
 			return dir, nil
 		}
 
-		// Check for .akb.yaml file
-		akbFile := filepath.Join(dir, ".akb.yaml")
-		if _, err := os.Stat(akbFile); err == nil {
-			return dir, nil
-		}
-
 		// Move to parent directory
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -117,5 +111,5 @@ func KBRoot() (string, error) {
 		dir = parent
 	}
 
-	return "", errors.New("KB root not found: no .akb directory or .akb.yaml file found")
+	return "", errors.New("not in a knowledge base directory (no .akb/ found)")
 }
