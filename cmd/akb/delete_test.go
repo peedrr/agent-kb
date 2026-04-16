@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/peedrr/agent-kb/internal/index"
+	"github.com/peedrr/agent-kb/internal/log"
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/storage"
 )
@@ -123,6 +125,59 @@ func TestDelete(t *testing.T) {
 			t.Errorf("expected file to be deleted, got error: %v", err)
 		}
 	})
+
+	t.Run("error on delete index.md", func(t *testing.T) {
+		indexPath := filepath.Join(kbRoot, "kb", "index.md")
+		if err := os.WriteFile(indexPath, []byte("# Index\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		err := runDelete("kb/index.md", false)
+		if err == nil {
+			t.Error("expected error for index.md delete, got nil")
+		}
+		if err != nil && !strings.Contains(err.Error(), "cannot delete index.md") {
+			t.Errorf("expected 'cannot delete index.md' in error, got: %v", err)
+		}
+	})
+
+	t.Run("error on delete log.md", func(t *testing.T) {
+		logPath := filepath.Join(kbRoot, "kb", "log.md")
+		if err := os.WriteFile(logPath, []byte("# Log\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		err := runDelete("kb/log.md", false)
+		if err == nil {
+			t.Error("expected error for log.md delete, got nil")
+		}
+		if err != nil && !strings.Contains(err.Error(), "cannot delete log.md") {
+			t.Errorf("expected 'cannot delete log.md' in error, got: %v", err)
+		}
+	})
+
+	t.Run("successful delete page not in index", func(t *testing.T) {
+		testPage := filepath.Join(kbRoot, "kb", "notes", "not-in-index.md")
+		if err := os.MkdirAll(filepath.Dir(testPage), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(testPage, []byte("# Not In Index\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := addToGit(kbRoot, "kb/notes/not-in-index.md"); err != nil {
+			t.Fatal(err)
+		}
+
+		err := runDelete("notes/not-in-index.md", false)
+		if err != nil {
+			t.Fatalf("delete failed: %v", err)
+		}
+
+		if _, err := os.Stat(testPage); !os.IsNotExist(err) {
+			t.Errorf("expected file to be deleted, got error: %v", err)
+		}
+	})
 }
 
 // Helper to setup minimal test KB structure
@@ -198,6 +253,12 @@ func commitInitial(kbRoot string) {
 	cmd.CombinedOutput()
 }
 
+func execGitAddTest(kbRoot, relPath string) {
+	cmd := exec.Command("git", "add", relPath)
+	cmd.Dir = kbRoot
+	cmd.Output()
+}
+
 func runDelete(inputPath string, noCommit bool) error {
 	kbRoot, err := path.KBRoot()
 	if err != nil {
@@ -209,6 +270,13 @@ func runDelete(inputPath string, noCommit bool) error {
 	}
 
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
+
+	if cleanPath == "index.md" {
+		return fmt.Errorf("cannot delete index.md; use 'akb index rebuild' to reset")
+	}
+	if cleanPath == "log.md" {
+		return fmt.Errorf("cannot delete log.md; it is a managed file")
+	}
 
 	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
 
@@ -227,7 +295,14 @@ func runDelete(inputPath string, noCommit bool) error {
 	}
 
 	relPath := filepath.Join("kb", cleanPath)
-	fmt.Printf("Deleted %s\n", filepath.ToSlash(relPath))
+	relPath = filepath.ToSlash(relPath)
+
+	_ = index.RemoveEntry(kbRoot, relPath)
+	_ = log.AppendLog(kbRoot, "delete", "Removed page "+cleanPath, "")
+	execGitAddTest(kbRoot, "kb/index.md")
+	execGitAddTest(kbRoot, "kb/log.md")
+
+	fmt.Printf("Deleted %s\n", relPath)
 
 	return nil
 }

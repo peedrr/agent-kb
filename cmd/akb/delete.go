@@ -4,10 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/index"
 	"github.com/peedrr/agent-kb/internal/linkgraph"
+	logmod "github.com/peedrr/agent-kb/internal/log"
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/storage"
 	"github.com/spf13/cobra"
@@ -35,6 +39,14 @@ func runDeleteCmd(cmd *cobra.Command, args []string) error {
 
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
 
+	// Guard: block delete on managed files
+	if cleanPath == "index.md" {
+		return fmt.Errorf("cannot delete index.md; use 'akb index rebuild' to reset")
+	}
+	if cleanPath == "log.md" {
+		return fmt.Errorf("cannot delete log.md; it is a managed file")
+	}
+
 	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
 
 	exists, err := fileExists(fullPath)
@@ -45,6 +57,28 @@ func runDeleteCmd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("page not found: %s", inputPath)
 	}
 
+	relPath := filepath.Join("kb", cleanPath)
+	relPath = filepath.ToSlash(relPath)
+
+	// Try to get title from frontmatter for log entry
+	title := ""
+	if content, err := os.ReadFile(fullPath); err == nil {
+		if fm, _, err := frontmatter.Parse(content); err == nil {
+			title = fm.Title
+		}
+	}
+
+	// Remove from index.md (succeeds silently if not in index)
+	_ = index.RemoveEntry(kbRoot, relPath)
+
+	// Log the deletion
+	_ = logmod.AppendLog(kbRoot, "delete", "Removed page "+cleanPath, title)
+
+	// Stage index.md and log.md so they're included in the delete commit
+	gitAdd := exec.Command("git", "add", "kb/index.md", "kb/log.md")
+	gitAdd.Dir = kbRoot
+	gitAdd.Run() // best effort
+
 	store := storage.NewGitProvider(kbRoot, noCommit)
 	ctx := context.Background()
 	if err := store.Delete(ctx, fullPath); err != nil {
@@ -52,14 +86,11 @@ func runDeleteCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	updater := &linkgraph.NoOpLinkGraphUpdater{}
-	relPath := filepath.Join("kb", cleanPath)
 	if err := updater.RemovePage(ctx, relPath); err != nil {
 		return err
 	}
 
-	relPathOutput := filepath.ToSlash(relPath)
-
-	fmt.Printf("Deleted %s\n", relPathOutput)
+	fmt.Printf("Deleted %s\n", relPath)
 
 	return nil
 }
