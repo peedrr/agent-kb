@@ -65,7 +65,7 @@ func AppendLog(kbRoot string, operation string, description string, title string
 	lp := logPath(kbRoot)
 
 	var entries []LogEntry
-	data, err := os.ReadFile(lp)
+	_, err := os.ReadFile(lp)
 	if err != nil {
 		if os.IsNotExist(err) {
 			entries = []LogEntry{}
@@ -77,7 +77,6 @@ func AppendLog(kbRoot string, operation string, description string, title string
 		if err != nil {
 			return fmt.Errorf("parse log.md: %w", err)
 		}
-		_ = data
 	}
 
 	entries = append(entries, LogEntry{

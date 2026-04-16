@@ -66,6 +66,15 @@ func runAppend(cmd *cobra.Command, args []string) error {
 
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
 
+	// Guard: block append to managed files
+	base := filepath.Base(cleanPath)
+	if base == "index.md" {
+		return fmt.Errorf("cannot append to index.md; use 'akb index add' to update")
+	}
+	if base == "log.md" {
+		return fmt.Errorf("cannot append to log.md; it is a managed file")
+	}
+
 	_, err = path.ResolveKBPath(kbRoot, inputPath)
 	if err != nil {
 		return err

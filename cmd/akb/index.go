@@ -149,6 +149,9 @@ func runIndexRemove(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	indexPath := filepath.Join(kbRoot, "kb", "index.md")
+	oldContent, _ := os.ReadFile(indexPath)
+
 	// Normalize path to kb/ prefix
 	cleanPath := strings.TrimPrefix(entryPath, "kb/")
 	relPath := filepath.Join("kb", cleanPath)
@@ -158,11 +161,14 @@ func runIndexRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("remove entry: %w", err)
 	}
 
-	// Read the updated index content for git commit
-	indexPath := filepath.Join(kbRoot, "kb", "index.md")
 	newContent, err := os.ReadFile(indexPath)
 	if err != nil {
 		return fmt.Errorf("read updated index: %w", err)
+	}
+
+	if string(oldContent) == string(newContent) {
+		fmt.Printf("Removed %s from index\n", relPath)
+		return nil
 	}
 
 	store := storage.NewGitProvider(kbRoot, noCommit)
@@ -182,15 +188,21 @@ func runIndexRebuild(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	indexPath := filepath.Join(kbRoot, "kb", "index.md")
+	oldContent, _ := os.ReadFile(indexPath)
+
 	if err := index.RebuildIndex(kbRoot); err != nil {
 		return fmt.Errorf("rebuild index: %w", err)
 	}
 
-	// Read the updated index content for git commit
-	indexPath := filepath.Join(kbRoot, "kb", "index.md")
 	newContent, err := os.ReadFile(indexPath)
 	if err != nil {
 		return fmt.Errorf("read rebuilt index: %w", err)
+	}
+
+	if string(oldContent) == string(newContent) {
+		fmt.Println("Index rebuilt")
+		return nil
 	}
 
 	store := storage.NewGitProvider(kbRoot, noCommit)

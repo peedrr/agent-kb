@@ -98,6 +98,15 @@ func runWrite(cmd *cobra.Command, args []string) error {
 	// Strip kb/ prefix
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
 
+	// Guard: block write to managed files
+	base := filepath.Base(cleanPath)
+	if base == "index.md" {
+		return fmt.Errorf("cannot write index.md; use 'akb index add' to update")
+	}
+	if base == "log.md" {
+		return fmt.Errorf("cannot write log.md; it is a managed file")
+	}
+
 	// Strip type-dir prefix if it matches the type's Dir
 	if dirFromType != "" {
 		typeDirPrefix := dirFromType + "/"
