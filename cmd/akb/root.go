@@ -4,6 +4,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var noCommit bool
+
 var RootCmd = &cobra.Command{
 	Use:     "akb",
 	Short:   "Agent Knowledge Base CLI",
@@ -15,8 +17,12 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
+	RootCmd.PersistentFlags().BoolVar(&noCommit, "no-commit", false, "skip git commit")
 	RootCmd.AddCommand(initCmd)
 	RootCmd.AddCommand(statusCmd)
+	RootCmd.AddCommand(writeCmd)
+	RootCmd.AddCommand(readCmd)
+	RootCmd.AddCommand(deleteCmd)
 }
 
 func Execute() error {
