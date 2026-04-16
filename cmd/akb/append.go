@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -82,7 +81,7 @@ func runAppend(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("page not found: %s. Use `akb write` to create.", inputPath)
 	}
 
-	store := storage.NewGitProvider(kbRoot, true)
+	store := storage.NewGitProvider(kbRoot, noCommit)
 	ctx := context.Background()
 
 	existingContent, err := store.Read(ctx, fullPath)
@@ -115,17 +114,10 @@ func runAppend(cmd *cobra.Command, args []string) error {
 	newBody := string(body) + "\n" + string(stdinContent)
 	fullContent := string(frontmatterPortion) + newBody
 
-	if err := store.Write(ctx, fullPath, []byte(fullContent)); err != nil {
+	relPath := filepath.ToSlash(filepath.Join("kb", cleanPath))
+	commitMsg := fmt.Sprintf("akb: append %s", relPath)
+	if err := store.WriteWithCommitMsg(ctx, fullPath, []byte(fullContent), commitMsg); err != nil {
 		return fmt.Errorf("write page: %w", err)
-	}
-
-	relPath := filepath.Join("kb", cleanPath)
-	relPath = filepath.ToSlash(relPath)
-
-	if !noCommit {
-		if err := gitCommitAppend(kbRoot, relPath); err != nil {
-			return err
-		}
 	}
 
 	searcher := &search.NoOpSearcher{}
@@ -148,32 +140,5 @@ func runAppend(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Appended to %s\n", relPath)
 
-	return nil
-}
-
-func gitCommitAppend(kbRoot, relPath string) error {
-	gitConfig := func(args ...string) error {
-		cmd := exec.Command("git", args...)
-		cmd.Dir = kbRoot
-		_, err := cmd.Output()
-		return err
-	}
-	if err := gitConfig("config", "--local", "user.name"); err != nil {
-		if err := gitConfig("config", "user.name", "akb"); err != nil {
-			return fmt.Errorf("set git user.name: %w", err)
-		}
-	}
-	if err := gitConfig("config", "--local", "user.email"); err != nil {
-		if err := gitConfig("config", "user.email", "akb@local"); err != nil {
-			return fmt.Errorf("set git user.email: %w", err)
-		}
-	}
-
-	commitMsg := fmt.Sprintf("akb: append %s", relPath)
-	cmd := exec.Command("git", "commit", "-m", commitMsg)
-	cmd.Dir = kbRoot
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err)
-	}
 	return nil
 }

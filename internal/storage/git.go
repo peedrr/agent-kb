@@ -19,7 +19,8 @@ func NewGitProvider(kbRoot string, noCommit bool) *GitProvider {
 	return &GitProvider{kbRoot: kbRoot, noCommit: noCommit}
 }
 
-func (g *GitProvider) Write(ctx context.Context, path string, data []byte) error {
+// WriteWithCommitMsg writes data to a file and commits with a custom message.
+func (g *GitProvider) WriteWithCommitMsg(ctx context.Context, path string, data []byte, commitMsg string) error {
 	if err := g.checkMergeConflicts(); err != nil {
 		return err
 	}
@@ -48,9 +49,16 @@ func (g *GitProvider) Write(ctx context.Context, path string, data []byte) error
 	if err := g.ensureGitConfig(); err != nil {
 		return err
 	}
-
-	commitMsg := fmt.Sprintf("akb: write %s", filepath.ToSlash(relPath))
 	return g.gitCommit(commitMsg)
+}
+
+func (g *GitProvider) Write(ctx context.Context, path string, data []byte) error {
+	relPath, err := filepath.Rel(g.kbRoot, path)
+	if err != nil {
+		return fmt.Errorf("resolve relative path: %w", err)
+	}
+	commitMsg := fmt.Sprintf("akb: write %s", filepath.ToSlash(relPath))
+	return g.WriteWithCommitMsg(ctx, path, data, commitMsg)
 }
 
 func (g *GitProvider) Read(_ context.Context, path string) ([]byte, error) {

@@ -490,6 +490,72 @@ func TestGitProvider_Delete_NoCommit(t *testing.T) {
 	})
 }
 
+func TestGitProvider_WriteWithCommitMsg(t *testing.T) {
+	tmpDir := initGitRepo(t)
+	defer os.RemoveAll(tmpDir)
+
+	p := NewGitProvider(tmpDir, false)
+	ctx := context.Background()
+
+	t.Run("uses custom commit message", func(t *testing.T) {
+		path := filepath.Join(tmpDir, "kb", "custom-msg.md")
+		err := p.WriteWithCommitMsg(ctx, path, []byte("custom content"), "akb: append kb/custom-msg.md")
+		if err != nil {
+			t.Fatalf("WriteWithCommitMsg failed: %v", err)
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile failed: %v", err)
+		}
+		if string(data) != "custom content" {
+			t.Errorf("content = %q, want %q", string(data), "custom content")
+		}
+
+		gitLog := exec.Command("git", "log", "--oneline", "-1")
+		gitLog.Dir = tmpDir
+		out, err := gitLog.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git log failed: %v", err)
+		}
+		logMsg := strings.TrimSpace(string(out))
+		if !strings.Contains(logMsg, "akb: append kb/custom-msg.md") {
+			t.Errorf("commit message should contain 'akb: append kb/custom-msg.md', got %q", logMsg)
+		}
+	})
+
+	t.Run("skips commit when noCommit is true", func(t *testing.T) {
+		pNoCommit := NewGitProvider(tmpDir, true)
+		path := filepath.Join(tmpDir, "kb", "no-commit-msg.md")
+
+		gitLog := exec.Command("git", "log", "--oneline")
+		gitLog.Dir = tmpDir
+		out, _ := gitLog.CombinedOutput()
+		commitCountBefore := len(strings.Split(strings.TrimSpace(string(out)), "\n"))
+
+		err := pNoCommit.WriteWithCommitMsg(ctx, path, []byte("no commit custom"), "akb: append kb/no-commit-msg.md")
+		if err != nil {
+			t.Fatalf("WriteWithCommitMsg with noCommit failed: %v", err)
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("ReadFile failed: %v", err)
+		}
+		if string(data) != "no commit custom" {
+			t.Errorf("content = %q, want %q", string(data), "no commit custom")
+		}
+
+		gitLog = exec.Command("git", "log", "--oneline")
+		gitLog.Dir = tmpDir
+		out, _ = gitLog.CombinedOutput()
+		commitCountAfter := len(strings.Split(strings.TrimSpace(string(out)), "\n"))
+		if commitCountAfter != commitCountBefore {
+			t.Errorf("commit count changed: before=%d, after=%d", commitCountBefore, commitCountAfter)
+		}
+	})
+}
+
 func TestGitProvider_Exists(t *testing.T) {
 	tmpDir := initGitRepo(t)
 	defer os.RemoveAll(tmpDir)
