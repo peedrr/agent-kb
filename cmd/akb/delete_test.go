@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,10 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/peedrr/agent-kb/internal/index"
-	"github.com/peedrr/agent-kb/internal/log"
-	"github.com/peedrr/agent-kb/internal/path"
-	"github.com/peedrr/agent-kb/internal/storage"
+	"github.com/spf13/cobra"
 )
 
 func TestDelete(t *testing.T) {
@@ -37,7 +33,9 @@ func TestDelete(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(testPage), 0755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(testPage, []byte("# Test Page\n"), 0644); err != nil {
+		// Write with proper frontmatter for production code path
+		content := "---\ntype: note\ntitle: Test Page\n---\nContent here.\n"
+		if err := os.WriteFile(testPage, []byte(content), 0644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -45,7 +43,12 @@ func TestDelete(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err := runDelete("notes/test-page.md", false)
+		// Save and reset noCommit after test
+		origNoCommit := noCommit
+		noCommit = false
+		t.Cleanup(func() { noCommit = origNoCommit })
+
+		err := runDeleteCmd(&cobra.Command{}, []string{"notes/test-page.md"})
 		if err != nil {
 			t.Fatalf("delete failed: %v", err)
 		}
@@ -57,7 +60,12 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("error on non-existent page", func(t *testing.T) {
-		err := runDelete("notes/non-existent.md", false)
+		// Save and reset noCommit after test
+		origNoCommit := noCommit
+		noCommit = false
+		t.Cleanup(func() { noCommit = origNoCommit })
+
+		err := runDeleteCmd(&cobra.Command{}, []string{"notes/non-existent.md"})
 		if err == nil {
 			t.Error("expected error for non-existent page, got nil")
 		}
@@ -68,13 +76,18 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("error on raw/ prefix path", func(t *testing.T) {
-		err := runDelete("raw/some-file.txt", false)
+		// Save and reset noCommit after test
+		origNoCommit := noCommit
+		noCommit = false
+		t.Cleanup(func() { noCommit = origNoCommit })
+
+		err := runDeleteCmd(&cobra.Command{}, []string{"raw/some-file.txt"})
 		if err == nil {
 			t.Error("expected error for raw/ prefix, got nil")
 		}
-		// Should get ErrUseAKBRawWrite
-		if err != path.ErrUseAKBRawWrite {
-			t.Errorf("expected ErrUseAKBRawWrite, got: %v", err)
+		// Production code returns "use `akb raw delete`"
+		if err != nil && !strings.Contains(err.Error(), "akb raw delete") {
+			t.Errorf("expected 'akb raw delete' in error, got: %v", err)
 		}
 	})
 
@@ -83,7 +96,9 @@ func TestDelete(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(testPage), 0755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(testPage, []byte("# No Commit Test\n"), 0644); err != nil {
+		// Write with proper frontmatter for production code path
+		content := "---\ntype: note\ntitle: No Commit Test\n---\nContent here.\n"
+		if err := os.WriteFile(testPage, []byte(content), 0644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -91,7 +106,12 @@ func TestDelete(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err := runDelete("notes/no-commit-test.md", true)
+		// Save and reset noCommit after test
+		origNoCommit := noCommit
+		noCommit = true
+		t.Cleanup(func() { noCommit = origNoCommit })
+
+		err := runDeleteCmd(&cobra.Command{}, []string{"notes/no-commit-test.md"})
 		if err != nil {
 			t.Fatalf("delete failed: %v", err)
 		}
@@ -106,7 +126,9 @@ func TestDelete(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(testPage), 0755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(testPage, []byte("# Prefix Test\n"), 0644); err != nil {
+		// Write with proper frontmatter for production code path
+		content := "---\ntype: note\ntitle: Prefix Test\n---\nContent here.\n"
+		if err := os.WriteFile(testPage, []byte(content), 0644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -116,7 +138,12 @@ func TestDelete(t *testing.T) {
 
 		commitInitial(kbRoot)
 
-		err := runDelete("kb/notes/prefix-test.md", false)
+		// Save and reset noCommit after test
+		origNoCommit := noCommit
+		noCommit = false
+		t.Cleanup(func() { noCommit = origNoCommit })
+
+		err := runDeleteCmd(&cobra.Command{}, []string{"kb/notes/prefix-test.md"})
 		if err != nil {
 			t.Fatalf("delete failed: %v", err)
 		}
@@ -132,7 +159,12 @@ func TestDelete(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err := runDelete("kb/index.md", false)
+		// Save and reset noCommit after test
+		origNoCommit := noCommit
+		noCommit = false
+		t.Cleanup(func() { noCommit = origNoCommit })
+
+		err := runDeleteCmd(&cobra.Command{}, []string{"kb/index.md"})
 		if err == nil {
 			t.Error("expected error for index.md delete, got nil")
 		}
@@ -147,7 +179,12 @@ func TestDelete(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err := runDelete("kb/log.md", false)
+		// Save and reset noCommit after test
+		origNoCommit := noCommit
+		noCommit = false
+		t.Cleanup(func() { noCommit = origNoCommit })
+
+		err := runDeleteCmd(&cobra.Command{}, []string{"kb/log.md"})
 		if err == nil {
 			t.Error("expected error for log.md delete, got nil")
 		}
@@ -161,7 +198,9 @@ func TestDelete(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(testPage), 0755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(testPage, []byte("# Not In Index\n"), 0644); err != nil {
+		// Write with proper frontmatter for production code path
+		content := "---\ntype: note\ntitle: Not In Index\n---\nContent here.\n"
+		if err := os.WriteFile(testPage, []byte(content), 0644); err != nil {
 			t.Fatal(err)
 		}
 
@@ -169,7 +208,12 @@ func TestDelete(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err := runDelete("notes/not-in-index.md", false)
+		// Save and reset noCommit after test
+		origNoCommit := noCommit
+		noCommit = false
+		t.Cleanup(func() { noCommit = origNoCommit })
+
+		err := runDeleteCmd(&cobra.Command{}, []string{"notes/not-in-index.md"})
 		if err != nil {
 			t.Fatalf("delete failed: %v", err)
 		}
@@ -230,9 +274,9 @@ func initGitRepo(kbRoot string) error {
 		return err
 	}
 
-	if err := setGitConfig("config", "user.name", "akb-test"); err != nil {
+	if err := setGitConfig("user.name", "akb-test"); err != nil {
 	}
-	if err := setGitConfig("config", "user.email", "akb-test@local"); err != nil {
+	if err := setGitConfig("user.email", "akb-test@local"); err != nil {
 	}
 
 	return nil
@@ -251,67 +295,4 @@ func commitInitial(kbRoot string) {
 	cmd := exec.Command("git", "commit", "-m", "initial")
 	cmd.Dir = kbRoot
 	cmd.CombinedOutput()
-}
-
-func execGitAddTest(kbRoot, relPath string) {
-	cmd := exec.Command("git", "add", relPath)
-	cmd.Dir = kbRoot
-	cmd.Output()
-}
-
-func runDelete(inputPath string, noCommit bool) error {
-	kbRoot, err := path.KBRoot()
-	if err != nil {
-		return err
-	}
-
-	if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
-		return path.ErrUseAKBRawWrite
-	}
-
-	cleanPath := strings.TrimPrefix(inputPath, "kb/")
-
-	if cleanPath == "index.md" {
-		return fmt.Errorf("cannot delete index.md; use 'akb index rebuild' to reset")
-	}
-	if cleanPath == "log.md" {
-		return fmt.Errorf("cannot delete log.md; it is a managed file")
-	}
-
-	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
-
-	exists, err := fileExists(fullPath)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return &DeleteError{Message: "page not found: " + inputPath}
-	}
-
-	store := storage.NewGitProvider(kbRoot, noCommit)
-	ctx := context.Background()
-	if err := store.Delete(ctx, fullPath); err != nil {
-		return err
-	}
-
-	relPath := filepath.Join("kb", cleanPath)
-	relPath = filepath.ToSlash(relPath)
-
-	_ = index.RemoveEntry(kbRoot, relPath)
-	_ = log.AppendLog(kbRoot, "delete", "Removed page "+cleanPath, "")
-	execGitAddTest(kbRoot, "kb/index.md")
-	execGitAddTest(kbRoot, "kb/log.md")
-
-	fmt.Printf("Deleted %s\n", relPath)
-
-	return nil
-}
-
-// DeleteError is a custom error for delete operations
-type DeleteError struct {
-	Message string
-}
-
-func (e *DeleteError) Error() string {
-	return e.Message
 }
