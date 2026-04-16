@@ -23,6 +23,7 @@ func init() {
 	RootCmd.AddCommand(writeCmd)
 	RootCmd.AddCommand(readCmd)
 	RootCmd.AddCommand(deleteCmd)
+	RootCmd.AddCommand(appendCmd)
 }
 
 func Execute() error {
