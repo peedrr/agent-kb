@@ -1,0 +1,63 @@
+name: adr
+dir: decisions
+required:
+  - title
+  - type
+  - summary
+  - tags
+  - status:
+      enum:
+        - proposed
+        - accepted
+        - deprecated
+        - superseded
+  - deciders
+  - created
+  - updated
+optional:
+  - sources
+  - context
+  - decision
+  - consequences
+body: |
+  # {{.Title}}
+
+  ## Status
+
+  {{.Status}}
+
+  ## Type
+
+  {{.Type}}
+
+  ## Summary
+
+  {{.Summary}}
+
+  ## Tags
+
+  {{.Tags}}
+
+  ## Deciders
+
+  {{.Deciders}}
+
+  ## Created
+
+  {{.Created}}
+
+  ## Updated
+
+  {{.Updated}}
+
+  ## Context
+
+  {{.Context}}
+
+  ## Decision
+
+  {{.Decision}}
+
+  ## Consequences
+
+  {{.Consequences}}

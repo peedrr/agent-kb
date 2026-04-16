@@ -1,0 +1,13 @@
+name: note
+dir: notes
+required:
+  - title
+  - type
+  - summary
+  - tags
+optional:
+  - created
+  - updated
+  - sources
+body: |
+  # {{.Title}}

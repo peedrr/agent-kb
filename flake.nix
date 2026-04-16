@@ -55,6 +55,8 @@
 
               self.formatter.${system}
               self.nixLsp.${system}
+
+              tmux
             ];
           };
         }

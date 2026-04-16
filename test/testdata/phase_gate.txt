@@ -1,0 +1,38 @@
+# Phase Gate Verification - P0
+exec akb --version
+stdout 'akb (v0\.1\.0|dev)'
+
+exec akb init test-kb
+stdout 'Initialized KB "test-kb"'
+
+cd test-kb
+
+exists kb
+exists raw
+exists .akb
+exists .akb/templates
+
+exists kb/index.md
+exists kb/log.md
+exists raw/files.log
+
+exists .akb/.akb.yaml
+
+exists .akb/templates/note.yaml
+exists .akb/templates/adr.yaml
+
+exists .akb/search.db
+
+exists .akb/.gitignore
+exists .gitignore
+
+grep 'search\.db' .akb/.gitignore
+grep '\.akb\.bak' .gitignore
+
+exec git log --oneline
+stdout 'akb: init test-kb'
+
+exec akb status
+stdout 'Name: test-kb'
+stdout 'Pages: 2'
+stdout 'Git: clean'

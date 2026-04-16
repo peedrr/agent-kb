@@ -1,0 +1,17 @@
+# Validation Tests - P0
+
+! exec akb init foo/bar
+stderr 'must not contain'
+
+! exec akb init -- -test
+stderr 'must not start'
+
+exec akb init mykb
+! exec akb init mykb
+stderr 'already initialized'
+
+! exec akb status
+stderr 'not in a knowledge base'
+
+exec akb --version
+stdout 'akb'
