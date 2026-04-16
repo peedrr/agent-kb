@@ -1,4 +1,4 @@
-# P1 No Commit — verify --no-commit flag skips git commits
+# No Commit Flag — verify --no-commit flag skips git commits
 
 -- note-input.md --
 ---

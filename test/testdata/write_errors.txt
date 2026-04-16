@@ -1,4 +1,4 @@
-# P1 Write Error Cases — type validation errors
+# Write Error Cases — type validation errors
 
 -- unknown-type.md --
 ---

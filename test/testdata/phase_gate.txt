@@ -1,4 +1,4 @@
-# Phase Gate Verification - P0
+# Phase Gate Verification — Init Status
 exec akb --version
 stdout 'akb (v0\.1\.0|dev)'
 

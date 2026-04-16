@@ -1,11 +1,11 @@
-# P1 Phase Gate — verify complete P1 phase contract
+# Core I/O Phase Gate — verify complete write/read/append/delete contract
 
 # Input files for note operations
 -- note-input.md --
 ---
 type: note
 title: Phase Gate Note
-summary: Testing P1 phase gate
+summary: Testing core I/O phase gate
 tags: test
 ---
 Note content for phase gate verification.
@@ -22,7 +22,7 @@ type: adr
 title: Phase Gate ADR
 status: proposed
 deciders: team
-summary: Testing P1 phase gate
+summary: Testing core I/O phase gate
 tags: test
 created: '2026-01-01'
 updated: '2026-01-01'
@@ -55,13 +55,13 @@ Content
 
 # === PHASE GATE SETUP ===
 
-# Initialize KB (P0 deliverable)
+# Initialize KB
 exec akb init test-kb
 stdout 'Initialized KB "test-kb"'
 
 cd test-kb
 
-# Verify P0 structure exists
+# Verify KB structure exists
 exists kb
 exists raw
 exists .akb

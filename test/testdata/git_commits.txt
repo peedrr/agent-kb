@@ -1,4 +1,4 @@
-# P1 Git Commits — verify git commit messages for each operation
+# Git Commits — verify git commit messages for each operation
 
 -- note-input.md --
 ---

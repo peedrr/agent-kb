@@ -1,4 +1,4 @@
-# P1 Round Trip — write → read → append → read → delete cycle
+# Round Trip — write → read → append → read → delete cycle
 
 -- note-input.md --
 ---

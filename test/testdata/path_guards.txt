@@ -1,4 +1,4 @@
-# P1 Path Guard Rails — error cases for invalid paths
+# Path Guard Rails — error cases for invalid paths
 
 -- raw-prefix-input.md --
 ---
