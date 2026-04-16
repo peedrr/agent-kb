@@ -1,0 +1,191 @@
+# P1 Phase Gate — verify complete P1 phase contract
+
+# Input files for note operations
+-- note-input.md --
+---
+type: note
+title: Phase Gate Note
+summary: Testing P1 phase gate
+tags: test
+---
+Note content for phase gate verification.
+-- note-input.md --
+
+-- append-input.md --
+Appended content line.
+-- append-input.md --
+
+# Input files for ADR operations
+-- adr-input.md --
+---
+type: adr
+title: Phase Gate ADR
+status: proposed
+deciders: team
+summary: Testing P1 phase gate
+tags: test
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+ADR content for phase gate verification.
+-- adr-input.md --
+
+# Input files for error cases
+-- unknown-type-input.md --
+---
+type: nonexistent
+title: Unknown Type Test
+---
+Content
+-- unknown-type-input.md --
+
+-- no-type-input.md --
+---
+title: No Type Test
+---
+Content
+-- no-type-input.md --
+
+-- no-title-input.md --
+---
+type: note
+---
+Content
+-- no-title-input.md --
+
+# === PHASE GATE SETUP ===
+
+# Initialize KB (P0 deliverable)
+exec akb init test-kb
+stdout 'Initialized KB "test-kb"'
+
+cd test-kb
+
+# Verify P0 structure exists
+exists kb
+exists raw
+exists .akb
+exists .akb/templates
+
+# === WRITE OPERATIONS ===
+
+# Write a note to kb/notes/
+exec akb write gate-note.md <../note-input.md
+stdout 'Written to kb/notes/gate-note.md'
+
+# Verify note file exists in correct location
+exists kb/notes/gate-note.md
+
+# Write an ADR to kb/decisions/
+exec akb write gate-adr.md <../adr-input.md
+stdout 'Written to kb/decisions/gate-adr.md'
+
+# Verify ADR file exists in correct location
+exists kb/decisions/gate-adr.md
+
+# === READ OPERATIONS ===
+
+# Read the note back
+exec akb read gate-note.md
+stdout 'Phase Gate Note'
+stdout 'type: note'
+stdout 'Note content for phase gate verification.'
+
+# Read the ADR back
+exec akb read gate-adr.md
+stdout 'Phase Gate ADR'
+stdout 'type: adr'
+stdout 'ADR content for phase gate verification.'
+
+# === APPEND OPERATIONS ===
+
+# Append to note
+exec akb append notes/gate-note.md <../append-input.md
+stdout 'Appended to kb/notes/gate-note.md'
+
+# Verify frontmatter preserved and content extended
+exec akb read gate-note.md
+stdout 'type: note'
+stdout 'Phase Gate Note'
+stdout 'Note content for phase gate verification.'
+stdout 'Appended content line.'
+
+# === DELETE OPERATIONS ===
+
+# Delete the note
+exec akb delete notes/gate-note.md
+stdout 'Deleted kb/notes/gate-note.md'
+
+# Verify file removed
+! exists kb/notes/gate-note.md
+
+# Delete the ADR
+exec akb delete decisions/gate-adr.md
+stdout 'Deleted kb/decisions/gate-adr.md'
+
+# Verify file removed
+! exists kb/decisions/gate-adr.md
+
+# === ERROR CASES ===
+
+# Unknown type error includes template suggestion
+! exec akb write bad-type.md <../unknown-type-input.md
+stderr 'unknown type'
+stderr 'Create .akb/templates'
+
+# Missing type error
+! exec akb write no-type.md <../no-type-input.md
+stderr 'missing required field'
+
+# Missing title error
+! exec akb write no-title.md <../no-title-input.md
+stderr 'missing required field'
+
+# raw/ prefix error on write
+! exec akb write raw/notes/test.md <../note-input.md
+stderr 'akb raw write'
+
+# raw/ prefix error on read
+! exec akb read raw/notes/test.md
+stderr 'akb raw read'
+
+# raw/ prefix error on delete
+! exec akb delete raw/notes/test.md
+stderr 'akb raw delete'
+
+# raw/ prefix error on append
+! exec akb append raw/notes/test.md <../note-input.md
+stderr 'akb raw write'
+
+# === --no-commit FLAG ===
+
+# Re-create note for no-commit test
+exec akb --no-commit write nocommit-note.md <../note-input.md
+stdout 'Written to kb/notes/nocommit-note.md'
+
+# Verify file exists
+exists kb/notes/nocommit-note.md
+
+# Verify NO git commit was created
+exec git status --short
+stdout ''
+
+# === GIT COMMIT MESSAGE FORMAT ===
+
+# Write creates commit with proper format
+exec akb write final-note.md <../note-input.md
+
+exec git log --oneline -1
+stdout 'akb: write kb/notes/final-note.md'
+
+# Append creates commit with proper format
+exec akb append notes/final-note.md <../append-input.md
+
+exec git log --oneline -1
+stdout 'akb: append kb/notes/final-note.md'
+
+# Delete creates commit with proper format
+exec akb delete notes/final-note.md
+
+exec git log --oneline -1
+stdout 'akb: delete kb/notes/final-note.md'
