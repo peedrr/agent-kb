@@ -200,10 +200,13 @@ required:
 		}
 	})
 
-	t.Run("returns error for nonexistent directory", func(t *testing.T) {
-		_, err := LoadTemplates("/nonexistent/path/templates")
-		if err == nil {
-			t.Fatal("expected error for nonexistent directory")
+	t.Run("returns empty map for nonexistent directory", func(t *testing.T) {
+		result, err := LoadTemplates("/nonexistent/path/templates")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(result) != 0 {
+			t.Errorf("expected empty map, got: %v", result)
 		}
 	})
 }

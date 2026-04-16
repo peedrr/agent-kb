@@ -72,6 +72,9 @@ func init() {
 func LoadTemplates(dir string) (map[string]Template, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]Template{}, nil
+		}
 		return nil, fmt.Errorf("read template directory: %w", err)
 	}
 
