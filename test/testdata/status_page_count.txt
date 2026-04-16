@@ -1,0 +1,77 @@
+# Status Page Count Tests — verify page count excludes managed files
+
+-- note-input.md --
+---
+type: note
+title: Status Note
+summary: Note for status testing
+tags: test
+---
+Note content for status test.
+-- note-input.md --
+
+-- adr-input.md --
+---
+type: adr
+title: Status Decision
+status: proposed
+deciders: team
+summary: Decision for status testing
+tags: test
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+ADR content for status test.
+-- adr-input.md --
+
+# --- Fresh KB shows zero pages ---
+
+exec akb init test-kb
+cd test-kb
+
+exec akb status
+stdout 'Pages: 0'
+
+# --- Write one note, page count is 1 ---
+
+exec akb write status-note.md <../note-input.md
+stdout 'Written to kb/notes/status-note.md'
+
+exec akb status
+stdout 'Pages: 1'
+
+# --- Write one ADR, page count is 2 ---
+
+exec akb write status-decision.md <../adr-input.md
+stdout 'Written to kb/decisions/status-decision.md'
+
+exec akb status
+stdout 'Pages: 2'
+
+# --- Delete note, page count drops to 1 ---
+
+exec akb delete notes/status-note.md
+stdout 'Deleted kb/notes/status-note.md'
+
+exec akb status
+stdout 'Pages: 1'
+
+# --- Delete remaining ADR, page count drops to 0 ---
+
+exec akb delete decisions/status-decision.md
+stdout 'Deleted kb/decisions/status-decision.md'
+
+exec akb status
+stdout 'Pages: 0'
+
+# --- Index and log files are not counted as pages ---
+
+exec akb write final-note.md <../note-input.md
+stdout 'Written to kb/notes/final-note.md'
+
+exec akb status
+stdout 'Pages: 1'
+
+# index.md and log.md exist but are not counted
+exists kb/index.md
+exists kb/log.md

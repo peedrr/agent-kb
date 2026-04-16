@@ -1,0 +1,88 @@
+# Enhanced Delete Tests — verify delete with index and log integration
+
+-- note-input.md --
+---
+type: note
+title: Delete Test Note
+summary: Note for delete testing
+tags: test
+---
+Note content for delete test.
+-- note-input.md --
+
+-- note2-input.md --
+---
+type: note
+title: Unindexed Note
+summary: Note not in index
+tags: test
+---
+Unindexed note content.
+-- note2-input.md --
+
+# --- Setup: initialize KB and write a note ---
+
+exec akb init test-kb
+cd test-kb
+
+exec akb write delete-note.md <../note-input.md
+stdout 'Written to kb/notes/delete-note.md'
+
+# --- Add note to index ---
+
+exec akb index add kb/notes/delete-note.md "Delete test summary"
+stdout 'Added kb/notes/delete-note.md to index'
+
+# Verify entry is in index
+exec akb index show
+stdout 'delete-note.md'
+
+# --- Delete the note ---
+
+exec akb delete notes/delete-note.md
+stdout 'Deleted kb/notes/delete-note.md'
+
+# --- Verify file is removed ---
+
+! exists kb/notes/delete-note.md
+
+# --- Verify index entry is removed ---
+
+exec akb index show
+! stdout 'delete-note.md'
+
+# --- Verify log contains deletion entry ---
+
+exec akb log show --type delete
+stdout 'delete'
+stdout 'delete-note.md'
+
+# --- Delete a page not in index succeeds without error ---
+
+exec akb write unindexed-note.md <../note2-input.md
+stdout 'Written to kb/notes/unindexed-note.md'
+
+exec akb delete notes/unindexed-note.md
+stdout 'Deleted kb/notes/unindexed-note.md'
+
+! exists kb/notes/unindexed-note.md
+
+# --- Cannot delete index.md ---
+
+! exec akb delete kb/index.md
+stderr 'cannot delete index.md'
+
+# --- Cannot delete log.md ---
+
+! exec akb delete kb/log.md
+stderr 'cannot delete log.md'
+
+# --- Cannot delete index.md with just filename ---
+
+! exec akb delete index.md
+stderr 'cannot delete index.md'
+
+# --- Cannot delete log.md with just filename ---
+
+! exec akb delete log.md
+stderr 'cannot delete log.md'

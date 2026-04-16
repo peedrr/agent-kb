@@ -1,0 +1,104 @@
+# Index Rebuild Tests — verify index regeneration from filesystem
+
+-- note-input.md --
+---
+type: note
+title: Rebuild Note
+summary: Note for rebuild test
+tags: test
+---
+Note content for rebuild.
+-- note-input.md --
+
+-- note2-input.md --
+---
+type: note
+title: Another Note
+summary: Second note for rebuild
+tags: test
+---
+Second note content.
+-- note2-input.md --
+
+-- adr-input.md --
+---
+type: adr
+title: Rebuild Decision
+status: proposed
+deciders: team
+summary: Decision for rebuild test
+tags: test
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+ADR content for rebuild.
+-- adr-input.md --
+
+# --- Setup: initialize KB and write pages ---
+
+exec akb init test-kb
+cd test-kb
+
+exec akb write rebuild-note.md <../note-input.md
+stdout 'Written to kb/notes/rebuild-note.md'
+
+exec akb write another-note.md <../note2-input.md
+stdout 'Written to kb/notes/another-note.md'
+
+exec akb write rebuild-decision.md <../adr-input.md
+stdout 'Written to kb/decisions/rebuild-decision.md'
+
+# --- Rebuild index from filesystem ---
+
+exec akb index rebuild
+stdout 'Index rebuilt'
+
+# --- Show index contains entries for all pages ---
+
+exec akb index show
+stdout '## Notes'
+stdout '## Decisions'
+stdout 'Rebuild Note'
+stdout 'Another Note'
+stdout 'Rebuild Decision'
+
+# --- Entries are under correct type headings ---
+
+exec akb index show
+stdout 'rebuild-note.md'
+stdout 'another-note.md'
+stdout 'rebuild-decision.md'
+
+# --- Rebuild after manual index add preserves all entries ---
+
+exec akb index add kb/notes/rebuild-note.md "Manual summary"
+stdout 'Added kb/notes/rebuild-note.md to index'
+
+# Rebuild regenerates from filesystem, replacing manual entry
+exec akb index rebuild
+stdout 'Index rebuilt'
+
+exec akb index show
+stdout 'Rebuild Note'
+stdout 'Another Note'
+stdout 'Rebuild Decision'
+
+# --- Rebuild on empty KB produces minimal index ---
+
+exec akb delete notes/rebuild-note.md
+stdout 'Deleted kb/notes/rebuild-note.md'
+
+exec akb delete notes/another-note.md
+stdout 'Deleted kb/notes/another-note.md'
+
+exec akb delete decisions/rebuild-decision.md
+stdout 'Deleted kb/decisions/rebuild-decision.md'
+
+exec akb index rebuild
+stdout 'Index rebuilt'
+
+exec akb index show
+stdout '# Index'
+! stdout 'rebuild-note'
+! stdout 'another-note'
+! stdout 'rebuild-decision'

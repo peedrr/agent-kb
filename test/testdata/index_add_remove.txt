@@ -1,0 +1,115 @@
+# Index Add and Remove Tests — verify index entry management
+
+-- note-input.md --
+---
+type: note
+title: Test Note
+summary: A test note for index
+tags: test
+---
+Test note content.
+-- note-input.md --
+
+-- note2-input.md --
+---
+type: note
+title: Second Note
+summary: Another test note
+tags: test
+---
+Second note content.
+-- note2-input.md --
+
+-- adr-input.md --
+---
+type: adr
+title: Test Decision
+status: proposed
+deciders: team
+summary: A test decision
+tags: test
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+ADR content.
+-- adr-input.md --
+
+# --- Setup: initialize KB and write a note ---
+
+exec akb init test-kb
+cd test-kb
+
+exec akb write test-note.md <../note-input.md
+stdout 'Written to kb/notes/test-note.md'
+
+# --- Add entry to index ---
+
+exec akb index add kb/notes/test-note.md "Test summary"
+stdout 'Added kb/notes/test-note.md to index'
+
+# --- Show index contains the entry ---
+
+exec akb index show
+stdout '## Notes'
+stdout 'Test Note'
+stdout 'test-note.md'
+
+# --- Add same path again updates, no duplicate ---
+
+exec akb index add kb/notes/test-note.md "Updated summary"
+stdout 'Added kb/notes/test-note.md to index'
+
+exec akb index show
+stdout 'Updated summary'
+! stdout 'Test summary'
+
+# Count: only one entry line for test-note
+exec akb index show
+stdout 'test-note.md'
+
+# --- Remove entry from index ---
+
+exec akb index remove kb/notes/test-note.md
+stdout 'Removed kb/notes/test-note.md from index'
+
+exec akb index show
+! stdout 'test-note.md'
+
+# --- Remove nonexistent path succeeds silently ---
+
+exec akb index remove kb/notes/nonexistent.md
+stdout 'Removed kb/notes/nonexistent.md from index'
+
+# --- Cannot add index.md to index ---
+
+! exec akb index add kb/index.md "Bad entry"
+stderr 'cannot add index.md'
+
+# --- Cannot add log.md to index ---
+
+! exec akb index add kb/log.md "Bad entry"
+stderr 'cannot add log.md'
+
+# --- Add ADR entry appears under Decisions heading ---
+
+exec akb write test-decision.md <../adr-input.md
+stdout 'Written to kb/decisions/test-decision.md'
+
+exec akb index add kb/decisions/test-decision.md "Decision summary"
+stdout 'Added kb/decisions/test-decision.md to index'
+
+exec akb index show
+stdout '## Decisions'
+stdout 'Test Decision'
+
+# --- Add note entry appears under Notes heading ---
+
+exec akb write second-note.md <../note2-input.md
+stdout 'Written to kb/notes/second-note.md'
+
+exec akb index add kb/notes/second-note.md "Second note summary"
+stdout 'Added kb/notes/second-note.md to index'
+
+exec akb index show
+stdout '## Notes'
+stdout 'Second Note'
