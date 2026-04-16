@@ -1,0 +1,78 @@
+# P1 No Commit — verify --no-commit flag skips git commits
+
+-- note-input.md --
+---
+type: note
+title: No Commit Note
+summary: Test no-commit flag
+tags: test
+---
+No-commit content.
+-- note-input.md --
+
+-- append-input.md --
+Appended without commit.
+-- append-input.md --
+
+-- commit-note-input.md --
+---
+type: note
+title: Commit Note
+summary: Test commit
+tags: test
+---
+Commit content.
+-- commit-note-input.md --
+
+# Setup: initialize a KB
+exec akb init test-kb
+cd test-kb
+
+# Record initial commit count (should be 1 from init)
+exec git log --oneline
+cp stdout initial-commits.txt
+
+# --- Write with --no-commit should NOT create a git commit ---
+exec akb --no-commit write nocommit-note.md <../note-input.md
+stdout 'Written to kb/notes/nocommit-note.md'
+
+# Verify file exists on disk (write still happened)
+exists kb/notes/nocommit-note.md
+
+# Verify no new commit was created
+exec git log --oneline
+cmp stdout initial-commits.txt
+
+# --- Delete with --no-commit should NOT create a git commit ---
+exec akb --no-commit delete notes/nocommit-note.md
+stdout 'Deleted kb/notes/nocommit-note.md'
+
+# Verify file is gone from disk (delete still happened)
+! exists kb/notes/nocommit-note.md
+
+# Verify still no new commit
+exec git log --oneline
+cmp stdout initial-commits.txt
+
+# --- Write without --no-commit DOES create a commit ---
+exec akb write commit-note.md <../commit-note-input.md
+
+# Verify a new commit was created
+exec git log --oneline -1
+stdout 'akb: write kb/notes/commit-note.md'
+
+# --- Append with --no-commit should NOT create a git commit ---
+# First, record current commit count
+exec git log --oneline
+cp stdout before-append-commits.txt
+
+exec akb --no-commit append notes/commit-note.md <../append-input.md
+stdout 'Appended to kb/notes/commit-note.md'
+
+# Verify content was appended
+exec akb read notes/commit-note.md
+stdout 'Appended without commit.'
+
+# Verify no new commit
+exec git log --oneline
+cmp stdout before-append-commits.txt

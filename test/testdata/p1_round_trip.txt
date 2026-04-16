@@ -1,0 +1,93 @@
+# P1 Round Trip — write → read → append → read → delete cycle
+
+-- note-input.md --
+---
+type: note
+title: My Note
+summary: A test note
+tags: test
+---
+First content line.
+-- note-input.md --
+
+-- append-input.md --
+Second content line.
+-- append-input.md --
+
+-- adr-input.md --
+---
+type: adr
+title: My Decision
+status: proposed
+deciders: team
+summary: A test decision
+tags: test
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+ADR content here.
+-- adr-input.md --
+
+# Setup: initialize a KB
+exec akb init test-kb
+cd test-kb
+
+# --- Write a note page ---
+exec akb write my-note.md <../note-input.md
+stdout 'Written to kb/notes/my-note.md'
+
+# --- Verify file exists on disk ---
+exists kb/notes/my-note.md
+
+# --- Read the page back ---
+exec akb read my-note.md
+stdout 'First content line.'
+stdout 'type: note'
+stdout 'title: My Note'
+
+# --- Read with kb/ prefix ---
+exec akb read kb/notes/my-note.md
+stdout 'First content line.'
+
+# --- Read with type-dir prefix ---
+exec akb read notes/my-note.md
+stdout 'First content line.'
+
+# --- Append to the page ---
+exec akb append notes/my-note.md <../append-input.md
+stdout 'Appended to kb/notes/my-note.md'
+
+# --- Read after append — both lines present ---
+exec akb read notes/my-note.md
+stdout 'First content line.'
+stdout 'Second content line.'
+
+# --- Frontmatter preserved after append ---
+exec akb read notes/my-note.md
+stdout 'type: note'
+stdout 'title: My Note'
+
+# --- Write an ADR page ---
+exec akb write my-decision.md <../adr-input.md
+stdout 'Written to kb/decisions/my-decision.md'
+
+# --- Verify ADR file exists ---
+exists kb/decisions/my-decision.md
+
+# --- Read ADR page ---
+exec akb read decisions/my-decision.md
+stdout 'ADR content here.'
+
+# --- Delete the note page ---
+exec akb delete notes/my-note.md
+stdout 'Deleted kb/notes/my-note.md'
+
+# --- Verify note file is gone ---
+! exists kb/notes/my-note.md
+
+# --- Delete the ADR page ---
+exec akb delete decisions/my-decision.md
+stdout 'Deleted kb/decisions/my-decision.md'
+
+# --- Verify ADR file is gone ---
+! exists kb/decisions/my-decision.md

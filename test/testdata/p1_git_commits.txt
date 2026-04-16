@@ -1,0 +1,66 @@
+# P1 Git Commits — verify git commit messages for each operation
+
+-- note-input.md --
+---
+type: note
+title: Commit Note
+summary: Test git commit
+tags: test
+---
+Note content.
+-- note-input.md --
+
+-- append-input.md --
+Appended line.
+-- append-input.md --
+
+-- adr-input.md --
+---
+type: adr
+title: Commit ADR
+status: proposed
+deciders: team
+summary: Test ADR commit
+tags: test
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+ADR content.
+-- adr-input.md --
+
+# Setup: initialize a KB
+exec akb init test-kb
+cd test-kb
+
+# --- Write creates a git commit ---
+exec akb write commit-note.md <../note-input.md
+
+# Verify write commit message
+exec git log --oneline -1
+stdout 'akb: write kb/notes/commit-note.md'
+
+# --- Append creates a git commit ---
+exec akb append notes/commit-note.md <../append-input.md
+
+# Verify append commit message
+exec git log --oneline -1
+stdout 'akb: append kb/notes/commit-note.md'
+
+# --- Delete creates a git commit ---
+exec akb delete notes/commit-note.md
+
+# Verify delete commit message
+exec git log --oneline -1
+stdout 'akb: delete kb/notes/commit-note.md'
+
+# --- Verify commit history has all three operations ---
+exec git log --oneline
+stdout 'akb: delete kb/notes/commit-note.md'
+stdout 'akb: append kb/notes/commit-note.md'
+stdout 'akb: write kb/notes/commit-note.md'
+
+# --- Write an ADR and verify its commit message ---
+exec akb write commit-adr.md <../adr-input.md
+
+exec git log --oneline -1
+stdout 'akb: write kb/decisions/commit-adr.md'

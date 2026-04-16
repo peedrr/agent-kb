@@ -48,10 +48,12 @@ func Test(t *testing.T) {
 					break
 				}
 			}
-			// Create a unique temp HOME directory for each test to avoid
-			// parallel test conflicts on the shared registry file
-			testHome := filepath.Join(filepath.Dir(akbBin), "home")
-			os.MkdirAll(testHome, 0755)
+			// Create a unique HOME directory per test to isolate the KB
+			// registry file and avoid parallel test conflicts
+			testHome := filepath.Join(env.WorkDir, "home")
+			if err := os.MkdirAll(testHome, 0755); err != nil {
+				return err
+			}
 			env.Vars = append(env.Vars, "HOME="+testHome)
 			return nil
 		},
