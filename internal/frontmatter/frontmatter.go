@@ -1,0 +1,72 @@
+package frontmatter
+
+import (
+	"bytes"
+	"fmt"
+
+	"github.com/adrg/frontmatter"
+	"github.com/peedrr/agent-kb/internal/template"
+)
+
+type ParsedFrontmatter struct {
+	Type   string
+	Title  string
+	Fields map[string]any
+}
+
+func Parse(content []byte) (*ParsedFrontmatter, []byte, error) {
+	var raw map[string]any
+	body, err := frontmatter.MustParse(bytes.NewReader(content), &raw)
+	if err != nil {
+		if err == frontmatter.ErrNotFound {
+			return nil, nil, fmt.Errorf("no frontmatter found in content")
+		}
+		return nil, nil, fmt.Errorf("parse frontmatter: %w", err)
+	}
+
+	if len(raw) == 0 {
+		return nil, nil, fmt.Errorf("empty frontmatter")
+	}
+
+	fm := &ParsedFrontmatter{
+		Fields: make(map[string]any),
+	}
+
+	for key, val := range raw {
+		switch key {
+		case "type":
+			s, ok := val.(string)
+			if !ok {
+				return nil, nil, fmt.Errorf("field 'type' must be a string, got %T", val)
+			}
+			fm.Type = s
+		case "title":
+			s, ok := val.(string)
+			if !ok {
+				return nil, nil, fmt.Errorf("field 'title' must be a string, got %T", val)
+			}
+			fm.Title = s
+		default:
+			fm.Fields[key] = val
+		}
+	}
+
+	return fm, body, nil
+}
+
+func ValidateType(fm *ParsedFrontmatter, templates map[string]template.Template) error {
+	if fm.Type == "" {
+		return fmt.Errorf("missing required field 'type' in frontmatter")
+	}
+	if _, ok := templates[fm.Type]; !ok {
+		return fmt.Errorf("unknown type '%s'. Create .akb/templates/%s.yaml first.", fm.Type, fm.Type)
+	}
+	return nil
+}
+
+func ValidateTitle(fm *ParsedFrontmatter) error {
+	if fm.Title == "" {
+		return fmt.Errorf("missing required field 'title' in frontmatter")
+	}
+	return nil
+}

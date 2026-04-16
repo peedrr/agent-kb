@@ -12,7 +12,12 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require golang.org/x/tools v0.42.0 // indirect
+require (
+	github.com/BurntSushi/toml v0.3.1 // indirect
+	github.com/adrg/frontmatter v0.2.0 // indirect
+	golang.org/x/tools v0.42.0 // indirect
+	gopkg.in/yaml.v2 v2.3.0 // indirect
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
