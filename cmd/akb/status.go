@@ -69,6 +69,18 @@ func countPages(kbRoot string) (int, error) {
 			return err
 		}
 		if !info.IsDir() && strings.HasSuffix(path, ".md") {
+			relPath, err := filepath.Rel(kbDir, path)
+			if err != nil {
+				return err
+			}
+			base := filepath.Base(relPath)
+			parent := filepath.Dir(relPath)
+			if base == "index.md" && parent == "." {
+				return nil
+			}
+			if base == "log.md" && parent == "." {
+				return nil
+			}
 			count++
 		}
 		return nil

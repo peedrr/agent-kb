@@ -24,6 +24,7 @@ func init() {
 	RootCmd.AddCommand(readCmd)
 	RootCmd.AddCommand(deleteCmd)
 	RootCmd.AddCommand(appendCmd)
+	RootCmd.AddCommand(listCmd)
 }
 
 func Execute() error {

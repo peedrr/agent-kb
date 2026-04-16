@@ -34,5 +34,5 @@ stdout 'akb: init test-kb'
 
 exec akb status
 stdout 'Name: test-kb'
-stdout 'Pages: 2'
+stdout 'Pages: 0'
 stdout 'Git: clean'
