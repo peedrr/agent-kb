@@ -1,2 +1,53 @@
 .direnv/
-.sisyphus/akb
+
+
+# --- Compiled Binaries & Packages ---
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+/akb
+bin/
+
+# --- Go Tooling ---
+# Test binaries and coverage reports
+*.test
+*.out
+debug
+debug.test
+
+# Delve debugger artifacts (produced during 'dlv debug')
+__debug_bin
+__debug_bin.*
+
+# Project caches
+.golangci-lint.cache
+.cache
+
+# Go Workspaces
+go.work
+go.work.sum
+
+# --- IDEs, Editors, AI ---
+.idea/
+*~
+*.swp
+*.swo
+.netrwhist
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+.sisyphus/*
+
+# --- OS guff ---
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+[Bb]humbs.db
