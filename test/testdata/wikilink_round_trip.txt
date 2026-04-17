@@ -1,0 +1,88 @@
+# Wikilink Round Trip — write → search confirms page is indexed
+
+-- note-input.md --
+---
+type: note
+title: Round Trip Note
+summary: Note for write-search round trip
+tags: roundtrip
+---
+This note contains unique content about quantum computing.
+-- note-input.md --
+
+-- note2-input.md --
+---
+type: note
+title: Second Round Trip Note
+summary: Another note for round trip
+tags: roundtrip
+---
+Content about classical computing and algorithms.
+-- note2-input.md --
+
+-- append-input.md --
+---
+Appended content about quantum entanglement.
+-- append-input.md --
+
+# --- Setup: initialize KB ---
+
+exec akb init test-kb
+cd test-kb
+
+# --- Write a page, search immediately finds it ---
+
+exec akb write round-note.md <../note-input.md
+stdout 'Written to kb/notes/round-note.md'
+
+exec akb search "quantum"
+stdout 'notes/round-note.md'
+stdout 'Round Trip Note'
+
+# --- Write another page, search finds both ---
+
+exec akb write second-note.md <../note2-input.md
+stdout 'Written to kb/notes/second-note.md'
+
+exec akb search "computing"
+stdout 'notes/round-note.md'
+stdout 'notes/second-note.md'
+
+# --- Append updates content, search finds appended content ---
+
+exec akb append notes/round-note.md <../append-input.md
+stdout 'Appended to kb/notes/round-note.md'
+
+exec akb search "entanglement"
+stdout 'notes/round-note.md'
+
+# --- Search by title still works after append ---
+
+exec akb search "Round Trip Note"
+stdout 'notes/round-note.md'
+
+# --- Search by tag works ---
+
+exec akb search "roundtrip"
+stdout 'notes/round-note.md'
+stdout 'notes/second-note.md'
+
+# --- Search with --json returns structured data ---
+
+exec akb search --json "quantum"
+stdout '"path": "notes/round-note.md"'
+stdout '"title": "Round Trip Note"'
+
+# --- Core I/O still works alongside search ---
+
+exec akb read round-note.md
+stdout 'Round Trip Note'
+stdout 'quantum computing'
+stdout 'quantum entanglement'
+
+exec akb list
+stdout 'notes/round-note.md'
+stdout 'notes/second-note.md'
+
+exec akb status
+stdout 'Pages: 2'

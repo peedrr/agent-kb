@@ -1,0 +1,135 @@
+# Link Graph Round Trip — write with wikilinks → links/backlinks/orphans round-trip
+
+-- source-input.md --
+---
+type: note
+title: Source Note
+summary: Note that links to other pages
+tags: linkgraph
+---
+This note references [[target-note]] and [[decisions/graph-decision]].
+It also has a broken link to [[missing-page]].
+-- source-input.md --
+
+-- target-input.md --
+---
+type: note
+title: Target Note
+summary: Note that is linked to
+tags: linkgraph
+---
+This is the target note. It links back to [[source-note]].
+-- target-input.md --
+
+-- adr-input.md --
+---
+type: adr
+title: Graph Decision
+status: proposed
+deciders: team
+summary: Decision for link graph testing
+tags: linkgraph
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+We decided based on [[source-note]] and [[target-note]].
+-- adr-input.md --
+
+-- orphan-input.md --
+---
+type: note
+title: Orphan Note
+summary: Note with no inbound links
+tags: linkgraph
+---
+This note stands alone with no links to or from other pages.
+-- orphan-input.md --
+
+# --- Setup: initialize KB and write pages ---
+
+exec akb init test-kb
+cd test-kb
+
+exec akb write source-note.md <../source-input.md
+stdout 'Written to kb/notes/source-note.md'
+
+exec akb write target-note.md <../target-input.md
+stdout 'Written to kb/notes/target-note.md'
+
+exec akb write graph-decision.md <../adr-input.md
+stdout 'Written to kb/decisions/graph-decision.md'
+
+exec akb write orphan-note.md <../orphan-input.md
+stdout 'Written to kb/notes/orphan-note.md'
+
+# --- links show: outbound links from source ---
+
+exec akb links show notes/source-note.md
+stdout 'Outbound:'
+stdout 'target-note'
+stdout 'graph-decision'
+stdout 'Broken:'
+stdout 'missing-page'
+
+# --- backlinks: pages linking to target ---
+
+exec akb links backlinks notes/target-note.md
+stdout 'notes/source-note.md'
+stdout 'decisions/graph-decision.md'
+
+# --- backlinks: pages linking to source ---
+
+exec akb links backlinks notes/source-note.md
+stdout 'notes/target-note.md'
+stdout 'decisions/graph-decision.md'
+
+# --- orphans: pages with zero inbound links ---
+
+exec akb links orphans
+stdout 'notes/orphan-note.md'
+
+# --- Delete source note, verify link graph updates ---
+
+exec akb delete notes/source-note.md
+stdout 'Deleted kb/notes/source-note.md'
+
+# Source note no longer appears in backlinks of target
+exec akb links backlinks notes/target-note.md
+! stdout 'notes/source-note.md'
+stdout 'decisions/graph-decision.md'
+
+# Orphan list updates (target now has fewer inbound links)
+exec akb links orphans
+stdout 'notes/orphan-note.md'
+
+# --- Delete target note, verify link graph updates ---
+
+exec akb delete notes/target-note.md
+stdout 'Deleted kb/notes/target-note.md'
+
+# Decision's outbound links no longer resolve target
+exec akb links show decisions/graph-decision.md
+stdout 'Outbound:'
+stdout 'Broken:'
+
+# --- Delete decision, verify orphans update ---
+
+exec akb delete decisions/graph-decision.md
+stdout 'Deleted kb/decisions/graph-decision.md'
+
+# Only orphan note remains
+exec akb links orphans
+stdout 'notes/orphan-note.md'
+
+# --- Delete orphan note, empty link graph ---
+
+exec akb delete notes/orphan-note.md
+stdout 'Deleted kb/notes/orphan-note.md'
+
+exec akb links orphans
+! stdout .
+
+# --- Core I/O still works after link graph operations ---
+
+exec akb status
+stdout 'Pages: 0'

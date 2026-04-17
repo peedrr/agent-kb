@@ -1,0 +1,128 @@
+# Search Command Tests — FTS5 search with BM25 ranking
+
+-- note-input.md --
+---
+type: note
+title: Search Test Note
+summary: A note for search testing
+tags: searchtest
+---
+This note is about distributed systems and consensus algorithms.
+-- note-input.md --
+
+-- note2-input.md --
+---
+type: note
+title: Another Search Note
+summary: Second note for search
+tags: searchtest
+---
+Content about machine learning and neural networks.
+-- note2-input.md --
+
+-- adr-input.md --
+---
+type: adr
+title: Search Decision
+status: proposed
+deciders: team
+summary: Decision for search testing
+tags: searchtest
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+We decided to use distributed systems for our architecture.
+-- adr-input.md --
+
+# --- Setup: initialize KB and write pages ---
+
+exec akb init test-kb
+cd test-kb
+
+exec akb write search-note.md <../note-input.md
+stdout 'Written to kb/notes/search-note.md'
+
+exec akb write another-note.md <../note2-input.md
+stdout 'Written to kb/notes/another-note.md'
+
+exec akb write search-decision.md <../adr-input.md
+stdout 'Written to kb/decisions/search-decision.md'
+
+# --- Search finds page by content ---
+
+exec akb search "distributed"
+stdout 'notes/search-note.md'
+
+# --- Search finds page by title ---
+
+exec akb search "Search Test Note"
+stdout 'notes/search-note.md'
+
+# --- Search finds page by tags ---
+
+exec akb search "searchtest"
+stdout 'notes/search-note.md'
+stdout 'notes/another-note.md'
+
+# --- Search with multi-word query ---
+
+exec akb search "distributed systems"
+stdout 'notes/search-note.md'
+
+# --- Search returns results in BM25 rank order ---
+
+exec akb search "distributed"
+stdout 'Search Test Note'
+
+# --- Search with no matches produces no output ---
+
+exec akb search "xyznonexistent"
+! stdout .
+
+# --- Search with --json flag produces JSON output ---
+
+exec akb search --json "distributed"
+stdout '"path"'
+stdout '"title"'
+stdout '"rank"'
+
+# --- Search with empty query returns error ---
+
+! exec akb search ""
+stderr 'search query must not be empty'
+
+# --- Search with special characters (stripped by FTS5 escaping) ---
+
+exec akb search "distributed*"
+stdout 'notes/search-note.md'
+
+# --- Search with FTS5 operators (OR, AND, NOT stripped) ---
+
+exec akb search "distributed OR systems"
+stdout 'notes/search-note.md'
+
+# --- Search finds ADR content ---
+
+exec akb search "architecture"
+stdout 'decisions/search-decision.md'
+
+# --- Search snippet contains match context ---
+
+exec akb search "distributed"
+stdout 'distributed'
+
+# --- Missing search.db produces rebuild hint ---
+
+# Remove search.db to simulate missing database
+exec rm .akb/search.db
+
+! exec akb search "distributed"
+stderr 'akb index rebuild'
+
+# --- Rebuild restores search functionality ---
+
+exec akb index rebuild
+stdout 'Index rebuilt'
+
+exec akb search "distributed"
+stdout 'notes/search-note.md'

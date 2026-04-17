@@ -1,0 +1,145 @@
+# Link Graph Tests — links show, backlinks, orphans commands
+
+-- note-input.md --
+---
+type: note
+title: Links Test Note
+summary: A note for link testing
+tags: linktest
+---
+This note links to [[another-note]] and references [[decisions/search-decision]].
+-- note-input.md --
+
+-- note2-input.md --
+---
+type: note
+title: Another Links Note
+summary: Second note for link testing
+tags: linktest
+---
+This note links back to [[links-test-note]].
+-- note2-input.md --
+
+-- adr-input.md --
+---
+type: adr
+title: Links Decision
+status: proposed
+deciders: team
+summary: Decision for link testing
+tags: linktest
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+We decided based on [[links-test-note]].
+-- adr-input.md --
+
+-- broken-input.md --
+---
+type: note
+title: Broken Link Note
+summary: Note with broken links
+tags: linktest
+---
+This note has a [[nonexistent-page]] link.
+-- broken-input.md --
+
+-- wikilink-input.md --
+---
+type: note
+title: Wikilink Format Note
+summary: Note testing wikilink formats
+tags: linktest
+---
+Simple link: [[another-links-note]]
+Display link: [[another-links-note|alt display]]
+Heading link: [[another-links-note#Introduction]]
+Heading with display: [[another-links-note#Introduction|see intro]]
+-- wikilink-input.md --
+
+# --- Setup: initialize KB and write pages ---
+
+exec akb init test-kb
+cd test-kb
+
+exec akb write links-test-note.md <../note-input.md
+stdout 'Written to kb/notes/links-test-note.md'
+
+exec akb write another-links-note.md <../note2-input.md
+stdout 'Written to kb/notes/another-links-note.md'
+
+exec akb write links-decision.md <../adr-input.md
+stdout 'Written to kb/decisions/links-decision.md'
+
+exec akb write broken-note.md <../broken-input.md
+stdout 'Written to kb/notes/broken-note.md'
+
+# --- links show displays outbound links ---
+
+exec akb links show notes/links-test-note.md
+stdout 'Outbound:'
+stdout 'another-note'
+stdout 'search-decision'
+
+# --- links show displays broken links ---
+
+exec akb links show notes/broken-note.md
+stdout 'Broken:'
+stdout 'nonexistent-page'
+
+# --- links show with nonexistent page returns error ---
+
+! exec akb links show notes/no-such-page.md
+stderr 'page not found'
+
+# --- backlinks shows inbound links ---
+
+exec akb links backlinks notes/links-test-note.md
+stdout 'notes/another-links-note.md'
+stdout 'decisions/links-decision.md'
+
+# --- backlinks with nonexistent page returns error ---
+
+! exec akb links backlinks notes/no-such-page.md
+stderr 'page not found'
+
+# --- orphans shows pages with zero inbound links ---
+
+exec akb links orphans
+stdout 'notes/broken-note.md'
+
+# --- orphans on empty KB returns no output ---
+
+exec akb delete notes/links-test-note.md
+exec akb delete notes/another-links-note.md
+exec akb delete decisions/links-decision.md
+exec akb delete notes/broken-note.md
+
+exec akb links orphans
+! stdout .
+
+# --- Missing search.db produces rebuild hint for links ---
+
+exec rm .akb/search.db
+
+! exec akb links show notes/links-test-note.md
+stderr 'akb index rebuild'
+
+! exec akb links backlinks notes/links-test-note.md
+stderr 'akb index rebuild'
+
+! exec akb links orphans
+stderr 'akb index rebuild'
+
+# --- Wikilink format variants ---
+
+exec akb index rebuild
+stdout 'Index rebuilt'
+
+exec akb write wikilink-note.md <../wikilink-input.md
+stdout 'Written to kb/notes/wikilink-note.md'
+
+# links show resolves various wikilink formats
+exec akb links show notes/wikilink-note.md
+stdout 'Outbound:'
+stdout 'another-links-note'

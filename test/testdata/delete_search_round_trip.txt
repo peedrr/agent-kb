@@ -1,0 +1,112 @@
+# Delete Search Round Trip — delete → search confirms removal
+
+-- note-input.md --
+---
+type: note
+title: Delete Search Note
+summary: Note for delete-search round trip
+tags: deletesearch
+---
+This note is about distributed databases and replication.
+-- note-input.md --
+
+-- note2-input.md --
+---
+type: note
+title: Keep This Note
+summary: Note that stays after delete
+tags: deletesearch
+---
+Content about distributed databases and caching.
+-- note2-input.md --
+
+-- adr-input.md --
+---
+type: adr
+title: Delete Search Decision
+status: proposed
+deciders: team
+summary: Decision for delete-search round trip
+tags: deletesearch
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+We chose distributed databases for our data layer.
+-- adr-input.md --
+
+# --- Setup: initialize KB and write pages ---
+
+exec akb init test-kb
+cd test-kb
+
+exec akb write delete-note.md <../note-input.md
+stdout 'Written to kb/notes/delete-note.md'
+
+exec akb write keep-note.md <../note2-input.md
+stdout 'Written to kb/notes/keep-note.md'
+
+exec akb write delete-decision.md <../adr-input.md
+stdout 'Written to kb/decisions/delete-decision.md'
+
+# --- Search finds all pages before delete ---
+
+exec akb search "distributed databases"
+stdout 'notes/delete-note.md'
+stdout 'notes/keep-note.md'
+stdout 'decisions/delete-decision.md'
+
+# --- Delete a page ---
+
+exec akb delete notes/delete-note.md
+stdout 'Deleted kb/notes/delete-note.md'
+
+# --- Search no longer finds deleted page ---
+
+exec akb search "distributed databases"
+! stdout 'notes/delete-note.md'
+stdout 'notes/keep-note.md'
+stdout 'decisions/delete-decision.md'
+
+# --- Search for unique content of deleted page returns nothing ---
+
+exec akb search "replication"
+! stdout 'notes/delete-note.md'
+
+# --- Delete another page ---
+
+exec akb delete decisions/delete-decision.md
+stdout 'Deleted kb/decisions/delete-decision.md'
+
+# --- Search no longer finds second deleted page ---
+
+exec akb search "distributed databases"
+! stdout 'decisions/delete-decision.md'
+stdout 'notes/keep-note.md'
+
+# --- Remaining page still searchable ---
+
+exec akb search "caching"
+stdout 'notes/keep-note.md'
+
+# --- Delete last page ---
+
+exec akb delete notes/keep-note.md
+stdout 'Deleted kb/notes/keep-note.md'
+
+# --- Search returns no results ---
+
+exec akb search "distributed databases"
+! stdout .
+
+# --- Links also confirm removal ---
+
+exec akb links orphans
+! stdout .
+
+# --- Core I/O still works after all deletes ---
+
+exec akb status
+stdout 'Pages: 0'
+
+exec akb list
+! stdout .
