@@ -140,14 +140,8 @@ func runAppend(cmd *cobra.Command, args []string) error {
 	}
 
 	searcher := search.NewSQLiteFTS5Searcher(dbConn)
-	tags := ""
-	if t, ok := fm.Fields["tags"]; ok {
-		tags = fmt.Sprintf("%v", t)
-	}
-	summary := ""
-	if s, ok := fm.Fields["summary"]; ok {
-		summary = fmt.Sprintf("%v", s)
-	}
+	tags := search.ExtractTags(fm.Fields)
+	summary := search.ExtractSummary(fm.Fields)
 	if err := searcher.IndexPage(ctx, relPath, fm.Title, string(body), tags, summary); err != nil {
 		return fmt.Errorf("index page: %w", err)
 	}

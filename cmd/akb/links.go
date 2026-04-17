@@ -15,16 +15,7 @@ import (
 )
 
 var linksCmd = &cobra.Command{
-	Use:   "links",
-	Short: "Query the link graph",
-	Long:  `Query the link graph: show outbound/broken/ambiguous links, backlinks, or orphan pages.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
-	},
-}
-
-var linksShowCmd = &cobra.Command{
-	Use:   "show <path>",
+	Use:   "links <path>",
 	Short: "Show outbound, broken, and ambiguous links for a page",
 	Long:  `Show outbound, broken, and ambiguous links for a page in the knowledge base.`,
 	Args:  cobra.ExactArgs(1),
@@ -47,12 +38,6 @@ var orphansCmd = &cobra.Command{
 	RunE:  runOrphans,
 }
 
-func init() {
-	linksCmd.AddCommand(linksShowCmd)
-	linksCmd.AddCommand(backlinksCmd)
-	linksCmd.AddCommand(orphansCmd)
-}
-
 func openLinkGraphDB(kbRoot string) (*sql.DB, *linkgraph.SQLiteLinkGraph, error) {
 	d, err := db.OpenKB(kbRoot)
 	if err != nil {
@@ -69,7 +54,8 @@ func resolvePagePath(kbRoot, inputPath string) (string, error) {
 		return "", fmt.Errorf("page not found: %s", cleanPath)
 	}
 
-	return cleanPath, nil
+	relPath := filepath.Join("kb", cleanPath)
+	return filepath.ToSlash(relPath), nil
 }
 
 func runLinksShow(cmd *cobra.Command, args []string) error {

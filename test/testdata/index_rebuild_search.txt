@@ -115,7 +115,7 @@ stdout 'decisions/rebuild-decision.md'
 
 # --- Link graph also rebuilt after index rebuild ---
 
-exec akb links orphans
+exec akb orphans
 stdout 'notes/second-rebuild-note.md'
 
 # --- Core I/O still works after rebuild ---

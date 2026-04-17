@@ -47,7 +47,7 @@ func (s *SQLiteFTS5Searcher) IndexPage(ctx context.Context, path, title, content
 		return fmt.Errorf("get document id: %w", err)
 	}
 
-	if _, err := tx.ExecContext(ctx, "INSERT INTO pages_fts(rowid, title, content, tags) VALUES (?, ?, ?, ?)", id, title, content, tags); err != nil {
+	if _, err := tx.ExecContext(ctx, "INSERT INTO pages_fts(rowid, title, content, tags, summary) VALUES (?, ?, ?, ?, ?)", id, title, content, tags, summary); err != nil {
 		return fmt.Errorf("insert fts: %w", err)
 	}
 
@@ -121,7 +121,7 @@ func (s *SQLiteFTS5Searcher) Search(ctx context.Context, query string, opts Sear
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT documents.path, documents.title, documents.summary,
 		       snippet(pages_fts, 0, '→', '←', '...', 32) as snippet,
-		       bm25(pages_fts, 10.0, 1.0, 5.0) as rank
+		       bm25(pages_fts, 10.0, 1.0, 5.0, 3.0) as rank
 		FROM pages_fts
 		JOIN documents ON pages_fts.rowid = documents.id
 		WHERE pages_fts MATCH ?
@@ -168,8 +168,14 @@ func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) er
 		return fmt.Errorf("commit transaction: %w", err)
 	}
 
-	if _, err := s.db.ExecContext(ctx, "INSERT INTO pages_fts(pages_fts) VALUES('rebuild')"); err != nil {
-		return fmt.Errorf("rebuild fts: %w", err)
+	// Drop and recreate FTS5 table to handle schema migration (adding summary column)
+	if _, err := s.db.ExecContext(ctx, "DROP TABLE IF EXISTS pages_fts"); err != nil {
+		return fmt.Errorf("drop fts5 table: %w", err)
+	}
+
+	// Recreate FTS5 table with current schema
+	if _, err := s.db.ExecContext(ctx, `CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(title, content, tags, summary, content=documents, content_rowid=id)`); err != nil {
+		return fmt.Errorf("create fts5 table: %w", err)
 	}
 
 	err = filepath.WalkDir(kbDir, func(path string, d os.DirEntry, err error) error {
@@ -203,8 +209,8 @@ func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) er
 		}
 		relPath = filepath.ToSlash(relPath)
 
-		tags := extractTags(fm.Fields)
-		summary := extractSummary(fm.Fields)
+		tags := ExtractTags(fm.Fields)
+		summary := ExtractSummary(fm.Fields)
 
 		if err := s.IndexPage(ctx, relPath, fm.Title, string(body), tags, summary); err != nil {
 			return fmt.Errorf("index page %s: %w", relPath, err)
@@ -223,8 +229,8 @@ func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) er
 	return nil
 }
 
-// extractTags extracts the tags field from frontmatter fields.
-func extractTags(fields map[string]any) string {
+// ExtractTags extracts the tags field from frontmatter fields.
+func ExtractTags(fields map[string]any) string {
 	if t, ok := fields["tags"]; ok {
 		switch v := t.(type) {
 		case string:
@@ -242,8 +248,8 @@ func extractTags(fields map[string]any) string {
 	return ""
 }
 
-// extractSummary extracts the summary field from frontmatter fields.
-func extractSummary(fields map[string]any) string {
+// ExtractSummary extracts the summary field from frontmatter fields.
+func ExtractSummary(fields map[string]any) string {
 	if s, ok := fields["summary"]; ok {
 		if str, ok := s.(string); ok {
 			return str

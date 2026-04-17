@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -40,7 +41,7 @@ func (g *SQLiteLinkGraph) UpdatePageLinks(ctx context.Context, path string, cont
 	defer tx.Rollback()
 
 	if _, err := tx.ExecContext(ctx,
-		"INSERT OR REPLACE INTO pages (path, title, summary) VALUES (?, '', '')",
+		"INSERT OR IGNORE INTO pages (path, title, summary) VALUES (?, '', '')",
 		path,
 	); err != nil {
 		return fmt.Errorf("upsert page: %w", err)
@@ -102,6 +103,54 @@ func (g *SQLiteLinkGraph) RemovePage(ctx context.Context, path string) error {
 	}
 
 	return tx.Commit()
+}
+
+// RebuildLinks rebuilds the entire link graph from the filesystem.
+// It deletes all existing links and re-resolves wikilinks for every page.
+func (g *SQLiteLinkGraph) RebuildLinks(ctx context.Context, kbRoot string) error {
+	kbDir := filepath.Join(kbRoot, "kb")
+
+	if _, err := g.db.ExecContext(ctx, "DELETE FROM links"); err != nil {
+		return fmt.Errorf("delete links: %w", err)
+	}
+
+	err := filepath.WalkDir(kbDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".md" {
+			return nil
+		}
+		base := filepath.Base(path)
+		if base == "index.md" || base == "log.md" {
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(kbRoot, path)
+		if err != nil {
+			return nil
+		}
+		relPath = filepath.ToSlash(relPath)
+
+		if err := g.UpdatePageLinks(ctx, relPath, string(content)); err != nil {
+			return fmt.Errorf("update links for %s: %w", relPath, err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walk kb directory: %w", err)
+	}
+
+	return nil
 }
 
 // GetOutboundLinks returns all links originating from the given page.

@@ -29,6 +29,8 @@ func init() {
 	RootCmd.AddCommand(logCmd)
 	RootCmd.AddCommand(searchCmd)
 	RootCmd.AddCommand(linksCmd)
+	RootCmd.AddCommand(backlinksCmd)
+	RootCmd.AddCommand(orphansCmd)
 }
 
 func Execute() error {

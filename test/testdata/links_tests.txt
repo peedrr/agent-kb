@@ -76,36 +76,36 @@ stdout 'Written to kb/notes/broken-note.md'
 
 # --- links show displays outbound links ---
 
-exec akb links show notes/links-test-note.md
+exec akb links notes/links-test-note.md
 stdout 'Outbound:'
 stdout 'another-note'
 stdout 'search-decision'
 
 # --- links show displays broken links ---
 
-exec akb links show notes/broken-note.md
+exec akb links notes/broken-note.md
 stdout 'Broken:'
 stdout 'nonexistent-page'
 
 # --- links show with nonexistent page returns error ---
 
-! exec akb links show notes/no-such-page.md
+! exec akb links notes/no-such-page.md
 stderr 'page not found'
 
 # --- backlinks shows inbound links ---
 
-exec akb links backlinks notes/links-test-note.md
+exec akb backlinks notes/links-test-note.md
 stdout 'notes/another-links-note.md'
 stdout 'decisions/links-decision.md'
 
 # --- backlinks with nonexistent page returns error ---
 
-! exec akb links backlinks notes/no-such-page.md
+! exec akb backlinks notes/no-such-page.md
 stderr 'page not found'
 
 # --- orphans shows pages with zero inbound links ---
 
-exec akb links orphans
+exec akb orphans
 stdout 'notes/broken-note.md'
 
 # --- orphans on empty KB returns no output ---
@@ -115,20 +115,20 @@ exec akb delete notes/another-links-note.md
 exec akb delete decisions/links-decision.md
 exec akb delete notes/broken-note.md
 
-exec akb links orphans
+exec akb orphans
 ! stdout .
 
 # --- Missing search.db produces rebuild hint for links ---
 
 exec rm .akb/search.db
 
-! exec akb links show notes/links-test-note.md
+! exec akb links notes/links-test-note.md
 stderr 'akb index rebuild'
 
-! exec akb links backlinks notes/links-test-note.md
+! exec akb backlinks notes/links-test-note.md
 stderr 'akb index rebuild'
 
-! exec akb links orphans
+! exec akb orphans
 stderr 'akb index rebuild'
 
 # --- Wikilink format variants ---
@@ -140,6 +140,6 @@ exec akb write wikilink-note.md <../wikilink-input.md
 stdout 'Written to kb/notes/wikilink-note.md'
 
 # links show resolves various wikilink formats
-exec akb links show notes/wikilink-note.md
+exec akb links notes/wikilink-note.md
 stdout 'Outbound:'
 stdout 'another-links-note'

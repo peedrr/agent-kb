@@ -100,7 +100,7 @@ exec akb search "distributed databases"
 
 # --- Links also confirm removal ---
 
-exec akb links orphans
+exec akb orphans
 ! stdout .
 
 # --- Core I/O still works after all deletes ---

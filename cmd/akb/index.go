@@ -11,6 +11,7 @@ import (
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/index"
+	"github.com/peedrr/agent-kb/internal/linkgraph"
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/search"
 	"github.com/peedrr/agent-kb/internal/storage"
@@ -208,6 +209,11 @@ func runIndexRebuild(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("rebuild search index: %w", err)
 	}
 
+	linkGraph := linkgraph.NewSQLiteLinkGraph(sqlDB)
+	if err := linkGraph.RebuildLinks(ctx, kbRoot); err != nil {
+		return fmt.Errorf("rebuild link graph: %w", err)
+	}
+
 	newContent, err := os.ReadFile(indexPath)
 	if err != nil {
 		return fmt.Errorf("read rebuilt index: %w", err)
@@ -258,6 +264,12 @@ func openOrCreateSearchDB(kbRoot string) (*sql.DB, error) {
 		sqlDB.Close()
 		return nil, fmt.Errorf("create schema: %w", err)
 	}
+
+	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		sqlDB.Close()
+		return nil, fmt.Errorf("enable WAL mode: %w", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
 
 	return sqlDB, nil
 }

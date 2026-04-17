@@ -148,14 +148,8 @@ func runWrite(cmd *cobra.Command, args []string) error {
 	relPath = filepath.ToSlash(relPath)
 
 	// Extract tags and summary from frontmatter fields
-	tags := ""
-	if t, ok := fm.Fields["tags"]; ok {
-		tags = fmt.Sprintf("%v", t)
-	}
-	summary := ""
-	if s, ok := fm.Fields["summary"]; ok {
-		summary = fmt.Sprintf("%v", s)
-	}
+	tags := search.ExtractTags(fm.Fields)
+	summary := search.ExtractSummary(fm.Fields)
 
 	// Create storage provider
 	store := storage.NewGitProvider(kbRoot, noCommit)

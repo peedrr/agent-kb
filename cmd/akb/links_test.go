@@ -89,13 +89,13 @@ func TestLinksShow_WithResolvedBrokenAmbiguous(t *testing.T) {
 	g := linkgraph.NewSQLiteLinkGraph(d)
 	ctx := context.Background()
 
-	insertTestPage(t, d, "target.md")
-	insertTestPage(t, d, "notes/note.md")
-	insertTestPage(t, d, "archive/note.md")
+	insertTestPage(t, d, "kb/target.md")
+	insertTestPage(t, d, "kb/notes/note.md")
+	insertTestPage(t, d, "kb/archive/note.md")
 
 	writeTestPage(t, kbRoot, "index.md", "---\ntitle: Index\n---\nSee [[target]] and [[missing]] and [[note]].")
 
-	err := g.UpdatePageLinks(ctx, "index.md", "See [[target]] and [[missing]] and [[note]].")
+	err := g.UpdatePageLinks(ctx, "kb/index.md", "See [[target]] and [[missing]] and [[note]].")
 	if err != nil {
 		t.Fatalf("UpdatePageLinks: %v", err)
 	}
@@ -110,8 +110,8 @@ func TestLinksShow_WithResolvedBrokenAmbiguous(t *testing.T) {
 	if !strings.Contains(output, "Outbound:") {
 		t.Error("expected Outbound section")
 	}
-	if !strings.Contains(output, "target -> target.md") {
-		t.Error("expected resolved outbound link target -> target.md")
+	if !strings.Contains(output, "target -> kb/target.md") {
+		t.Error("expected resolved outbound link target -> kb/target.md")
 	}
 	if !strings.Contains(output, "Broken:") {
 		t.Error("expected Broken section")
@@ -131,7 +131,7 @@ func TestLinksShow_NoLinks(t *testing.T) {
 	kbRoot := setupLinksTestKB(t)
 	d := setupLinkGraphDB(t, kbRoot)
 
-	insertTestPage(t, d, "empty.md")
+	insertTestPage(t, d, "kb/empty.md")
 	writeTestPage(t, kbRoot, "empty.md", "---\ntitle: Empty\n---\nNo links here.")
 
 	output, err := captureOutput(func() error {
@@ -152,13 +152,13 @@ func TestBacklinks_WithInboundLinks(t *testing.T) {
 	g := linkgraph.NewSQLiteLinkGraph(d)
 	ctx := context.Background()
 
-	insertTestPage(t, d, "target.md")
+	insertTestPage(t, d, "kb/target.md")
 
-	err := g.UpdatePageLinks(ctx, "page1.md", "See [[target]].")
+	err := g.UpdatePageLinks(ctx, "kb/page1.md", "See [[target]].")
 	if err != nil {
 		t.Fatalf("UpdatePageLinks page1: %v", err)
 	}
-	err = g.UpdatePageLinks(ctx, "page2.md", "Also see [[target]].")
+	err = g.UpdatePageLinks(ctx, "kb/page2.md", "Also see [[target]].")
 	if err != nil {
 		t.Fatalf("UpdatePageLinks page2: %v", err)
 	}
@@ -179,11 +179,11 @@ func TestBacklinks_WithInboundLinks(t *testing.T) {
 			sources[line] = true
 		}
 	}
-	if !sources["page1.md"] {
-		t.Error("expected backlink from page1.md")
+	if !sources["kb/page1.md"] {
+		t.Error("expected backlink from kb/page1.md")
 	}
-	if !sources["page2.md"] {
-		t.Error("expected backlink from page2.md")
+	if !sources["kb/page2.md"] {
+		t.Error("expected backlink from kb/page2.md")
 	}
 }
 
@@ -191,7 +191,7 @@ func TestBacklinks_NoInboundLinks(t *testing.T) {
 	kbRoot := setupLinksTestKB(t)
 	d := setupLinkGraphDB(t, kbRoot)
 
-	insertTestPage(t, d, "lonely.md")
+	insertTestPage(t, d, "kb/lonely.md")
 	writeTestPage(t, kbRoot, "lonely.md", "---\ntitle: Lonely\n---\nNo one links here.")
 
 	output, err := captureOutput(func() error {
@@ -212,10 +212,10 @@ func TestOrphans_WithOrphanPages(t *testing.T) {
 	g := linkgraph.NewSQLiteLinkGraph(d)
 	ctx := context.Background()
 
-	insertTestPage(t, d, "linked.md")
-	insertTestPage(t, d, "orphan.md")
+	insertTestPage(t, d, "kb/linked.md")
+	insertTestPage(t, d, "kb/orphan.md")
 
-	err := g.UpdatePageLinks(ctx, "index.md", "See [[linked]].")
+	err := g.UpdatePageLinks(ctx, "kb/index.md", "See [[linked]].")
 	if err != nil {
 		t.Fatalf("UpdatePageLinks: %v", err)
 	}
@@ -227,11 +227,11 @@ func TestOrphans_WithOrphanPages(t *testing.T) {
 		t.Fatalf("runOrphans: %v", err)
 	}
 
-	if !strings.Contains(output, "orphan.md") {
-		t.Error("expected orphan.md in orphans output")
+	if !strings.Contains(output, "kb/orphan.md") {
+		t.Error("expected kb/orphan.md in orphans output")
 	}
-	if strings.Contains(output, "linked.md") {
-		t.Error("linked.md should not be an orphan")
+	if strings.Contains(output, "kb/linked.md") {
+		t.Error("kb/linked.md should not be an orphan")
 	}
 }
 
@@ -322,10 +322,10 @@ func TestLinksShow_KbPrefixStripped(t *testing.T) {
 	g := linkgraph.NewSQLiteLinkGraph(d)
 	ctx := context.Background()
 
-	insertTestPage(t, d, "target.md")
+	insertTestPage(t, d, "kb/target.md")
 	writeTestPage(t, kbRoot, "source.md", "---\ntitle: Source\n---\nSee [[target]].")
 
-	err := g.UpdatePageLinks(ctx, "source.md", "See [[target]].")
+	err := g.UpdatePageLinks(ctx, "kb/source.md", "See [[target]].")
 	if err != nil {
 		t.Fatalf("UpdatePageLinks: %v", err)
 	}
@@ -337,7 +337,7 @@ func TestLinksShow_KbPrefixStripped(t *testing.T) {
 		t.Fatalf("runLinksShow with kb/ prefix: %v", err)
 	}
 
-	if !strings.Contains(output, "target -> target.md") {
+	if !strings.Contains(output, "target -> kb/target.md") {
 		t.Error("expected resolved link with kb/ prefix stripped from input")
 	}
 }

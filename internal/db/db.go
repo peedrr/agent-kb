@@ -98,7 +98,7 @@ func CreateSchema(db *sql.DB) error {
 			updated TEXT NOT NULL DEFAULT ''
 		)`,
 		`CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
-			title, content, tags,
+			title, content, tags, summary,
 			content=documents,
 			content_rowid=id
 		)`,
