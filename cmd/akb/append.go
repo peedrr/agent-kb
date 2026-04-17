@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/peedrr/agent-kb/internal/config"
+	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/linkgraph"
 	"github.com/peedrr/agent-kb/internal/path"
@@ -54,6 +55,15 @@ func runAppend(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	dbConn, err := db.OpenKB(kbRoot)
+	if err != nil {
+		if isMissingDB(err) {
+			return fmt.Errorf("run `akb index rebuild` to create the search index")
+		}
+		return err
+	}
+	defer dbConn.Close()
 
 	_, err = config.Load(filepath.Join(kbRoot, ".akb", ".akb.yaml"))
 	if err != nil {
@@ -129,7 +139,7 @@ func runAppend(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("write page: %w", err)
 	}
 
-	searcher := &search.NoOpSearcher{}
+	searcher := search.NewSQLiteFTS5Searcher(dbConn)
 	tags := ""
 	if t, ok := fm.Fields["tags"]; ok {
 		tags = fmt.Sprintf("%v", t)
@@ -142,7 +152,7 @@ func runAppend(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("index page: %w", err)
 	}
 
-	updater := &linkgraph.NoOpLinkGraphUpdater{}
+	updater := linkgraph.NewSQLiteLinkGraph(dbConn)
 	if err := updater.UpdatePageLinks(ctx, relPath, string(fullContent)); err != nil {
 		return fmt.Errorf("update links: %w", err)
 	}

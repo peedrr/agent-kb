@@ -250,6 +250,8 @@ created: "2024-01-01T00:00:00Z"
 		t.Fatal(err)
 	}
 
+	initTestSearchDB(t, kbRoot)
+
 	// Initialize git repo for testing
 	if err := initGitRepo(kbRoot); err != nil {
 		t.Logf("git not available, skipping git-related tests: %v", err)

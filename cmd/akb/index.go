@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/index"
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/search"
 	"github.com/peedrr/agent-kb/internal/storage"
 	"github.com/spf13/cobra"
 )
@@ -191,8 +194,18 @@ func runIndexRebuild(cmd *cobra.Command, args []string) error {
 	indexPath := filepath.Join(kbRoot, "kb", "index.md")
 	oldContent, _ := os.ReadFile(indexPath)
 
-	if err := index.RebuildIndex(kbRoot); err != nil {
-		return fmt.Errorf("rebuild index: %w", err)
+	// Open or create search database
+	sqlDB, err := openOrCreateSearchDB(kbRoot)
+	if err != nil {
+		return fmt.Errorf("open search database: %w", err)
+	}
+	defer sqlDB.Close()
+
+	// Rebuild search index (also rebuilds index.md via index.RebuildIndex)
+	ctx := context.Background()
+	searcher := search.NewSQLiteFTS5Searcher(sqlDB)
+	if err := searcher.RebuildIndex(ctx, kbRoot); err != nil {
+		return fmt.Errorf("rebuild search index: %w", err)
 	}
 
 	newContent, err := os.ReadFile(indexPath)
@@ -206,11 +219,58 @@ func runIndexRebuild(cmd *cobra.Command, args []string) error {
 	}
 
 	store := storage.NewGitProvider(kbRoot, noCommit)
-	ctx := context.Background()
 	if err := store.WriteWithCommitMsg(ctx, indexPath, newContent, "akb: index rebuild"); err != nil {
 		return fmt.Errorf("commit index: %w", err)
 	}
 
 	fmt.Println("Index rebuilt")
 	return nil
+}
+
+// openOrCreateSearchDB opens the search database, creating it if it doesn't exist.
+func openOrCreateSearchDB(kbRoot string) (*sql.DB, error) {
+	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
+
+	// Try to open existing database
+	sqlDB, err := db.OpenKB(kbRoot)
+	if err == nil {
+		return sqlDB, nil
+	}
+
+	// If error is not about missing DB, return the error
+	if !isSearchDBMissing(kbRoot, err) {
+		return nil, err
+	}
+
+	// Create the .akb directory if it doesn't exist
+	akbDir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(akbDir, 0755); err != nil {
+		return nil, fmt.Errorf("create .akb directory: %w", err)
+	}
+
+	// Initialize and create schema for new database
+	sqlDB, err = db.InitDB(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("init database: %w", err)
+	}
+
+	if err := db.CreateSchema(sqlDB); err != nil {
+		sqlDB.Close()
+		return nil, fmt.Errorf("create schema: %w", err)
+	}
+
+	return sqlDB, nil
+}
+
+// isSearchDBMissing checks if the error indicates a missing or invalid database.
+func isSearchDBMissing(kbRoot string, err error) bool {
+	if err == nil {
+		return false
+	}
+	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
+	if _, statErr := os.Stat(dbPath); os.IsNotExist(statErr) {
+		return true
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "invalid schema")
 }

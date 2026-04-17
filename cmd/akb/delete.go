@@ -8,11 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/index"
 	"github.com/peedrr/agent-kb/internal/linkgraph"
 	logmod "github.com/peedrr/agent-kb/internal/log"
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/search"
 	"github.com/peedrr/agent-kb/internal/storage"
 	"github.com/spf13/cobra"
 )
@@ -32,6 +34,15 @@ func runDeleteCmd(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+
+	dbConn, err := db.OpenKB(kbRoot)
+	if err != nil {
+		if isMissingDB(err) {
+			return fmt.Errorf("run `akb index rebuild` to create the search index")
+		}
+		return err
+	}
+	defer dbConn.Close()
 
 	if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
 		return fmt.Errorf("use `akb raw delete`")
@@ -68,6 +79,18 @@ func runDeleteCmd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	ctx := context.Background()
+
+	searcher := search.NewSQLiteFTS5Searcher(dbConn)
+	if err := searcher.RemovePage(ctx, relPath); err != nil {
+		return fmt.Errorf("remove from search index: %w", err)
+	}
+
+	updater := linkgraph.NewSQLiteLinkGraph(dbConn)
+	if err := updater.RemovePage(ctx, relPath); err != nil {
+		return fmt.Errorf("remove from link graph: %w", err)
+	}
+
 	// Remove from index.md (succeeds silently if not in index)
 	_ = index.RemoveEntry(kbRoot, relPath)
 
@@ -80,13 +103,7 @@ func runDeleteCmd(cmd *cobra.Command, args []string) error {
 	gitAdd.Run() // best effort
 
 	store := storage.NewGitProvider(kbRoot, noCommit)
-	ctx := context.Background()
 	if err := store.Delete(ctx, fullPath); err != nil {
-		return err
-	}
-
-	updater := &linkgraph.NoOpLinkGraphUpdater{}
-	if err := updater.RemovePage(ctx, relPath); err != nil {
 		return err
 	}
 

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/index"
 )
 
@@ -292,5 +293,151 @@ func TestIndexRebuild_RegeneratesFromFilesystem(t *testing.T) {
 	}
 	if !foundADR {
 		t.Error("expected to find ADR entry")
+	}
+}
+
+func TestIndexRebuild_RepopulatesSQLite(t *testing.T) {
+	kbRoot := setupIndexTestKB(t)
+
+	origNoCommit := noCommit
+	noCommit = true
+	t.Cleanup(func() { noCommit = origNoCommit })
+
+	notesDir := filepath.Join(kbRoot, "kb", "notes")
+	if err := os.MkdirAll(notesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	pageContent := "---\ntype: note\ntitle: My Note\ntags: testing\nsummary: A test note\n---\nNote body.\n"
+	pagePath := filepath.Join(notesDir, "my-note.md")
+	if err := os.WriteFile(pagePath, []byte(pageContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := addToGit(kbRoot, "kb/notes/my-note.md"); err != nil {
+		t.Fatal(err)
+	}
+
+	err := runIndexRebuild(nil, nil)
+	if err != nil {
+		t.Fatalf("index rebuild failed: %v", err)
+	}
+
+	sqlDB, err := db.OpenKB(kbRoot)
+	if err != nil {
+		t.Fatalf("OpenKB failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	var docCount int
+	if err := sqlDB.QueryRow("SELECT COUNT(*) FROM documents").Scan(&docCount); err != nil {
+		t.Fatalf("query documents: %v", err)
+	}
+	if docCount != 1 {
+		t.Errorf("expected 1 document, got %d", docCount)
+	}
+
+	var pageCount int
+	if err := sqlDB.QueryRow("SELECT COUNT(*) FROM pages").Scan(&pageCount); err != nil {
+		t.Fatalf("query pages: %v", err)
+	}
+	if pageCount != 1 {
+		t.Errorf("expected 1 page, got %d", pageCount)
+	}
+
+	var title, summary string
+	if err := sqlDB.QueryRow("SELECT title, summary FROM pages WHERE path = ?", "kb/notes/my-note.md").Scan(&title, &summary); err != nil {
+		t.Fatalf("query page: %v", err)
+	}
+	if title != "My Note" {
+		t.Errorf("expected title %q, got %q", "My Note", title)
+	}
+	if summary != "A test note" {
+		t.Errorf("expected summary %q, got %q", "A test note", summary)
+	}
+}
+
+func TestIndexRebuild_EmptyKBSucceeds(t *testing.T) {
+	kbRoot := setupIndexTestKB(t)
+
+	origNoCommit := noCommit
+	noCommit = true
+	t.Cleanup(func() { noCommit = origNoCommit })
+
+	err := runIndexRebuild(nil, nil)
+	if err != nil {
+		t.Fatalf("index rebuild on empty KB failed: %v", err)
+	}
+
+	sqlDB, err := db.OpenKB(kbRoot)
+	if err != nil {
+		t.Fatalf("OpenKB failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	var docCount int
+	if err := sqlDB.QueryRow("SELECT COUNT(*) FROM documents").Scan(&docCount); err != nil {
+		t.Fatalf("query documents: %v", err)
+	}
+	if docCount != 0 {
+		t.Errorf("expected 0 documents after rebuild, got %d", docCount)
+	}
+
+	var pageCount int
+	if err := sqlDB.QueryRow("SELECT COUNT(*) FROM pages").Scan(&pageCount); err != nil {
+		t.Fatalf("query pages: %v", err)
+	}
+	if pageCount != 0 {
+		t.Errorf("expected 0 pages after rebuild, got %d", pageCount)
+	}
+}
+
+func TestIndexRebuild_CreatesSearchDB(t *testing.T) {
+	kbRoot := setupIndexTestKB(t)
+
+	origNoCommit := noCommit
+	noCommit = true
+	t.Cleanup(func() { noCommit = origNoCommit })
+
+	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
+	if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+
+	notesDir := filepath.Join(kbRoot, "kb", "notes")
+	if err := os.MkdirAll(notesDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	pageContent := "---\ntype: note\ntitle: Test Note\nsummary: A test\n---\nContent.\n"
+	pagePath := filepath.Join(notesDir, "test.md")
+	if err := os.WriteFile(pagePath, []byte(pageContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := addToGit(kbRoot, "kb/notes/test.md"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := runIndexRebuild(nil, nil); err != nil {
+		t.Fatalf("index rebuild failed: %v", err)
+	}
+
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		t.Error("expected search.db to be created after rebuild")
+	}
+
+	sqlDB, err := db.OpenKB(kbRoot)
+	if err != nil {
+		t.Fatalf("OpenKB failed: %v", err)
+	}
+	defer sqlDB.Close()
+
+	var pageCount int
+	if err := sqlDB.QueryRow("SELECT COUNT(*) FROM pages").Scan(&pageCount); err != nil {
+		t.Fatalf("query pages: %v", err)
+	}
+	if pageCount != 1 {
+		t.Errorf("expected 1 page in new DB, got %d", pageCount)
 	}
 }

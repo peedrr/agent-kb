@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/template"
 )
 
@@ -53,6 +54,8 @@ func writeSetupTestKB(t *testing.T) string {
 		t.Fatalf("copy templates: %v", err)
 	}
 
+	initTestSearchDB(t, kbRoot)
+
 	cmd := exec.Command("git", "init")
 	cmd.Dir = kbRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -81,6 +84,25 @@ func writeSetupTestKB(t *testing.T) string {
 
 func writeCleanup(kbRoot string) {
 	os.RemoveAll(kbRoot)
+}
+
+func initTestSearchDB(t *testing.T, kbRoot string) {
+	t.Helper()
+	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
+	conn, err := db.InitDB(dbPath)
+	if err != nil {
+		t.Fatalf("init test search DB: %v", err)
+	}
+	defer conn.Close()
+
+	if _, err := conn.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		t.Fatalf("enable WAL mode: %v", err)
+	}
+	conn.SetMaxOpenConns(1)
+
+	if err := db.CreateSchema(conn); err != nil {
+		t.Fatalf("create test schema: %v", err)
+	}
 }
 
 func writeRun(kbRoot, inputPath, stdinContent string, extraArgs ...string) (string, error) {
