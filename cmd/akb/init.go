@@ -151,6 +151,11 @@ func initSearchDB(name string) error {
 	}
 	defer conn.Close()
 
+	if _, err := conn.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		return fmt.Errorf("enable WAL mode: %w", err)
+	}
+	conn.SetMaxOpenConns(1)
+
 	if err := db.CreateSchema(conn); err != nil {
 		return fmt.Errorf("create schema: %w", err)
 	}

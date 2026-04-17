@@ -4,16 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path/filepath"
 
 	_ "modernc.org/sqlite"
 )
 
-// DB wraps sql.DB for convenience.
 type DB struct {
 	*sql.DB
 }
 
-// Open opens a SQLite database at the given path and returns a wrapped DB.
 func Open(path string) (*DB, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -22,17 +21,14 @@ func Open(path string) (*DB, error) {
 	return &DB{db}, nil
 }
 
-// Close closes the underlying database connection.
 func (db *DB) Close() error {
 	return db.DB.Close()
 }
 
-// Ping verifies the database connection is alive.
 func (db *DB) Ping(ctx context.Context) error {
 	return db.DB.PingContext(ctx)
 }
 
-// InitDB opens or creates a SQLite database at dbPath and verifies connectivity.
 func InitDB(dbPath string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
@@ -45,7 +41,47 @@ func InitDB(dbPath string) (*sql.DB, error) {
 	return db, nil
 }
 
-// CreateSchema executes all DDL statements to create the database schema.
+func VerifySchema(db *sql.DB) error {
+	expected := map[string]bool{
+		"documents":          false,
+		"pages_fts":          false,
+		"pages":              false,
+		"links":              false,
+		"idx_links_source":   false,
+		"idx_links_resolved": false,
+	}
+
+	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type IN ('table', 'index')")
+	if err != nil {
+		return fmt.Errorf("query sqlite_master: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return fmt.Errorf("scan name: %w", err)
+		}
+		if _, ok := expected[name]; ok {
+			expected[name] = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate rows: %w", err)
+	}
+
+	var missing []string
+	for name, found := range expected {
+		if !found {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing schema objects: %v", missing)
+	}
+	return nil
+}
+
 func CreateSchema(db *sql.DB) error {
 	if db == nil {
 		return fmt.Errorf("db is nil")
@@ -89,4 +125,26 @@ func CreateSchema(db *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+func OpenKB(kbRoot string) (*sql.DB, error) {
+	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("open database: %w", err)
+	}
+
+	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("enable WAL mode: %w", err)
+	}
+
+	db.SetMaxOpenConns(1)
+
+	if err := VerifySchema(db); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("invalid schema: %w (run 'akb init' to fix)", err)
+	}
+
+	return db, nil
 }

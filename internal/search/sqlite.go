@@ -1,0 +1,253 @@
+package search
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/index"
+)
+
+// SQLiteFTS5Searcher implements the Searcher interface using SQLite FTS5.
+type SQLiteFTS5Searcher struct {
+	db *sql.DB
+}
+
+// NewSQLiteFTS5Searcher creates a new SQLiteFTS5Searcher with the given database connection.
+func NewSQLiteFTS5Searcher(db *sql.DB) *SQLiteFTS5Searcher {
+	return &SQLiteFTS5Searcher{db: db}
+}
+
+// IndexPage adds or updates a page in the search index.
+// It writes to both the documents and pages tables to maintain consistency.
+func (s *SQLiteFTS5Searcher) IndexPage(ctx context.Context, path, title, content, tags, summary string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	_, _ = tx.ExecContext(ctx, "DELETE FROM pages_fts WHERE rowid = (SELECT id FROM documents WHERE path = ?)", path)
+
+	_, err = tx.ExecContext(ctx,
+		"INSERT OR REPLACE INTO documents (path, title, content, tags, summary, created, updated) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))",
+		path, title, content, tags, summary)
+	if err != nil {
+		return fmt.Errorf("insert document: %w", err)
+	}
+
+	var id int64
+	if err := tx.QueryRowContext(ctx, "SELECT id FROM documents WHERE path = ?", path).Scan(&id); err != nil {
+		return fmt.Errorf("get document id: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, "INSERT INTO pages_fts(rowid, title, content, tags) VALUES (?, ?, ?, ?)", id, title, content, tags); err != nil {
+		return fmt.Errorf("insert fts: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, "INSERT OR REPLACE INTO pages (path, title, summary) VALUES (?, ?, ?)", path, title, summary); err != nil {
+		return fmt.Errorf("insert page: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
+// RemovePage removes a page from the search index.
+// It deletes from both the documents and pages tables to maintain consistency.
+func (s *SQLiteFTS5Searcher) RemovePage(ctx context.Context, path string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Delete from FTS first — requires document id which is deleted next
+	if _, err := tx.ExecContext(ctx, "DELETE FROM pages_fts WHERE rowid = (SELECT id FROM documents WHERE path = ?)", path); err != nil {
+		return fmt.Errorf("delete fts: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM documents WHERE path = ?", path); err != nil {
+		return fmt.Errorf("delete document: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM pages WHERE path = ?", path); err != nil {
+		return fmt.Errorf("delete page: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
+// fts5Operators matches FTS5 boolean operators at word boundaries.
+var fts5Operators = regexp.MustCompile(`\b(?:OR|AND|NOT)\b`)
+
+// escapeFTS5Query escapes FTS5 special characters and operators from a user query.
+func escapeFTS5Query(query string) string {
+	query = fts5Operators.ReplaceAllString(query, " ")
+
+	replacer := strings.NewReplacer(
+		`"`, " ",
+		`'`, " ",
+		"(", " ",
+		")", " ",
+		"*", " ",
+	)
+	return strings.TrimSpace(replacer.Replace(query))
+}
+
+// Search performs a full-text search over the index using FTS5 BM25 ranking.
+func (s *SQLiteFTS5Searcher) Search(ctx context.Context, query string, opts SearchOptions) ([]SearchResult, error) {
+	escaped := escapeFTS5Query(query)
+	if escaped == "" {
+		return nil, errors.New("search query must not be empty")
+	}
+
+	limit := opts.Limit
+	if limit == 0 {
+		limit = 10
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT documents.path, documents.title, documents.summary,
+		       snippet(pages_fts, 0, '→', '←', '...', 32) as snippet,
+		       bm25(pages_fts, 10.0, 1.0, 5.0) as rank
+		FROM pages_fts
+		JOIN documents ON pages_fts.rowid = documents.id
+		WHERE pages_fts MATCH ?
+		ORDER BY rank
+		LIMIT ?`, escaped, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search query: %w", err)
+	}
+	defer rows.Close()
+
+	results := []SearchResult{}
+	for rows.Next() {
+		var r SearchResult
+		if err := rows.Scan(&r.Path, &r.Title, &r.Summary, &r.Snippet, &r.Rank); err != nil {
+			return nil, fmt.Errorf("scan result: %w", err)
+		}
+		results = append(results, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate results: %w", err)
+	}
+	return results, nil
+}
+
+// RebuildIndex rebuilds the entire search index from the filesystem.
+// It walks the kb/ directory, parses frontmatter from each .md file,
+// clears all tables, and re-inserts all pages.
+func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) error {
+	kbDir := filepath.Join(kbRoot, "kb")
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM pages"); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("delete pages: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM documents"); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("delete documents: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+
+	if _, err := s.db.ExecContext(ctx, "INSERT INTO pages_fts(pages_fts) VALUES('rebuild')"); err != nil {
+		return fmt.Errorf("rebuild fts: %w", err)
+	}
+
+	err = filepath.WalkDir(kbDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".md" {
+			return nil
+		}
+		base := filepath.Base(path)
+		if base == "index.md" || base == "log.md" {
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		fm, body, err := frontmatter.Parse(content)
+		if err != nil {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(kbRoot, path)
+		if err != nil {
+			return nil
+		}
+		relPath = filepath.ToSlash(relPath)
+
+		tags := extractTags(fm.Fields)
+		summary := extractSummary(fm.Fields)
+
+		if err := s.IndexPage(ctx, relPath, fm.Title, string(body), tags, summary); err != nil {
+			return fmt.Errorf("index page %s: %w", relPath, err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walk kb directory: %w", err)
+	}
+
+	if err := index.RebuildIndex(kbRoot); err != nil {
+		return fmt.Errorf("rebuild index.md: %w", err)
+	}
+
+	return nil
+}
+
+// extractTags extracts the tags field from frontmatter fields.
+func extractTags(fields map[string]any) string {
+	if t, ok := fields["tags"]; ok {
+		switch v := t.(type) {
+		case string:
+			return v
+		case []any:
+			parts := make([]string, 0, len(v))
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					parts = append(parts, s)
+				}
+			}
+			return strings.Join(parts, " ")
+		}
+	}
+	return ""
+}
+
+// extractSummary extracts the summary field from frontmatter fields.
+func extractSummary(fields map[string]any) string {
+	if s, ok := fields["summary"]; ok {
+		if str, ok := s.(string); ok {
+			return str
+		}
+	}
+	return ""
+}

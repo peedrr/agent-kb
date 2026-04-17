@@ -2,8 +2,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -222,44 +220,63 @@ func TestOpen(t *testing.T) {
 	})
 }
 
-// VerifySchema checks that all expected tables and indexes exist in the database.
-func VerifySchema(db *sql.DB) error {
-	expected := map[string]bool{
-		"documents":          false,
-		"pages_fts":          false,
-		"pages":              false,
-		"links":              false,
-		"idx_links_source":   false,
-		"idx_links_resolved": false,
-	}
-
-	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type IN ('table', 'index')")
-	if err != nil {
-		return fmt.Errorf("query sqlite_master: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return fmt.Errorf("scan name: %w", err)
+func TestOpenKB(t *testing.T) {
+	t.Run("opens database with valid schema", func(t *testing.T) {
+		dir := t.TempDir()
+		akbDir := filepath.Join(dir, ".akb")
+		if err := os.MkdirAll(akbDir, 0755); err != nil {
+			t.Fatalf("create .akb dir: %v", err)
 		}
-		if _, ok := expected[name]; ok {
-			expected[name] = true
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate rows: %w", err)
-	}
+		dbPath := filepath.Join(akbDir, "search.db")
 
-	var missing []string
-	for name, found := range expected {
-		if !found {
-			missing = append(missing, name)
+		db, err := InitDB(dbPath)
+		if err != nil {
+			t.Fatalf("InitDB failed: %v", err)
 		}
-	}
-	if len(missing) > 0 {
-		return fmt.Errorf("missing schema objects: %v", missing)
-	}
-	return nil
+		if err := CreateSchema(db); err != nil {
+			t.Fatalf("CreateSchema failed: %v", err)
+		}
+		db.Close()
+
+		opened, err := OpenKB(dir)
+		if err != nil {
+			t.Fatalf("OpenKB failed: %v", err)
+		}
+		defer opened.Close()
+
+		var mode string
+		if err := opened.QueryRow("PRAGMA journal_mode").Scan(&mode); err != nil {
+			t.Fatalf("check WAL mode: %v", err)
+		}
+		if mode != "wal" {
+			t.Errorf("expected WAL mode, got %s", mode)
+		}
+	})
+
+	t.Run("returns error for missing directory", func(t *testing.T) {
+		_, err := OpenKB("/nonexistent/kb/root")
+		if err == nil {
+			t.Fatal("expected error for missing directory")
+		}
+	})
+
+	t.Run("returns error when schema is invalid", func(t *testing.T) {
+		dir := t.TempDir()
+		akbDir := filepath.Join(dir, ".akb")
+		if err := os.MkdirAll(akbDir, 0755); err != nil {
+			t.Fatalf("create .akb dir: %v", err)
+		}
+		dbPath := filepath.Join(akbDir, "search.db")
+
+		db, err := InitDB(dbPath)
+		if err != nil {
+			t.Fatalf("InitDB failed: %v", err)
+		}
+		db.Close()
+
+		_, err = OpenKB(dir)
+		if err == nil {
+			t.Fatal("expected error for invalid schema")
+		}
+	})
 }
