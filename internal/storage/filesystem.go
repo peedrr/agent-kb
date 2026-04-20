@@ -3,8 +3,11 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 )
 
 // FilesystemProvider performs file I/O without git operations.
@@ -50,4 +53,30 @@ func (f *FilesystemProvider) Exists(_ context.Context, path string) (bool, error
 		return false, nil
 	}
 	return false, fmt.Errorf("check file existence: %w", err)
+}
+
+func (f *FilesystemProvider) List(_ context.Context, dir string, ext string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if ext != "" && !strings.HasSuffix(path, ext) {
+			return nil
+		}
+		relPath, err := filepath.Rel(f.kbRoot, path)
+		if err != nil {
+			return err
+		}
+		files = append(files, filepath.ToSlash(relPath))
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("walk directory: %w", err)
+	}
+	sort.Strings(files)
+	return files, nil
 }

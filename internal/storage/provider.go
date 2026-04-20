@@ -8,4 +8,5 @@ type StorageProvider interface {
 	Read(ctx context.Context, path string) ([]byte, error)
 	Delete(ctx context.Context, path string) error
 	Exists(ctx context.Context, path string) (bool, error)
+	List(ctx context.Context, dir string, ext string) ([]string, error)
 }
