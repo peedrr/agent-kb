@@ -1,0 +1,116 @@
+# Raw Delete — verify raw file deletion with manifest update and sources scan
+
+-- csv-input.txt --
+hello
+-- csv-input.txt --
+
+-- note-input.md --
+---
+type: note
+title: Data Source Note
+sources: data.csv
+---
+Note referencing data.csv
+-- note-input.md --
+
+-- multi-input.md --
+---
+type: note
+title: Multi Source Note
+sources:
+  - data.csv
+  - other.txt
+---
+Note referencing multiple sources
+-- multi-input.md --
+
+-- logo-input.txt --
+logodata
+-- logo-input.txt --
+
+# Setup: initialize a KB
+exec akb init test-kb
+cd test-kb
+
+# --- Write a raw file ---
+exec akb raw write data.csv <../csv-input.txt
+stdout 'Written to raw/data.csv'
+
+# --- Delete the raw file ---
+exec akb raw delete data.csv
+stdout 'Deleted raw/data.csv'
+
+# --- Verify file is removed from disk ---
+! exists raw/data.csv
+
+# --- Verify manifest entry is removed ---
+exec akb raw list
+! stdout 'data.csv'
+
+# --- Write and delete a file in subdirectory ---
+exec akb raw write images/logo.png <../logo-input.txt
+stdout 'Written to raw/images/logo.png'
+
+exec akb raw delete images/logo.png
+stdout 'Deleted raw/images/logo.png'
+
+! exists raw/images/logo.png
+
+exec akb raw list
+! stdout 'images/logo.png'
+
+# --- Sources scan: write raw file, create KB page referencing it, then delete ---
+exec akb raw write data.csv <../csv-input.txt
+stdout 'Written to raw/data.csv'
+
+exec akb write source-note.md <../note-input.md
+stdout 'Written to kb/notes/source-note.md'
+
+# Delete the raw file — should warn about source reference
+exec akb raw delete data.csv
+stdout 'Deleted raw/data.csv'
+stdout 'Pages referencing this file: notes/source-note.md'
+
+# --- Sources scan with list of sources ---
+exec akb raw write data.csv <../csv-input.txt
+stdout 'Written to raw/data.csv'
+
+exec akb write multi-note.md <../multi-input.md
+stdout 'Written to kb/notes/multi-note.md'
+
+exec akb raw delete data.csv
+stdout 'Deleted raw/data.csv'
+stdout 'Pages referencing this file: notes/multi-note.md'
+
+# --- Delete with raw/ prefix ---
+exec akb raw write test.csv <../csv-input.txt
+stdout 'Written to raw/test.csv'
+
+exec akb raw delete raw/test.csv
+stdout 'Deleted raw/test.csv'
+
+! exists raw/test.csv
+
+# --- Cross-namespace guard: akb delete raw/test.txt errors ---
+exec akb raw write test.txt <../csv-input.txt
+stdout 'Written to raw/test.txt'
+
+! exec akb delete raw/test.txt
+stderr 'akb raw delete'
+
+# --- Block deleting files.log ---
+! exec akb raw delete files.log
+stderr 'managed file'
+
+# --- Delete non-existent file returns error ---
+! exec akb raw delete nonexistent.csv
+stderr 'raw file not found'
+
+# --- Delete with --no-commit flag ---
+exec akb raw write nocommit.csv <../csv-input.txt
+stdout 'Written to raw/nocommit.csv'
+
+exec akb raw delete nocommit.csv --no-commit
+stdout 'Deleted raw/nocommit.csv'
+
+! exists raw/nocommit.csv

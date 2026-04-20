@@ -1,0 +1,64 @@
+# Raw Sync — reconcile manifest with filesystem
+
+-- csv-input.txt --
+hello world
+-- csv-input.txt --
+
+-- csv-modified.txt --
+hello modified
+-- csv-modified.txt --
+
+# Setup: initialize a KB
+exec akb init test-kb
+cd test-kb
+
+# --- Write a file to create manifest ---
+exec akb raw write test.csv <../csv-input.txt
+stdout 'Written to raw/test.csv'
+
+# --- Verify manifest exists ---
+exists raw/files.log
+
+# --- Write another file externally (simulates external addition) ---
+exec bash -c 'echo "external" > raw/external.txt'
+
+# --- Run sync to detect new file ---
+exec akb raw sync
+stdout 'Synced: 1 new, 0 modified, 0 deleted, 1 unchanged'
+
+# --- Verify external file is now in manifest ---
+exec akb raw list
+stdout 'external.txt'
+stdout 'test.csv'
+
+# --- Modify a file externally ---
+exec bash -c 'echo "modified content" > raw/test.csv'
+
+# --- Run sync to detect modification ---
+exec akb raw sync
+stdout 'Synced: 0 new, 1 modified, 0 deleted, 1 unchanged'
+
+# --- Delete a file externally ---
+exec bash -c 'rm raw/test.csv'
+
+# --- Run sync to detect deletion ---
+exec akb raw sync
+stdout 'Synced: 0 new, 0 modified, 1 deleted, 1 unchanged'
+
+# --- Verify test.csv is removed from manifest ---
+exec akb raw list
+! stdout 'test.csv'
+
+# --- Run sync on clean state (no changes) ---
+exec akb raw sync
+stdout 'No changes to sync.'
+
+# --- Test --no-commit flag ---
+# Write a file but don't commit
+exec bash -c 'echo "nocommittest" > raw/nocommittest.txt'
+exec akb raw sync --no-commit
+stdout 'Synced: 1 new, 0 modified, 0 deleted, 0 unchanged'
+
+# Verify files.log was updated but no commit was made
+exec bash -c 'git diff --cached raw/files.log | grep -q "nocommittest.txt" && exit 0 || exit 1'
+! status 0

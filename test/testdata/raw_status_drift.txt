@@ -1,0 +1,92 @@
+# Raw Status — verify drift detection for raw files
+
+-- csv-input.txt --
+hello
+-- csv-input.txt --
+
+-- modified-input.txt --
+modified content
+-- modified-input.txt --
+
+-- data-input.txt --
+data
+-- data-input.txt --
+
+-- corrupt-manifest.txt --
+invalid line without pipes
+-- corrupt-manifest.txt --
+
+# Setup: initialize a KB
+exec akb init test-kb
+cd test-kb
+
+# --- Clean state: no drift ---
+exec akb raw status
+stdout 'no drift'
+
+# --- Write a raw file, then check status (still no drift) ---
+exec akb raw write data.csv <../csv-input.txt
+exec akb raw status
+stdout 'no drift'
+
+# --- Modified file: change file on disk, detect drift ---
+# Overwrite the file directly (bypassing akb) to change its hash
+cp ../modified-input.txt raw/data.csv
+exec akb raw status
+stdout 'MODIFIED data.csv'
+! stdout 'UNTRACKED'
+! stdout 'MISSING'
+
+# --- Modified file exits with code 1 ---
+! exec akb raw status
+
+# --- Untracked file: create file directly in raw/ ---
+cp ../data-input.txt raw/untracked.txt
+exec akb raw status
+stdout 'UNTRACKED untracked.txt'
+
+# --- Missing file: delete a tracked file from disk ---
+rm raw/data.csv
+exec akb raw status
+stdout 'MISSING data.csv'
+
+# --- Specific file check: filter to one file ---
+# Restore data.csv with modified content so it's MODIFIED
+cp ../modified-input.txt raw/data.csv
+exec akb raw status data.csv
+stdout 'MODIFIED data.csv'
+! stdout 'untracked.txt'
+
+# --- Specific file with no drift exits 0 ---
+exec akb raw write fresh.csv <../csv-input.txt
+exec akb raw status fresh.csv
+stdout 'no drift'
+
+# --- JSON output format ---
+exec akb raw status --json
+stdout '"files"'
+stdout '"summary"'
+stdout '"modified"'
+stdout '"untracked"'
+stdout '"missing"'
+
+# --- JSON output with no drift ---
+exec akb raw write clean.csv <../csv-input.txt
+exec akb raw status clean.csv --json
+stdout '"modified": 0'
+stdout '"untracked": 0'
+stdout '"missing": 0'
+
+# --- Error: no raw/ directory ---
+rm -rf raw
+! exec akb raw status
+stderr 'raw/ directory not found'
+
+# --- Error: corrupted manifest ---
+exec akb init test-kb2
+cd test-kb2
+exec akb raw write data.csv <../csv-input.txt
+# Corrupt the manifest by overwriting with invalid content
+cp ../corrupt-manifest.txt raw/files.log
+! exec akb raw status
+stderr 'corrupted'
