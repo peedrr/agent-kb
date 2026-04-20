@@ -1,0 +1,54 @@
+# Raw List — verify raw file listing behavior
+
+-- csv-input.txt --
+hello
+-- csv-input.txt --
+
+-- logo-input.txt --
+logodata
+-- logo-input.txt --
+
+-- data-input.txt --
+data
+-- data-input.txt --
+
+# Setup: initialize a KB
+exec akb init test-kb
+cd test-kb
+
+# --- Empty raw directory: list shows nothing ---
+exec akb raw list
+! stdout .
+
+# --- Write a single file, list shows it ---
+exec akb raw write test.csv <../csv-input.txt
+exec akb raw list
+stdout 'test.csv'
+
+# --- Write multiple files, list shows all alphabetically ---
+exec akb raw write alpha.txt <../data-input.txt
+exec akb raw write zeta.txt <../data-input.txt
+exec akb raw list
+stdout 'alpha.txt'
+stdout 'test.csv'
+stdout 'zeta.txt'
+
+# --- List excludes files.log ---
+exec akb raw list
+! stdout 'files.log'
+
+# --- Write file in subdirectory, list shows relative path ---
+exec akb raw write images/logo.png <../logo-input.txt
+exec akb raw list
+stdout 'images/logo.png'
+stdout 'alpha.txt'
+stdout 'test.csv'
+stdout 'zeta.txt'
+
+# --- Delete a file, list no longer shows it ---
+exec akb raw delete alpha.txt
+exec akb raw list
+! stdout 'alpha.txt'
+stdout 'test.csv'
+stdout 'zeta.txt'
+stdout 'images/logo.png'

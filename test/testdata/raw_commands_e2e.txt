@@ -1,0 +1,196 @@
+# Raw Commands E2E — full end-to-end flow for raw operations
+
+-- csv-input.txt --
+hello,world
+-- csv-input.txt --
+
+-- logo-input.txt --
+logodata
+-- logo-input.txt --
+
+-- config-input.txt --
+key=value
+-- config-input.txt --
+
+-- modified-input.txt --
+modified content
+-- modified-input.txt --
+
+-- note-input.md --
+---
+type: note
+title: Data Source Note
+sources: data.csv
+---
+Note referencing data.csv
+-- note-input.md --
+
+-- append-input.md --
+Appended content
+-- append-input.md --
+
+# === INIT ===
+
+exec akb init test-kb
+cd test-kb
+
+# === RAW WRITE ===
+
+# Write multiple raw files
+exec akb raw write data.csv <../csv-input.txt
+stdout 'Written to raw/data.csv'
+
+exec akb raw write images/logo.png <../logo-input.txt
+stdout 'Written to raw/images/logo.png'
+
+exec akb raw write config/settings.ini <../config-input.txt
+stdout 'Written to raw/config/settings.ini'
+
+# === RAW LIST ===
+
+# List shows all files alphabetically
+exec akb raw list
+stdout 'config/settings.ini'
+stdout 'data.csv'
+stdout 'images/logo.png'
+
+# List excludes files.log
+exec akb raw list
+! stdout 'files.log'
+
+# === RAW READ ===
+
+# Read each file correctly
+exec akb raw read data.csv
+stdout 'hello,world'
+
+exec akb raw read images/logo.png
+stdout 'logodata'
+
+exec akb raw read config/settings.ini
+stdout 'key=value'
+
+# Read with raw/ prefix
+exec akb raw read raw/data.csv
+stdout 'hello,world'
+
+# === RAW STATUS — NO DRIFT ===
+
+exec akb raw status
+stdout 'no drift'
+
+# === DRIFT DETECTION ===
+
+# Modify file externally → drift detected
+cp ../modified-input.txt raw/data.csv
+exec akb raw status
+stdout 'MODIFIED data.csv'
+! stdout 'UNTRACKED'
+! stdout 'MISSING'
+
+# Drift exits with code 1
+! exec akb raw status
+
+# Create untracked file
+exec bash -c 'echo "untracked" > raw/untracked.txt'
+exec akb raw status
+stdout 'UNTRACKED untracked.txt'
+
+# Delete tracked file → missing
+rm raw/config/settings.ini
+exec akb raw status
+stdout 'MISSING config/settings.ini'
+
+# === RAW SYNC — FIX DRIFT ===
+
+exec akb raw sync
+stdout 'Synced'
+
+# Verify sync fixed drift
+exec akb raw status
+stdout 'no drift'
+
+# Sync on clean state reports no changes
+exec akb raw sync
+stdout 'No changes to sync.'
+
+# === RAW DELETE ===
+
+# Write a file for deletion
+exec akb raw write temp.txt <../csv-input.txt
+stdout 'Written to raw/temp.txt'
+
+# Delete the file
+exec akb raw delete temp.txt
+stdout 'Deleted raw/temp.txt'
+
+# Verify file removed from disk
+! exists raw/temp.txt
+
+# Verify manifest entry removed
+exec akb raw list
+! stdout 'temp.txt'
+
+# === SOURCES SCAN WARNING ===
+
+# Write a raw file and create a KB page referencing it
+exec akb raw write data.csv <../csv-input.txt
+stdout 'Written to raw/data.csv'
+
+exec akb write source-note.md <../note-input.md
+stdout 'Written to kb/notes/source-note.md'
+
+# Delete the raw file — should warn about source reference
+exec akb raw delete data.csv
+stdout 'Deleted raw/data.csv'
+stdout 'Pages referencing this file: notes/source-note.md'
+
+# === CROSS-NAMESPACE GUARDS ===
+
+# Block raw/ prefix on regular write
+! exec akb write raw/notes/test.md <../note-input.md
+stderr 'akb raw write'
+
+# Block raw/ prefix on regular read
+! exec akb read raw/notes/test.md
+stderr 'akb raw read'
+
+# Block raw/ prefix on regular delete
+! exec akb delete raw/notes/test.md
+stderr 'akb raw delete'
+
+# Block raw/ prefix on regular append
+! exec akb append raw/notes/test.md <../append-input.md
+stderr 'akb raw write'
+
+# Block kb/ prefix on raw write
+! exec akb raw write kb/test.md <../csv-input.txt
+stderr 'akb write'
+
+# Block kb/ prefix on raw read
+! exec akb raw read kb/test.md
+stderr 'akb read'
+
+# === --no-commit FLAG ===
+
+# Write with --no-commit
+exec akb raw write nocommit.txt <../csv-input.txt --no-commit
+stdout 'Written to raw/nocommit.txt'
+
+# Verify file exists
+exists raw/nocommit.txt
+
+# Verify no git commit was created for the write
+exec git status --short
+stdout 'raw/nocommit.txt'
+
+# Sync with --no-commit
+exec bash -c 'echo "external" > raw/external.txt'
+exec akb raw sync --no-commit
+stdout 'Synced'
+
+# Delete with --no-commit
+exec akb raw delete nocommit.txt --no-commit
+stdout 'Deleted raw/nocommit.txt'
+
+! exists raw/nocommit.txt
