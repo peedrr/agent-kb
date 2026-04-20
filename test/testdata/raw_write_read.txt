@@ -1,0 +1,84 @@
+# Raw Write/Read/List — verify raw file operations
+
+-- csv-input.txt --
+hello
+-- csv-input.txt --
+
+-- logo-input.txt --
+data
+-- logo-input.txt --
+
+-- pipe-input.txt --
+data
+-- pipe-input.txt --
+
+# Setup: initialize a KB
+exec akb init test-kb
+cd test-kb
+
+# --- Write a raw file ---
+exec akb raw write test.csv <../csv-input.txt
+stdout 'Written to raw/test.csv'
+
+# --- Verify file exists on disk ---
+exists raw/test.csv
+
+# --- Read the raw file back ---
+exec akb raw read test.csv
+stdout 'hello'
+
+# --- Read with raw/ prefix ---
+exec akb raw read raw/test.csv
+stdout 'hello'
+
+# --- List raw files ---
+exec akb raw list
+stdout 'test.csv'
+
+# --- Write a raw file in a subdirectory ---
+exec akb raw write images/logo.png <../logo-input.txt
+stdout 'Written to raw/images/logo.png'
+
+# --- Verify subdirectory was created ---
+exists raw/images/logo.png
+
+# --- List includes subdirectory file ---
+exec akb raw list
+stdout 'images/logo.png'
+stdout 'test.csv'
+
+# --- files.log is excluded from list ---
+exec akb raw list
+! stdout 'files.log'
+
+# --- Block writing files.log ---
+! exec akb raw write files.log <../csv-input.txt
+stderr 'managed file'
+
+# --- Block kb/ prefix on raw write ---
+! exec akb raw write kb/test.md <../csv-input.txt
+stderr 'akb write'
+
+# --- Block raw/ prefix on regular write ---
+! exec akb write raw/test.md <../csv-input.txt
+stderr 'akb raw write'
+
+# --- Block pipe character in filename ---
+! exec akb raw write "data|with|pipes.txt" <../pipe-input.txt
+stderr 'must not contain'
+
+# --- Block .. in path ---
+! exec akb raw write ../etc/passwd <../csv-input.txt
+stderr 'must not contain'
+
+# --- Block absolute path ---
+! exec akb raw write /tmp/evil.txt <../csv-input.txt
+stderr 'must be relative'
+
+# --- Read nonexistent file ---
+! exec akb raw read nonexistent.csv
+stderr 'raw file not found'
+
+# --- Block kb/ prefix on raw read ---
+! exec akb raw read kb/test.md
+stderr 'akb read'

@@ -31,6 +31,7 @@ func init() {
 	RootCmd.AddCommand(linksCmd)
 	RootCmd.AddCommand(backlinksCmd)
 	RootCmd.AddCommand(orphansCmd)
+	RootCmd.AddCommand(rawCmd)
 }
 
 func Execute() error {
