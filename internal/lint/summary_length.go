@@ -1,0 +1,52 @@
+package lint
+
+import (
+	"context"
+	"fmt"
+)
+
+type SummaryLengthChecker struct{}
+
+func NewSummaryLengthChecker() *SummaryLengthChecker {
+	return &SummaryLengthChecker{}
+}
+
+func (c *SummaryLengthChecker) Name() string {
+	return "summary_length"
+}
+
+func (c *SummaryLengthChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error) {
+	var issues []LintIssue
+	for _, page := range kb.Pages {
+		if !page.HasFrontmatter {
+			continue
+		}
+		summaryVal, ok := page.Frontmatter.Fields["summary"]
+		if !ok || summaryVal == nil {
+			continue
+		}
+
+		summary, ok := summaryVal.(string)
+		if !ok {
+			continue
+		}
+
+		if len(summary) < SummaryMinLength {
+			issues = append(issues, LintIssue{
+				Type:     "summary_length",
+				Message:  fmt.Sprintf("summary is too short (%d chars, minimum is %d)", len(summary), SummaryMinLength),
+				Path:     page.RelPath,
+				Severity: "warning",
+			})
+		}
+		if len(summary) > SummaryMaxLength {
+			issues = append(issues, LintIssue{
+				Type:     "summary_length",
+				Message:  fmt.Sprintf("summary is too long (%d chars, maximum is %d)", len(summary), SummaryMaxLength),
+				Path:     page.RelPath,
+				Severity: "warning",
+			})
+		}
+	}
+	return issues, nil
+}

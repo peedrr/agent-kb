@@ -1,0 +1,60 @@
+package lint
+
+import (
+	"context"
+	"fmt"
+)
+
+type CitationsChecker struct{}
+
+func NewCitationsChecker() *CitationsChecker {
+	return &CitationsChecker{}
+}
+
+func (c *CitationsChecker) Name() string {
+	return "citations"
+}
+
+func (c *CitationsChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error) {
+	manifestFiles := make(map[string]bool)
+	for _, e := range kb.Manifest {
+		manifestFiles[e.Filename] = true
+	}
+
+	var issues []LintIssue
+	for _, page := range kb.Pages {
+		if !page.HasFrontmatter {
+			continue
+		}
+		sources, ok := page.Frontmatter.Fields["sources"]
+		if !ok || sources == nil {
+			continue
+		}
+
+		var filenames []string
+		switch s := sources.(type) {
+		case string:
+			filenames = []string{s}
+		case []any:
+			for _, item := range s {
+				if str, ok := item.(string); ok {
+					filenames = append(filenames, str)
+				}
+			}
+		default:
+			continue
+		}
+
+		for _, fn := range filenames {
+			if !manifestFiles[fn] {
+				issues = append(issues, LintIssue{
+					Type:     "citations",
+					Message:  fmt.Sprintf("source '%s' not found in raw manifest; run 'akb raw sync' to update", fn),
+					Path:     page.RelPath,
+					Severity: "error",
+				})
+			}
+		}
+	}
+	return issues, nil
+}

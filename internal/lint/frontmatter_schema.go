@@ -1,0 +1,90 @@
+package lint
+
+import (
+	"context"
+	"fmt"
+	"strings"
+)
+
+type FrontmatterSchemaChecker struct{}
+
+func NewFrontmatterSchemaChecker() *FrontmatterSchemaChecker {
+	return &FrontmatterSchemaChecker{}
+}
+
+func (c *FrontmatterSchemaChecker) Name() string {
+	return "frontmatter_schema"
+}
+
+func (c *FrontmatterSchemaChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error) {
+	var issues []LintIssue
+	for _, page := range kb.Pages {
+		if !page.HasFrontmatter {
+			continue
+		}
+		fm := page.Frontmatter
+		if fm.Type == "" {
+			continue
+		}
+		tmpl, ok := kb.Templates[fm.Type]
+		if !ok {
+			continue
+		}
+
+		for _, field := range tmpl.Required {
+			var value any
+			var exists bool
+			switch field.Name {
+			case "type":
+				value = fm.Type
+				exists = fm.Type != ""
+			case "title":
+				value = fm.Title
+				exists = fm.Title != ""
+			default:
+				value, exists = fm.Fields[field.Name]
+			}
+
+			if !exists {
+				issues = append(issues, LintIssue{
+					Type:     "frontmatter_schema",
+					Message:  fmt.Sprintf("missing required field '%s' for type '%s'", field.Name, fm.Type),
+					Path:     page.RelPath,
+					Severity: "error",
+				})
+				continue
+			}
+
+			if len(field.Enum) > 0 {
+				strVal, ok := value.(string)
+				if !ok {
+					issues = append(issues, LintIssue{
+						Type:     "frontmatter_schema",
+						Message:  fmt.Sprintf("field '%s' must be a string for type '%s'", field.Name, fm.Type),
+						Path:     page.RelPath,
+						Severity: "error",
+					})
+					continue
+				}
+				if !isInEnum(strVal, field.Enum) {
+					issues = append(issues, LintIssue{
+						Type:     "frontmatter_schema",
+						Message:  fmt.Sprintf("field '%s' value '%s' is not valid; must be one of: %s", field.Name, strVal, strings.Join(field.Enum, ", ")),
+						Path:     page.RelPath,
+						Severity: "error",
+					})
+				}
+			}
+		}
+	}
+	return issues, nil
+}
+
+func isInEnum(val string, enum []string) bool {
+	for _, e := range enum {
+		if val == e {
+			return true
+		}
+	}
+	return false
+}
