@@ -166,3 +166,47 @@ func TestValidateTitle(t *testing.T) {
 		}
 	})
 }
+
+func TestIsDraft(t *testing.T) {
+	t.Run("nil fields returns true", func(t *testing.T) {
+		if !IsDraft(nil) {
+			t.Error("expected IsDraft(nil) = true")
+		}
+	})
+
+	t.Run("missing key returns true", func(t *testing.T) {
+		if !IsDraft(map[string]any{}) {
+			t.Error("expected IsDraft(empty map) = true")
+		}
+	})
+
+	t.Run("explicit true bool returns true", func(t *testing.T) {
+		if !IsDraft(map[string]any{"is_draft": true}) {
+			t.Error("expected IsDraft(true) = true")
+		}
+	})
+
+	t.Run("explicit false bool returns false", func(t *testing.T) {
+		if IsDraft(map[string]any{"is_draft": false}) {
+			t.Error("expected IsDraft(false) = false")
+		}
+	})
+
+	t.Run("string true returns true", func(t *testing.T) {
+		if !IsDraft(map[string]any{"is_draft": "true"}) {
+			t.Error("expected IsDraft('true') = true")
+		}
+	})
+
+	t.Run("string false returns false", func(t *testing.T) {
+		if IsDraft(map[string]any{"is_draft": "false"}) {
+			t.Error("expected IsDraft('false') = false")
+		}
+	})
+
+	t.Run("other fields ignored", func(t *testing.T) {
+		if !IsDraft(map[string]any{"tags": []string{"go"}}) {
+			t.Error("expected IsDraft with only tags = true")
+		}
+	})
+}

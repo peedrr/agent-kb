@@ -70,3 +70,24 @@ func ValidateTitle(fm *ParsedFrontmatter) error {
 	}
 	return nil
 }
+
+// IsDraft returns true when a page is in draft state.
+// Draft is the implicit default: if is_draft is absent or explicitly true,
+// the page is a draft. Only an explicit false means approved.
+func IsDraft(fields map[string]any) bool {
+	if fields == nil {
+		return true
+	}
+	v, ok := fields["is_draft"]
+	if !ok {
+		return true
+	}
+	switch val := v.(type) {
+	case bool:
+		return val
+	case string:
+		return val != "false"
+	default:
+		return true
+	}
+}

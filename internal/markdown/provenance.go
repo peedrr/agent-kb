@@ -2,6 +2,7 @@ package markdown
 
 import (
 	"regexp"
+	"strings"
 )
 
 // ProvenanceMarker represents a ^[type] provenance marker in content.
@@ -47,4 +48,33 @@ func CountMarkersByType(markers []ProvenanceMarker) map[string]int {
 		counts[m.Type]++
 	}
 	return counts
+}
+
+var stripProvenanceRe = regexp.MustCompile(`\^\[(inferred|ambiguous|extracted)\]`)
+
+// StripProvenanceMarkers removes ^[inferred], ^[ambiguous], and ^[extracted]
+// markers from content, preserving those inside code blocks, inline code,
+// and HTML comments.
+func StripProvenanceMarkers(content string) string {
+	if content == "" {
+		return ""
+	}
+
+	excluded := computeExclusions(content)
+	matches := stripProvenanceRe.FindAllStringIndex(content, -1)
+
+	var result strings.Builder
+	lastEnd := 0
+	for _, m := range matches {
+		start := m[0]
+		end := m[1]
+		result.WriteString(content[lastEnd:start])
+		if excluded.isExcluded(start, end) {
+			result.WriteString(content[start:end])
+		}
+		lastEnd = end
+	}
+	result.WriteString(content[lastEnd:])
+
+	return result.String()
 }

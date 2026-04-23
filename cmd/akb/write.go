@@ -17,6 +17,7 @@ import (
 	"github.com/peedrr/agent-kb/internal/storage"
 	"github.com/peedrr/agent-kb/internal/template"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var writeCmd = &cobra.Command{
@@ -84,6 +85,25 @@ func runWrite(cmd *cobra.Command, args []string) error {
 	// Validate title
 	if err := frontmatter.ValidateTitle(fm); err != nil {
 		return err
+	}
+
+	writeContent := stdinContent
+	if val, ok := fm.Fields["is_draft"]; ok {
+		if val == true || val == "true" {
+			delete(fm.Fields, "is_draft")
+			allFields := map[string]any{
+				"type":  fm.Type,
+				"title": fm.Title,
+			}
+			for k, v := range fm.Fields {
+				allFields[k] = v
+			}
+			yamlBytes, err := yaml.Marshal(allFields)
+			if err != nil {
+				return fmt.Errorf("re-serialize frontmatter: %w", err)
+			}
+			writeContent = []byte("---\n" + string(yamlBytes) + "---\n" + string(body))
+		}
 	}
 
 	// Resolve type-derived directory
@@ -156,7 +176,7 @@ func runWrite(cmd *cobra.Command, args []string) error {
 
 	// Write content
 	ctx := context.Background()
-	if err := store.Write(ctx, fullPath, stdinContent); err != nil {
+	if err := store.Write(ctx, fullPath, writeContent); err != nil {
 		return fmt.Errorf("write page: %w", err)
 	}
 
@@ -166,7 +186,7 @@ func runWrite(cmd *cobra.Command, args []string) error {
 	}
 
 	updater := linkgraph.NewSQLiteLinkGraph(dbConn)
-	if err := updater.UpdatePageLinks(ctx, relPath, string(stdinContent)); err != nil {
+	if err := updater.UpdatePageLinks(ctx, relPath, string(writeContent)); err != nil {
 		return fmt.Errorf("update links: %w", err)
 	}
 
