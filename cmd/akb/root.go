@@ -37,6 +37,7 @@ func init() {
 	RootCmd.AddCommand(useCmd)
 	RootCmd.AddCommand(approveCmd)
 	RootCmd.AddCommand(staleCmd)
+	RootCmd.AddCommand(skillCmd)
 }
 
 func Execute() error {

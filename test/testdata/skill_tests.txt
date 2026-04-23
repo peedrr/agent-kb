@@ -1,0 +1,34 @@
+# Skill Install Tests
+
+exec mkdir -p $WORK/skills
+
+# --- Install skill without --location fails ---
+! exec akb skill install kb-management
+stderr '--location is required'
+
+# --- Install skill to temp directory ---
+exec akb skill install --location $WORK/skills kb-management
+
+# --- Verify SKILL.md extracted ---
+exec test -f $WORK/skills/kb-management/SKILL.md
+! stderr .
+
+# --- Verify references directory extracted ---
+exec test -d $WORK/skills/kb-management/references
+! stderr .
+
+# --- Verify reference files exist ---
+exec test -f $WORK/skills/kb-management/references/INIT.md
+exec test -f $WORK/skills/kb-management/references/INGEST.md
+exec test -f $WORK/skills/kb-management/references/QUERY.md
+exec test -f $WORK/skills/kb-management/references/UPDATE.md
+exec test -f $WORK/skills/kb-management/references/MAINTAIN.md
+exec test -f $WORK/skills/kb-management/references/APPROVE.md
+
+# --- Install same skill again fails ---
+! exec akb skill install --location $WORK/skills kb-management
+stderr 'already installed'
+
+# --- Install unknown skill fails ---
+! exec akb skill install --location $WORK/skills nonexistent
+stderr 'Unknown skill'
