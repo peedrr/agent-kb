@@ -51,7 +51,7 @@ func runAppend(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("read stdin: %w", err)
 	}
 
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}

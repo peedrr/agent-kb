@@ -241,4 +241,18 @@ func setupLogTestKB(t *testing.T, kbRoot string) {
 		t.Logf("git add initial files failed: %v", err)
 	}
 	commitInitial(kbRoot)
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", kbRoot)
+	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+
+	regPath := filepath.Join(kbRoot, ".config", "agent-kb", "registry.yaml")
+	os.MkdirAll(filepath.Dir(regPath), 0755)
+	regContent := `default: test-kb
+entries:
+  - name: test-kb
+    path: ` + kbRoot + `
+    created: "2024-01-01T00:00:00Z"
+`
+	os.WriteFile(regPath, []byte(regContent), 0644)
 }

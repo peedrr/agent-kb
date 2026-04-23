@@ -67,7 +67,7 @@ func init() {
 }
 
 func runIndexShow(cmd *cobra.Command, args []string) error {
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func runIndexAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("cannot add %s to index", base)
 	}
 
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func runIndexAdd(cmd *cobra.Command, args []string) error {
 func runIndexRemove(cmd *cobra.Command, args []string) error {
 	entryPath := args[0]
 
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}
@@ -187,7 +187,7 @@ func runIndexRemove(cmd *cobra.Command, args []string) error {
 }
 
 func runIndexRebuild(cmd *cobra.Command, args []string) error {
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}

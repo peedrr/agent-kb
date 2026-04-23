@@ -7,20 +7,55 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	t.Run("returns nil for non-existent file", func(t *testing.T) {
+	t.Run("returns empty registry for non-existent file", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "nonexistent.yaml")
 
-		entries, err := Load(path)
+		reg, err := Load(path)
 		if err != nil {
 			t.Fatalf("Load failed: %v", err)
 		}
-		if entries != nil {
-			t.Fatalf("expected nil for non-existent file, got %v", entries)
+		if reg == nil {
+			t.Fatal("expected non-nil registry for non-existent file")
+		}
+		if reg.Default != "" {
+			t.Fatalf("expected empty default, got %q", reg.Default)
+		}
+		if reg.Entries != nil {
+			t.Fatalf("expected nil entries, got %v", reg.Entries)
 		}
 	})
 
-	t.Run("parses existing registry file", func(t *testing.T) {
+	t.Run("parses new format registry file", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "registry.yaml")
+
+		content := `default: test-kb
+entries:
+  - name: test-kb
+    path: /home/user/kb/test
+    created: "2024-01-01"
+`
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatalf("write test file: %v", err)
+		}
+
+		reg, err := Load(path)
+		if err != nil {
+			t.Fatalf("Load failed: %v", err)
+		}
+		if reg.Default != "test-kb" {
+			t.Fatalf("expected default 'test-kb', got %q", reg.Default)
+		}
+		if len(reg.Entries) != 1 {
+			t.Fatalf("expected 1 entry, got %d", len(reg.Entries))
+		}
+		if reg.Entries[0].Name != "test-kb" {
+			t.Fatalf("expected name 'test-kb', got %q", reg.Entries[0].Name)
+		}
+	})
+
+	t.Run("migrates old flat format", func(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "registry.yaml")
 
@@ -32,15 +67,18 @@ func TestLoad(t *testing.T) {
 			t.Fatalf("write test file: %v", err)
 		}
 
-		entries, err := Load(path)
+		reg, err := Load(path)
 		if err != nil {
 			t.Fatalf("Load failed: %v", err)
 		}
-		if len(entries) != 1 {
-			t.Fatalf("expected 1 entry, got %d", len(entries))
+		if reg.Default != "" {
+			t.Fatalf("expected empty default after migration, got %q", reg.Default)
 		}
-		if entries[0].Name != "test-kb" {
-			t.Fatalf("expected name 'test-kb', got %q", entries[0].Name)
+		if len(reg.Entries) != 1 {
+			t.Fatalf("expected 1 entry, got %d", len(reg.Entries))
+		}
+		if reg.Entries[0].Name != "test-kb" {
+			t.Fatalf("expected name 'test-kb', got %q", reg.Entries[0].Name)
 		}
 	})
 }
@@ -50,11 +88,12 @@ func TestSave(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "subdir", "registry.yaml")
 
-		entries := []Entry{
-			{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"},
+		reg := &Registry{
+			Default: "kb1",
+			Entries: []Entry{{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"}},
 		}
 
-		err := Save(path, entries)
+		err := Save(path, reg)
 		if err != nil {
 			t.Fatalf("Save failed: %v", err)
 		}
@@ -68,12 +107,14 @@ func TestSave(t *testing.T) {
 		dir := t.TempDir()
 		path := filepath.Join(dir, "registry.yaml")
 
-		entries := []Entry{
-			{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"},
-			{Name: "kb2", Path: "/path/kb2", Created: "2024-01-02"},
+		reg := &Registry{
+			Entries: []Entry{
+				{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"},
+				{Name: "kb2", Path: "/path/kb2", Created: "2024-01-02"},
+			},
 		}
 
-		err := Save(path, entries)
+		err := Save(path, reg)
 		if err != nil {
 			t.Fatalf("Save failed: %v", err)
 		}
@@ -82,8 +123,8 @@ func TestSave(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Load after Save failed: %v", err)
 		}
-		if len(loaded) != 2 {
-			t.Fatalf("expected 2 entries, got %d", len(loaded))
+		if len(loaded.Entries) != 2 {
+			t.Fatalf("expected 2 entries, got %d", len(loaded.Entries))
 		}
 	})
 }
@@ -107,15 +148,15 @@ func TestAddEntry(t *testing.T) {
 			t.Fatalf("AddEntry failed: %v", err)
 		}
 
-		entries, err := Load(regPath)
+		reg, err := Load(regPath)
 		if err != nil {
 			t.Fatalf("Load failed: %v", err)
 		}
-		if len(entries) != 1 {
-			t.Fatalf("expected 1 entry, got %d", len(entries))
+		if len(reg.Entries) != 1 {
+			t.Fatalf("expected 1 entry, got %d", len(reg.Entries))
 		}
-		if entries[0].Name != "new-kb" {
-			t.Fatalf("expected name 'new-kb', got %q", entries[0].Name)
+		if reg.Entries[0].Name != "new-kb" {
+			t.Fatalf("expected name 'new-kb', got %q", reg.Entries[0].Name)
 		}
 	})
 
@@ -130,8 +171,8 @@ func TestAddEntry(t *testing.T) {
 			t.Fatalf("RegistryPath failed: %v", err)
 		}
 
-		existing := []Entry{
-			{Name: "existing-kb", Path: "/path/existing", Created: "2024-01-01"},
+		existing := &Registry{
+			Entries: []Entry{{Name: "existing-kb", Path: "/path/existing", Created: "2024-01-01"}},
 		}
 		if err := Save(regPath, existing); err != nil {
 			t.Fatalf("Save failed: %v", err)
@@ -156,11 +197,13 @@ func TestFindByName(t *testing.T) {
 			t.Fatalf("RegistryPath failed: %v", err)
 		}
 
-		entries := []Entry{
-			{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"},
-			{Name: "kb2", Path: "/path/kb2", Created: "2024-01-02"},
+		reg := &Registry{
+			Entries: []Entry{
+				{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"},
+				{Name: "kb2", Path: "/path/kb2", Created: "2024-01-02"},
+			},
 		}
-		if err := Save(regPath, entries); err != nil {
+		if err := Save(regPath, reg); err != nil {
 			t.Fatalf("Save failed: %v", err)
 		}
 
@@ -187,10 +230,10 @@ func TestFindByName(t *testing.T) {
 			t.Fatalf("RegistryPath failed: %v", err)
 		}
 
-		entries := []Entry{
-			{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"},
+		reg := &Registry{
+			Entries: []Entry{{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"}},
 		}
-		if err := Save(regPath, entries); err != nil {
+		if err := Save(regPath, reg); err != nil {
 			t.Fatalf("Save failed: %v", err)
 		}
 
@@ -200,6 +243,125 @@ func TestFindByName(t *testing.T) {
 		}
 		if found != nil {
 			t.Fatalf("expected nil for non-existent name, got %v", found)
+		}
+	})
+}
+
+func TestSetDefault(t *testing.T) {
+	t.Run("sets default to existing entry", func(t *testing.T) {
+		dir := t.TempDir()
+		origHome := os.Getenv("HOME")
+		os.Setenv("HOME", dir)
+		defer os.Setenv("HOME", origHome)
+
+		regPath, err := RegistryPath()
+		if err != nil {
+			t.Fatalf("RegistryPath failed: %v", err)
+		}
+
+		reg := &Registry{
+			Entries: []Entry{
+				{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"},
+			},
+		}
+		if err := Save(regPath, reg); err != nil {
+			t.Fatalf("Save failed: %v", err)
+		}
+
+		if err := SetDefault("kb1"); err != nil {
+			t.Fatalf("SetDefault failed: %v", err)
+		}
+
+		loaded, err := Load(regPath)
+		if err != nil {
+			t.Fatalf("Load failed: %v", err)
+		}
+		if loaded.Default != "kb1" {
+			t.Fatalf("expected default 'kb1', got %q", loaded.Default)
+		}
+	})
+
+	t.Run("rejects non-existent name", func(t *testing.T) {
+		dir := t.TempDir()
+		origHome := os.Getenv("HOME")
+		os.Setenv("HOME", dir)
+		defer os.Setenv("HOME", origHome)
+
+		regPath, err := RegistryPath()
+		if err != nil {
+			t.Fatalf("RegistryPath failed: %v", err)
+		}
+
+		reg := &Registry{
+			Entries: []Entry{{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"}},
+		}
+		if err := Save(regPath, reg); err != nil {
+			t.Fatalf("Save failed: %v", err)
+		}
+
+		err = SetDefault("nonexistent")
+		if err == nil {
+			t.Fatal("expected error for non-existent name")
+		}
+	})
+}
+
+func TestGetDefault(t *testing.T) {
+	t.Run("returns default entry", func(t *testing.T) {
+		dir := t.TempDir()
+		origHome := os.Getenv("HOME")
+		os.Setenv("HOME", dir)
+		defer os.Setenv("HOME", origHome)
+
+		regPath, err := RegistryPath()
+		if err != nil {
+			t.Fatalf("RegistryPath failed: %v", err)
+		}
+
+		reg := &Registry{
+			Default: "kb1",
+			Entries: []Entry{
+				{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"},
+				{Name: "kb2", Path: "/path/kb2", Created: "2024-01-02"},
+			},
+		}
+		if err := Save(regPath, reg); err != nil {
+			t.Fatalf("Save failed: %v", err)
+		}
+
+		entry, err := GetDefault()
+		if err != nil {
+			t.Fatalf("GetDefault failed: %v", err)
+		}
+		if entry.Name != "kb1" {
+			t.Fatalf("expected name 'kb1', got %q", entry.Name)
+		}
+		if entry.Path != "/path/kb1" {
+			t.Fatalf("expected path '/path/kb1', got %q", entry.Path)
+		}
+	})
+
+	t.Run("returns error when no default set", func(t *testing.T) {
+		dir := t.TempDir()
+		origHome := os.Getenv("HOME")
+		os.Setenv("HOME", dir)
+		defer os.Setenv("HOME", origHome)
+
+		regPath, err := RegistryPath()
+		if err != nil {
+			t.Fatalf("RegistryPath failed: %v", err)
+		}
+
+		reg := &Registry{
+			Entries: []Entry{{Name: "kb1", Path: "/path/kb1", Created: "2024-01-01"}},
+		}
+		if err := Save(regPath, reg); err != nil {
+			t.Fatalf("Save failed: %v", err)
+		}
+
+		_, err = GetDefault()
+		if err == nil {
+			t.Fatal("expected error when no default set")
 		}
 	})
 }

@@ -79,7 +79,23 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Initialized KB %q at %s\n", name, absPath)
+	regPath, err := registry.RegistryPath()
+	if err != nil {
+		return err
+	}
+	reg, err := registry.Load(regPath)
+	if err != nil {
+		return err
+	}
+
+	if reg.Default == "" {
+		if err := registry.SetDefault(name); err != nil {
+			return err
+		}
+		fmt.Printf("Initialized KB %q at %s and set as default\n", name, absPath)
+	} else {
+		fmt.Printf("Initialized KB %q at %s\n", name, absPath)
+	}
 	return nil
 }
 

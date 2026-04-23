@@ -6,12 +6,15 @@ stderr 'must not contain'
 ! exec akb init -- -test
 stderr 'must not start'
 
+! exec akb status
+stderr 'no default KB set'
+
 exec akb init mykb
 ! exec akb init mykb
 stderr 'already initialized'
 
-! exec akb status
-stderr 'not in a knowledge base'
+exec akb status
+stdout 'Name: mykb'
 
 exec akb --version
 stdout 'akb'

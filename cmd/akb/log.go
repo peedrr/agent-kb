@@ -55,7 +55,7 @@ func init() {
 }
 
 func runLogShow(cmd *cobra.Command, args []string) error {
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func runLogAppend(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid operation %q; must be one of: %s", operation, strings.Join(validOperations, ", "))
 	}
 
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}

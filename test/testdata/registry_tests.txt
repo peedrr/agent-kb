@@ -1,0 +1,82 @@
+# Registry Tests — init default, registry list, use, commands-from-outside-kb
+
+-- note-input.md --
+---
+type: note
+title: Registry Test Note
+summary: A test note
+tags: test
+---
+Note content.
+-- note-input.md --
+
+# Initialize first KB
+exec akb init kb-one
+stdout 'Initialized KB .kb-one. at .* and set as default'
+
+# Verify registry lists it as active
+exec akb registry
+stdout '^\\* kb-one .*kb-one$'
+
+# Initialize second KB
+exec akb init kb-two
+stdout 'Initialized KB .kb-two. at .*'
+
+# Verify registry lists both, kb-one still active
+exec akb registry
+stdout '^\\* kb-one .*kb-one$'
+stdout '^  kb-two .*kb-two$'
+
+# Switch default to kb-two
+exec akb use kb-two
+stdout "Default KB set to 'kb-two' at .*kb-two"
+
+# Verify kb-two is now active
+exec akb registry
+stdout '^  kb-one .*kb-one$'
+stdout '^\\* kb-two .*kb-two$'
+
+# Write a page from inside kb-two
+cd kb-two
+exec akb write my-note.md <../note-input.md
+stdout 'Written to kb/notes/my-note.md'
+
+# Go outside both KBs and verify commands still work via registry default
+cd ..
+
+# Read from outside KB using registry default
+exec akb read my-note.md
+stdout 'Note content.'
+
+# List from outside KB
+exec akb list
+stdout 'notes/my-note.md'
+
+# Search from outside KB
+exec akb search test
+stdout 'notes/my-note.md'
+
+# Status from outside KB
+exec akb status
+stdout 'Name: kb-two'
+
+# Switch back to kb-one
+exec akb use kb-one
+stdout "Default KB set to 'kb-one' at .*kb-one"
+
+# Verify kb-one is now the default for commands
+exec akb status
+stdout 'Name: kb-one'
+
+# Try to use non-existent KB
+! exec akb use nonexistent
+stderr "KB 'nonexistent' not found in registry. Use 'akb registry' to list available KBs."
+
+# Empty registry should show message
+# We can't truly empty the registry without deleting the file, but we can test the message
+# by creating a fresh HOME and running registry there.
+# Instead, let's verify the registry command works with empty entries by creating a new HOME:
+mkdir empty-home
+env HOME=$WORK/empty-home
+exec akb registry
+stdout 'No KBs registered. Use .akb init <name>. to create one.'

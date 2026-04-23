@@ -19,7 +19,7 @@ var rawListCmd = &cobra.Command{
 }
 
 func runRawList(cmd *cobra.Command, args []string) error {
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}

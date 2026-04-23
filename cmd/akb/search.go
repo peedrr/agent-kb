@@ -30,7 +30,7 @@ func init() {
 func runSearch(cmd *cobra.Command, args []string) error {
 	query := args[0]
 
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}

@@ -30,7 +30,7 @@ var deleteCmd = &cobra.Command{
 func runDeleteCmd(cmd *cobra.Command, args []string) error {
 	inputPath := args[0]
 
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}

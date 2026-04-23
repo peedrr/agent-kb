@@ -23,7 +23,7 @@ var rawReadCmd = &cobra.Command{
 func runRawRead(cmd *cobra.Command, args []string) error {
 	inputPath := args[0]
 
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}

@@ -350,3 +350,69 @@ func TestKBRoot(t *testing.T) {
 		}
 	})
 }
+
+func TestResolveKB(t *testing.T) {
+	t.Run("returns default KB path from registry", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		origHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", origHome)
+
+		regPath := filepath.Join(tmpDir, ".config", "agent-kb", "registry.yaml")
+		os.MkdirAll(filepath.Dir(regPath), 0755)
+		regContent := `default: my-kb
+entries:
+  - name: my-kb
+    path: /path/to/my-kb
+    created: "2024-01-01T00:00:00Z"
+`
+		os.WriteFile(regPath, []byte(regContent), 0644)
+
+		path, err := ResolveKB()
+		if err != nil {
+			t.Fatalf("ResolveKB failed: %v", err)
+		}
+		if path != "/path/to/my-kb" {
+			t.Fatalf("expected '/path/to/my-kb', got %q", path)
+		}
+	})
+
+	t.Run("returns error when no default set", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		origHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", origHome)
+
+		regPath := filepath.Join(tmpDir, ".config", "agent-kb", "registry.yaml")
+		os.MkdirAll(filepath.Dir(regPath), 0755)
+		regContent := `entries:
+  - name: my-kb
+    path: /path/to/my-kb
+    created: "2024-01-01T00:00:00Z"
+`
+		os.WriteFile(regPath, []byte(regContent), 0644)
+
+		_, err := ResolveKB()
+		if err == nil {
+			t.Fatal("expected error when no default set")
+		}
+		if !strings.Contains(err.Error(), "no default KB set") {
+			t.Fatalf("expected 'no default KB set' error, got: %v", err)
+		}
+	})
+
+	t.Run("returns error when registry does not exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		origHome := os.Getenv("HOME")
+		os.Setenv("HOME", tmpDir)
+		defer os.Setenv("HOME", origHome)
+
+		_, err := ResolveKB()
+		if err == nil {
+			t.Fatal("expected error when registry does not exist")
+		}
+		if !strings.Contains(err.Error(), "no default KB set") {
+			t.Fatalf("expected 'no default KB set' error, got: %v", err)
+		}
+	})
+}

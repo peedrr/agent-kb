@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/peedrr/agent-kb/internal/registry"
 )
 
 // Common error messages
@@ -84,6 +86,30 @@ func ResolveRawPath(kbRoot, inputPath string) (string, error) {
 	}
 
 	return filepath.Join(kbRoot, "raw", cleanPath), nil
+}
+
+// ResolveKB returns the path of the default KB from the registry.
+func ResolveKB() (string, error) {
+	regPath, err := registry.RegistryPath()
+	if err != nil {
+		return "", err
+	}
+
+	reg, err := registry.Load(regPath)
+	if err != nil {
+		return "", err
+	}
+
+	if reg.Default == "" {
+		return "", errors.New("no default KB set. Run 'akb init <name>' or 'akb use <name>'")
+	}
+
+	entry, err := registry.GetDefault()
+	if err != nil {
+		return "", err
+	}
+
+	return entry.Path, nil
 }
 
 // KBRoot finds the KB root by walking up from cwd looking for .akb directory.

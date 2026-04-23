@@ -79,6 +79,20 @@ func writeSetupTestKB(t *testing.T) string {
 	cmd.Dir = kbRoot
 	cmd.Run()
 
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", kbRoot)
+	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+
+	regPath := filepath.Join(kbRoot, ".config", "agent-kb", "registry.yaml")
+	os.MkdirAll(filepath.Dir(regPath), 0755)
+	regContent := `default: write-test
+entries:
+  - name: write-test
+    path: ` + kbRoot + `
+    created: "2024-01-01T00:00:00Z"
+`
+	os.WriteFile(regPath, []byte(regContent), 0644)
+
 	return kbRoot
 }
 

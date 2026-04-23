@@ -36,7 +36,7 @@ func init() {
 }
 
 func runLint(cmd *cobra.Command, args []string) error {
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}

@@ -45,7 +45,7 @@ func runWrite(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve KB root
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}

@@ -37,7 +37,7 @@ This is the content of my note.`
 	defer os.Chdir(origDir)
 
 	// Run the read command
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		t.Fatalf("KBRoot failed: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestReadCmd_NonExistentPage(t *testing.T) {
 	os.Chdir(tmpDir)
 	defer os.Chdir(origDir)
 
-	kbRoot, _ := path.KBRoot()
+	kbRoot, _ := path.ResolveKB()
 	provider := storage.NewGitProvider(kbRoot, true)
 
 	cleanPath := strings.TrimPrefix("notes/non-existent.md", "kb/")
@@ -100,7 +100,7 @@ func TestReadCmd_RawPrefix(t *testing.T) {
 	os.Chdir(tmpDir)
 	defer os.Chdir(origDir)
 
-	kbRoot, _ := path.KBRoot()
+	kbRoot, _ := path.ResolveKB()
 
 	_, err := path.ResolveKBPath(kbRoot, "raw/some-file.md")
 
@@ -118,7 +118,7 @@ func TestReadCmd_ParentDir(t *testing.T) {
 	os.Chdir(tmpDir)
 	defer os.Chdir(origDir)
 
-	kbRoot, _ := path.KBRoot()
+	kbRoot, _ := path.ResolveKB()
 
 	_, err := path.ResolveKBPath(kbRoot, "../some-file.md")
 
@@ -146,7 +146,7 @@ title: Test
 	os.Chdir(tmpDir)
 	defer os.Chdir(origDir)
 
-	kbRoot, _ := path.KBRoot()
+	kbRoot, _ := path.ResolveKB()
 	provider := storage.NewGitProvider(kbRoot, true)
 
 	cleanPath := strings.TrimPrefix("test.md", "kb/")
@@ -180,4 +180,18 @@ created: "2024-01-01T00:00:00Z"`
 	cmd = exec.Command("git", "config", "user.name", "Test")
 	cmd.Dir = tmpDir
 	cmd.Run()
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+
+	regPath := filepath.Join(tmpDir, ".config", "agent-kb", "registry.yaml")
+	os.MkdirAll(filepath.Dir(regPath), 0755)
+	regContent := `default: test-kb
+entries:
+  - name: test-kb
+    path: ` + tmpDir + `
+    created: "2024-01-01T00:00:00Z"
+`
+	os.WriteFile(regPath, []byte(regContent), 0644)
 }

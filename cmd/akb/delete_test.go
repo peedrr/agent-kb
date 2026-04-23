@@ -23,7 +23,6 @@ func TestDelete(t *testing.T) {
 	}
 	defer os.Chdir(origCwd)
 
-	// Change to KB root so path.KBRoot() works
 	if err := os.Chdir(kbRoot); err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +236,6 @@ func setupTestKBWithGit(t *testing.T, kbRoot string) {
 		}
 	}
 
-	// Write minimal config
 	configContent := `name: test-kb
 created: "2024-01-01T00:00:00Z"
 `
@@ -245,14 +243,12 @@ created: "2024-01-01T00:00:00Z"
 		t.Fatal(err)
 	}
 
-	// Create a basic index.md
 	if err := os.WriteFile(filepath.Join(kbRoot, "kb", "index.md"), []byte("# Index\n\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	initTestSearchDB(t, kbRoot)
 
-	// Initialize git repo for testing
 	if err := initGitRepo(kbRoot); err != nil {
 		t.Logf("git not available, skipping git-related tests: %v", err)
 	}
@@ -260,6 +256,20 @@ created: "2024-01-01T00:00:00Z"
 	if err := addToGit(kbRoot, "."); err != nil {
 		t.Logf("git add initial files failed: %v", err)
 	}
+
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", kbRoot)
+	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+
+	regPath := filepath.Join(kbRoot, ".config", "agent-kb", "registry.yaml")
+	os.MkdirAll(filepath.Dir(regPath), 0755)
+	regContent := `default: test-kb
+entries:
+  - name: test-kb
+    path: ` + kbRoot + `
+    created: "2024-01-01T00:00:00Z"
+`
+	os.WriteFile(regPath, []byte(regContent), 0644)
 }
 
 func initGitRepo(kbRoot string) error {

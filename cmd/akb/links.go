@@ -59,7 +59,7 @@ func resolvePagePath(kbRoot, inputPath string) (string, error) {
 }
 
 func runLinksShow(cmd *cobra.Command, args []string) error {
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func runLinksShow(cmd *cobra.Command, args []string) error {
 }
 
 func runBacklinks(cmd *cobra.Command, args []string) error {
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func runBacklinks(cmd *cobra.Command, args []string) error {
 }
 
 func runOrphans(cmd *cobra.Command, args []string) error {
-	kbRoot, err := path.KBRoot()
+	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return err
 	}

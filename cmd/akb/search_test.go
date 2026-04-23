@@ -219,6 +219,20 @@ func TestSearch_MissingDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", kbRoot)
+	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+
+	regPath := filepath.Join(kbRoot, ".config", "agent-kb", "registry.yaml")
+	os.MkdirAll(filepath.Dir(regPath), 0755)
+	regContent := `default: test-kb
+entries:
+  - name: test-kb
+    path: ` + kbRoot + `
+    created: "2024-01-01T00:00:00Z"
+`
+	os.WriteFile(regPath, []byte(regContent), 0644)
+
 	origCwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
