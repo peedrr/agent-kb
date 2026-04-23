@@ -1,6 +1,6 @@
 # Phase Gate Verification — Init Status
 exec akb --version
-stdout 'akb (0\.[1-6]\.0|dev)'
+stdout 'akb (0\.[1-7]\.0|dev)'
 
 exec akb init test-kb
 stdout 'Initialized KB "test-kb"'
