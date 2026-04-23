@@ -44,7 +44,7 @@ func runApprove(cmd *cobra.Command, args []string) error {
 	content, err := store.Read(ctx, fullPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) || strings.Contains(err.Error(), "no such file") {
-			return fmt.Errorf("Page '%s' not found. Use 'akb list' to see available pages.", inputPath)
+			return fmt.Errorf("page '%s' not found. Use 'akb list' to see available pages", inputPath)
 		}
 		return err
 	}
