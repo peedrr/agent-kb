@@ -120,6 +120,30 @@ func TestResolveKBPath(t *testing.T) {
 			expected:    filepath.Join(kbRoot, "a/b/c/d.txt"),
 			expectError: false,
 		},
+		{
+			name:        "filename with spaces",
+			inputPath:   "notes/my note.md",
+			expected:    filepath.Join(kbRoot, "notes/my note.md"),
+			expectError: false,
+		},
+		{
+			name:        "unicode filename",
+			inputPath:   "notes/日本語.md",
+			expected:    filepath.Join(kbRoot, "notes/日本語.md"),
+			expectError: false,
+		},
+		{
+			name:        "emoji filename",
+			inputPath:   "notes/🚀-rocket.md",
+			expected:    filepath.Join(kbRoot, "notes/🚀-rocket.md"),
+			expectError: false,
+		},
+		{
+			name:        "very long filename",
+			inputPath:   "notes/" + strings.Repeat("a", 255) + ".md",
+			expected:    filepath.Join(kbRoot, "notes/"+strings.Repeat("a", 255)+".md"),
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -241,6 +265,30 @@ func TestResolveRawPath(t *testing.T) {
 			expected:    filepath.Join(kbRoot, "raw", "a/b/c.txt"),
 			expectError: false,
 		},
+		{
+			name:        "filename with spaces",
+			inputPath:   "data/my file.txt",
+			expected:    filepath.Join(kbRoot, "raw", "data/my file.txt"),
+			expectError: false,
+		},
+		{
+			name:        "unicode filename",
+			inputPath:   "data/日本語.txt",
+			expected:    filepath.Join(kbRoot, "raw", "data/日本語.txt"),
+			expectError: false,
+		},
+		{
+			name:        "emoji filename",
+			inputPath:   "data/🚀-rocket.txt",
+			expected:    filepath.Join(kbRoot, "raw", "data/🚀-rocket.txt"),
+			expectError: false,
+		},
+		{
+			name:        "very long filename",
+			inputPath:   "data/" + strings.Repeat("a", 255) + ".txt",
+			expected:    filepath.Join(kbRoot, "raw", "data/"+strings.Repeat("a", 255)+".txt"),
+			expectError: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -273,7 +321,7 @@ func TestKBRoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	// Test case: KB root found with .akb directory
 	t.Run("finds .akb directory", func(t *testing.T) {
@@ -283,7 +331,7 @@ func TestKBRoot(t *testing.T) {
 		}
 
 		akbDir := filepath.Join(workDir, ".akb")
-		if err := os.MkdirAll(akbDir, 0755); err != nil {
+		if err := os.MkdirAll(akbDir, 0750); err != nil {
 			t.Fatalf("failed to create .akb dir: %v", err)
 		}
 
@@ -328,12 +376,12 @@ func TestKBRoot(t *testing.T) {
 		}
 
 		subDir := filepath.Join(parentDir, "sub")
-		if err := os.MkdirAll(subDir, 0755); err != nil {
+		if err := os.MkdirAll(subDir, 0750); err != nil {
 			t.Fatalf("failed to create sub dir: %v", err)
 		}
 
 		akbDir := filepath.Join(parentDir, ".akb")
-		if err := os.MkdirAll(akbDir, 0755); err != nil {
+		if err := os.MkdirAll(akbDir, 0750); err != nil {
 			t.Fatalf("failed to create .akb dir: %v", err)
 		}
 
@@ -355,18 +403,22 @@ func TestResolveKB(t *testing.T) {
 	t.Run("returns default KB path from registry", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", tmpDir)
-		defer os.Setenv("HOME", origHome)
+		os.Setenv("HOME", tmpDir)         //nolint:errcheck,gosec // test setup — failure is non-fatal
+		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 		regPath := filepath.Join(tmpDir, ".config", "agent-kb", "registry.yaml")
-		os.MkdirAll(filepath.Dir(regPath), 0755)
+		if err := os.MkdirAll(filepath.Dir(regPath), 0750); err != nil {
+			t.Fatal(err)
+		}
 		regContent := `default: my-kb
 entries:
   - name: my-kb
     path: /path/to/my-kb
     created: "2024-01-01T00:00:00Z"
 `
-		os.WriteFile(regPath, []byte(regContent), 0644)
+		if err := os.WriteFile(regPath, []byte(regContent), 0600); err != nil {
+			t.Fatal(err)
+		}
 
 		path, err := ResolveKB()
 		if err != nil {
@@ -380,17 +432,21 @@ entries:
 	t.Run("returns error when no default set", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", tmpDir)
-		defer os.Setenv("HOME", origHome)
+		os.Setenv("HOME", tmpDir)         //nolint:errcheck,gosec // test setup — failure is non-fatal
+		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 		regPath := filepath.Join(tmpDir, ".config", "agent-kb", "registry.yaml")
-		os.MkdirAll(filepath.Dir(regPath), 0755)
+		if err := os.MkdirAll(filepath.Dir(regPath), 0750); err != nil {
+			t.Fatal(err)
+		}
 		regContent := `entries:
   - name: my-kb
     path: /path/to/my-kb
     created: "2024-01-01T00:00:00Z"
 `
-		os.WriteFile(regPath, []byte(regContent), 0644)
+		if err := os.WriteFile(regPath, []byte(regContent), 0600); err != nil {
+			t.Fatal(err)
+		}
 
 		_, err := ResolveKB()
 		if err == nil {
@@ -404,8 +460,8 @@ entries:
 	t.Run("returns error when registry does not exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", tmpDir)
-		defer os.Setenv("HOME", origHome)
+		os.Setenv("HOME", tmpDir)         //nolint:errcheck,gosec // test setup — failure is non-fatal
+		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 		_, err := ResolveKB()
 		if err == nil {

@@ -20,7 +20,7 @@ type Link struct {
 	ResolvedTo string
 }
 
-// SQLiteLinkGraph implements LinkGraphUpdater using SQLite.
+// SQLiteLinkGraph implements Updater using SQLite.
 type SQLiteLinkGraph struct {
 	db *sql.DB
 }
@@ -30,7 +30,7 @@ func NewSQLiteLinkGraph(db *sql.DB) *SQLiteLinkGraph {
 	return &SQLiteLinkGraph{db: db}
 }
 
-// UpdatePageLinks implements LinkGraphUpdater.UpdatePageLinks.
+// UpdatePageLinks implements Updater.UpdatePageLinks.
 func (g *SQLiteLinkGraph) UpdatePageLinks(ctx context.Context, path string, content string) error {
 	wikilinks := markdown.ParseWikilinks(content)
 
@@ -38,7 +38,7 @@ func (g *SQLiteLinkGraph) UpdatePageLinks(ctx context.Context, path string, cont
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
 
 	if _, err := tx.ExecContext(ctx,
 		"INSERT OR IGNORE INTO pages (path, title, summary) VALUES (?, '', '')",
@@ -77,16 +77,19 @@ func (g *SQLiteLinkGraph) UpdatePageLinks(ctx context.Context, path string, cont
 		}
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
 }
 
-// RemovePage implements LinkGraphUpdater.RemovePage.
+// RemovePage implements Updater.RemovePage.
 func (g *SQLiteLinkGraph) RemovePage(ctx context.Context, path string) error {
 	tx, err := g.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
 
 	if _, err := tx.ExecContext(ctx,
 		"DELETE FROM pages WHERE path = ?",
@@ -102,7 +105,10 @@ func (g *SQLiteLinkGraph) RemovePage(ctx context.Context, path string) error {
 		return fmt.Errorf("delete links: %w", err)
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
 }
 
 // RebuildLinks rebuilds the entire link graph from the filesystem.
@@ -129,7 +135,7 @@ func (g *SQLiteLinkGraph) RebuildLinks(ctx context.Context, kbRoot string) error
 			return nil
 		}
 
-		content, err := os.ReadFile(path)
+		content, err := os.ReadFile(path) //nolint:gosec // path validated by filepath.WalkDir within KB root
 		if err != nil {
 			return nil
 		}
@@ -162,7 +168,7 @@ func (g *SQLiteLinkGraph) GetOutboundLinks(ctx context.Context, path string) ([]
 	if err != nil {
 		return nil, fmt.Errorf("query outbound links: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Err() checked after iteration; close error non-critical
 	return scanLinks(rows)
 }
 
@@ -175,7 +181,7 @@ func (g *SQLiteLinkGraph) GetInboundLinks(ctx context.Context, path string) ([]L
 	if err != nil {
 		return nil, fmt.Errorf("query inbound links: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Err() checked after iteration; close error non-critical
 	return scanLinks(rows)
 }
 
@@ -190,7 +196,7 @@ func (g *SQLiteLinkGraph) GetOrphans(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query orphans: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Err() checked after iteration; close error non-critical
 
 	var paths []string
 	for rows.Next() {
@@ -200,7 +206,10 @@ func (g *SQLiteLinkGraph) GetOrphans(ctx context.Context) ([]string, error) {
 		}
 		paths = append(paths, p)
 	}
-	return paths, rows.Err()
+	if err := rows.Err(); err != nil {
+		return paths, fmt.Errorf("iterate rows: %w", err)
+	}
+	return paths, nil
 }
 
 // GetBrokenLinks returns links whose target could not be resolved.
@@ -211,7 +220,7 @@ func (g *SQLiteLinkGraph) GetBrokenLinks(ctx context.Context) ([]Link, error) {
 	if err != nil {
 		return nil, fmt.Errorf("query broken links: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Err() checked after iteration; close error non-critical
 	return scanLinks(rows)
 }
 
@@ -223,7 +232,7 @@ func (g *SQLiteLinkGraph) GetAmbiguousLinks(ctx context.Context) ([]Link, error)
 	if err != nil {
 		return nil, fmt.Errorf("query ambiguous links: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Err() checked after iteration; close error non-critical
 	return scanLinks(rows)
 }
 
@@ -267,7 +276,7 @@ func resolveTarget(ctx context.Context, tx *sql.Tx, rawTarget string) (*string, 
 	if err != nil {
 		return nil, fmt.Errorf("basename match query: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Err() checked after iteration; close error non-critical
 
 	var matches []string
 	for rows.Next() {
@@ -309,5 +318,8 @@ func scanLinks(rows *sql.Rows) ([]Link, error) {
 		}
 		links = append(links, l)
 	}
-	return links, rows.Err()
+	if err := rows.Err(); err != nil {
+		return links, fmt.Errorf("iterate rows: %w", err)
+	}
+	return links, nil
 }

@@ -11,7 +11,9 @@ func TestListPages(t *testing.T) {
 	t.Run("empty KB returns nil", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		os.MkdirAll(kbDir, 0755)
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
+			t.Fatal(err)
+		}
 
 		pages, err := listPages(tmpDir)
 		if err != nil {
@@ -25,8 +27,12 @@ func TestListPages(t *testing.T) {
 	t.Run("single page", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		os.MkdirAll(kbDir, 0755)
-		os.WriteFile(filepath.Join(kbDir, "note.md"), []byte("content"), 0644)
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(kbDir, "note.md"), []byte("content"), 0600); err != nil {
+			t.Fatal(err)
+		}
 
 		pages, err := listPages(tmpDir)
 		if err != nil {
@@ -43,11 +49,15 @@ func TestListPages(t *testing.T) {
 	t.Run("alphabetical order", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		os.MkdirAll(kbDir, 0755)
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
+			t.Fatal(err)
+		}
 
 		files := []string{"zebra.md", "apple.md", "mango.md"}
 		for _, f := range files {
-			os.WriteFile(filepath.Join(kbDir, f), []byte("content"), 0644)
+			if err := os.WriteFile(filepath.Join(kbDir, f), []byte("content"), 0600); err != nil {
+				t.Fatal(err)
+			}
 		}
 		pages, err := listPages(tmpDir)
 		if err != nil {
@@ -64,11 +74,15 @@ func TestListPages(t *testing.T) {
 	t.Run("excludes index.md and log.md", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		os.MkdirAll(kbDir, 0755)
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
+			t.Fatal(err)
+		}
 
 		files := []string{"note.md", "index.md", "log.md", "other.md"}
 		for _, f := range files {
-			os.WriteFile(filepath.Join(kbDir, f), []byte("content"), 0644)
+			if err := os.WriteFile(filepath.Join(kbDir, f), []byte("content"), 0600); err != nil {
+				t.Fatal(err)
+			}
 		}
 		pages, err := listPages(tmpDir)
 		if err != nil {
@@ -87,12 +101,20 @@ func TestListPages(t *testing.T) {
 	t.Run("strips kb/ prefix from subdirectory pages", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		os.MkdirAll(kbDir, 0755)
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
+			t.Fatal(err)
+		}
 
 		subDir := filepath.Join(kbDir, "notes")
-		os.MkdirAll(subDir, 0755)
-		os.WriteFile(filepath.Join(subDir, "note1.md"), []byte("content"), 0644)
-		os.WriteFile(filepath.Join(subDir, "note2.md"), []byte("content"), 0644)
+		if err := os.MkdirAll(subDir, 0750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(subDir, "note1.md"), []byte("content"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(subDir, "note2.md"), []byte("content"), 0600); err != nil {
+			t.Fatal(err)
+		}
 
 		pages, err := listPages(tmpDir)
 		if err != nil {
@@ -114,12 +136,18 @@ func TestListPages(t *testing.T) {
 	t.Run("all features together", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		os.MkdirAll(kbDir, 0755)
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
+			t.Fatal(err)
+		}
 
 		sub1 := filepath.Join(kbDir, "aaa")
 		sub2 := filepath.Join(kbDir, "zzz")
-		os.MkdirAll(sub1, 0755)
-		os.MkdirAll(sub2, 0755)
+		if err := os.MkdirAll(sub1, 0750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(sub2, 0750); err != nil {
+			t.Fatal(err)
+		}
 
 		files := []string{
 			"index.md",
@@ -129,7 +157,9 @@ func TestListPages(t *testing.T) {
 			"zzz/top.md",
 		}
 		for _, f := range files {
-			os.WriteFile(filepath.Join(kbDir, f), []byte("content"), 0644)
+			if err := os.WriteFile(filepath.Join(kbDir, f), []byte("content"), 0600); err != nil {
+				t.Fatal(err)
+			}
 		}
 
 		pages, err := listPages(tmpDir)

@@ -9,30 +9,33 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
+
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/markdown"
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/storage"
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 var approveCmd = &cobra.Command{
 	Use:   "approve <path>",
 	Short: "Approve a page by removing draft status and annotations",
 	Long:  `Read a page, strip olw-auto annotations and provenance markers, set is_draft to false, and write it back.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runApprove,
+	Example: `  # Approve a draft page
+  akb approve notes/my-draft.md`,
+	Args: cobra.ExactArgs(1),
+	RunE: runApprove,
 }
 
 var annotationRe = regexp.MustCompile(`(?s)<!--\s*olw-auto:.*?-->`)
 
-func runApprove(cmd *cobra.Command, args []string) error {
+func runApprove(_ *cobra.Command, args []string) error {
 	inputPath := args[0]
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
@@ -46,7 +49,7 @@ func runApprove(cmd *cobra.Command, args []string) error {
 		if errors.Is(err, os.ErrNotExist) || strings.Contains(err.Error(), "no such file") {
 			return fmt.Errorf("page '%s' not found. Use 'akb list' to see available pages", inputPath)
 		}
-		return err
+		return fmt.Errorf("read page: %w", err)
 	}
 
 	fm, body, err := frontmatter.Parse(content)

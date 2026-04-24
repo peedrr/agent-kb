@@ -6,9 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/manifest"
 	"github.com/peedrr/agent-kb/internal/path"
-	"github.com/spf13/cobra"
 )
 
 var statusJSON bool
@@ -33,18 +34,26 @@ var rawStatusCmd = &cobra.Command{
 	Use:   "status [path]",
 	Short: "Check raw file drift status",
 	Long:  `Compare the manifest against the filesystem to detect modified, untracked, or missing files.`,
-	Args:  cobra.MaximumNArgs(1),
-	RunE:  runRawStatus,
+	Example: `  # Check drift status for all files
+  akb raw status
+
+  # Check drift for specific file
+  akb raw status data/config.json
+
+  # JSON output
+  akb raw status --json`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: runRawStatus,
 }
 
 func init() {
 	rawStatusCmd.Flags().BoolVar(&statusJSON, "json", false, "output in JSON format")
 }
 
-func runRawStatus(cmd *cobra.Command, args []string) error {
+func runRawStatus(_ *cobra.Command, args []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	rawDir := filepath.Join(kbRoot, "raw")
@@ -83,7 +92,7 @@ func runRawStatus(cmd *cobra.Command, args []string) error {
 		}
 		relPath, err := filepath.Rel(rawDir, p)
 		if err != nil {
-			return err
+			return fmt.Errorf("compute relative path: %w", err)
 		}
 		relPath = filepath.ToSlash(relPath)
 		if relPath == "files.log" {
@@ -125,11 +134,11 @@ func runRawStatus(cmd *cobra.Command, args []string) error {
 		inputPath := args[0]
 		resolvedPath, resolveErr := path.ResolveRawPath(kbRoot, inputPath)
 		if resolveErr != nil {
-			return resolveErr
+			return fmt.Errorf("resolve raw path: %w", resolveErr)
 		}
 		targetRel, relErr := filepath.Rel(rawDir, resolvedPath)
 		if relErr != nil {
-			return relErr
+			return fmt.Errorf("compute relative path: %w", relErr)
 		}
 		targetRel = filepath.ToSlash(targetRel)
 

@@ -36,7 +36,7 @@ entries:
     path: /home/user/kb/test
     created: "2024-01-01"
 `
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 			t.Fatalf("write test file: %v", err)
 		}
 
@@ -63,7 +63,7 @@ entries:
   path: /home/user/kb/test
   created: "2024-01-01"
 `
-		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 			t.Fatalf("write test file: %v", err)
 		}
 
@@ -133,12 +133,12 @@ func TestAddEntry(t *testing.T) {
 	t.Run("adds entry to registry", func(t *testing.T) {
 		dir := t.TempDir()
 		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", dir)
-		defer os.Setenv("HOME", origHome)
+		os.Setenv("HOME", dir)            //nolint:errcheck,gosec // test setup — failure is non-fatal
+		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-		regPath, err := RegistryPath()
+		regPath, err := Path()
 		if err != nil {
-			t.Fatalf("RegistryPath failed: %v", err)
+			t.Fatalf("Path failed: %v", err)
 		}
 
 		entry := Entry{Name: "new-kb", Path: "/path/new", Created: "2024-01-01"}
@@ -163,12 +163,12 @@ func TestAddEntry(t *testing.T) {
 	t.Run("rejects duplicate name", func(t *testing.T) {
 		dir := t.TempDir()
 		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", dir)
-		defer os.Setenv("HOME", origHome)
+		os.Setenv("HOME", dir)            //nolint:errcheck,gosec // test setup — failure is non-fatal
+		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-		regPath, err := RegistryPath()
+		regPath, err := Path()
 		if err != nil {
-			t.Fatalf("RegistryPath failed: %v", err)
+			t.Fatalf("Path failed: %v", err)
 		}
 
 		existing := &Registry{
@@ -189,12 +189,12 @@ func TestFindByName(t *testing.T) {
 	t.Run("finds existing entry", func(t *testing.T) {
 		dir := t.TempDir()
 		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", dir)
-		defer os.Setenv("HOME", origHome)
+		os.Setenv("HOME", dir)            //nolint:errcheck,gosec // test setup — failure is non-fatal
+		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-		regPath, err := RegistryPath()
+		regPath, err := Path()
 		if err != nil {
-			t.Fatalf("RegistryPath failed: %v", err)
+			t.Fatalf("Path failed: %v", err)
 		}
 
 		reg := &Registry{
@@ -222,12 +222,12 @@ func TestFindByName(t *testing.T) {
 	t.Run("returns nil for non-existent name", func(t *testing.T) {
 		dir := t.TempDir()
 		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", dir)
-		defer os.Setenv("HOME", origHome)
+		os.Setenv("HOME", dir)            //nolint:errcheck,gosec // test setup — failure is non-fatal
+		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-		regPath, err := RegistryPath()
+		regPath, err := Path()
 		if err != nil {
-			t.Fatalf("RegistryPath failed: %v", err)
+			t.Fatalf("Path failed: %v", err)
 		}
 
 		reg := &Registry{
@@ -251,12 +251,12 @@ func TestSetDefault(t *testing.T) {
 	t.Run("sets default to existing entry", func(t *testing.T) {
 		dir := t.TempDir()
 		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", dir)
-		defer os.Setenv("HOME", origHome)
+		os.Setenv("HOME", dir)            //nolint:errcheck,gosec // test setup — failure is non-fatal
+		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-		regPath, err := RegistryPath()
+		regPath, err := Path()
 		if err != nil {
-			t.Fatalf("RegistryPath failed: %v", err)
+			t.Fatalf("Path failed: %v", err)
 		}
 
 		reg := &Registry{
@@ -284,12 +284,12 @@ func TestSetDefault(t *testing.T) {
 	t.Run("rejects non-existent name", func(t *testing.T) {
 		dir := t.TempDir()
 		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", dir)
-		defer os.Setenv("HOME", origHome)
+		os.Setenv("HOME", dir)            //nolint:errcheck,gosec // test setup — failure is non-fatal
+		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-		regPath, err := RegistryPath()
+		regPath, err := Path()
 		if err != nil {
-			t.Fatalf("RegistryPath failed: %v", err)
+			t.Fatalf("Path failed: %v", err)
 		}
 
 		reg := &Registry{
@@ -310,12 +310,12 @@ func TestGetDefault(t *testing.T) {
 	t.Run("returns default entry", func(t *testing.T) {
 		dir := t.TempDir()
 		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", dir)
-		defer os.Setenv("HOME", origHome)
+		os.Setenv("HOME", dir)            //nolint:errcheck,gosec // test setup — failure is non-fatal
+		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-		regPath, err := RegistryPath()
+		regPath, err := Path()
 		if err != nil {
-			t.Fatalf("RegistryPath failed: %v", err)
+			t.Fatalf("Path failed: %v", err)
 		}
 
 		reg := &Registry{
@@ -344,12 +344,12 @@ func TestGetDefault(t *testing.T) {
 	t.Run("returns error when no default set", func(t *testing.T) {
 		dir := t.TempDir()
 		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", dir)
-		defer os.Setenv("HOME", origHome)
+		os.Setenv("HOME", dir)            //nolint:errcheck,gosec // test setup — failure is non-fatal
+		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-		regPath, err := RegistryPath()
+		regPath, err := Path()
 		if err != nil {
-			t.Fatalf("RegistryPath failed: %v", err)
+			t.Fatalf("Path failed: %v", err)
 		}
 
 		reg := &Registry{

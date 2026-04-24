@@ -1,3 +1,4 @@
+// Package template loads and validates typed page templates.
 package template
 
 import (
@@ -10,11 +11,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Field defines a single template field with optional enum values.
 type Field struct {
 	Name string
 	Enum []string
 }
 
+// UnmarshalYAML parses a Field from YAML, supporting simple string or enum map.
 func (f *Field) UnmarshalYAML(unmarshal func(any) error) error {
 	var raw any
 	if err := unmarshal(&raw); err != nil {
@@ -47,6 +50,7 @@ func (f *Field) UnmarshalYAML(unmarshal func(any) error) error {
 	}
 }
 
+// Template defines a typed page template with fields and required keys.
 type Template struct {
 	Name         string  `yaml:"name"`
 	Dir          string  `yaml:"dir"`
@@ -56,9 +60,12 @@ type Template struct {
 	filename     string
 }
 
+// DefaultFS holds the embedded default templates.
+//
 //go:embed embedded/*.yaml
 var DefaultFS embed.FS
 
+// DefaultTemplates is the FS used to load embedded default templates.
 var DefaultTemplates fs.FS
 
 func init() {
@@ -69,6 +76,7 @@ func init() {
 	}
 }
 
+// LoadTemplates reads template YAML files from a directory.
 func LoadTemplates(dir string) (map[string]Template, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -85,7 +93,7 @@ func LoadTemplates(dir string) (map[string]Template, error) {
 		}
 
 		path := filepath.Join(dir, entry.Name())
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // path constructed from validated dir and fs.DirEntry
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", entry.Name(), err)
 		}
@@ -110,6 +118,7 @@ func LoadTemplates(dir string) (map[string]Template, error) {
 	return templates, nil
 }
 
+// LoadTemplatesFromFS reads template YAML files from an fs.FS.
 func LoadTemplatesFromFS(fsys fs.FS) (map[string]Template, error) {
 	entries, err := fs.ReadDir(fsys, ".")
 	if err != nil {
@@ -147,8 +156,9 @@ func LoadTemplatesFromFS(fsys fs.FS) (map[string]Template, error) {
 	return templates, nil
 }
 
+// CopyDefaults extracts embedded default templates to a directory.
 func CopyDefaults(targetDir string) error {
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, 0750); err != nil {
 		return fmt.Errorf("create target directory: %w", err)
 	}
 
@@ -172,7 +182,7 @@ func CopyDefaults(targetDir string) error {
 			return fmt.Errorf("read embedded %s: %w", entry.Name(), err)
 		}
 
-		if err := os.WriteFile(targetPath, data, 0644); err != nil {
+		if err := os.WriteFile(targetPath, data, 0600); err != nil {
 			return fmt.Errorf("write %s: %w", targetPath, err)
 		}
 	}

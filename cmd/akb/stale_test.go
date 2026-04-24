@@ -16,12 +16,12 @@ func TestFreshnessFormula(t *testing.T) {
 	now := time.Now()
 
 	tests := []struct {
-		name            string
-		daysAgo         int
-		confidence      string
-		minExpected     float64
-		maxExpected     float64
-		expectedStale   bool
+		name          string
+		daysAgo       int
+		confidence    string
+		minExpected   float64
+		maxExpected   float64
+		expectedStale bool
 	}{
 		{"fresh high", 0, "high", 99.0, 101.0, false},
 		{"fresh medium", 0, "medium", 69.0, 71.0, false},
@@ -63,12 +63,12 @@ func TestFreshnessFormula(t *testing.T) {
 
 func TestParseTimestamp(t *testing.T) {
 	tests := []struct {
-		name        string
-		input      string
-		wantErr    bool
-		wantYear   int
-		wantMonth  int
-		wantDay    int
+		name      string
+		input     string
+		wantErr   bool
+		wantYear  int
+		wantMonth int
+		wantDay   int
 	}{
 		{"rfc3339", "2024-01-15T10:30:00Z", false, 2024, 1, 15},
 		{"date only", "2024-01-15", false, 2024, 1, 15},
@@ -128,7 +128,7 @@ func TestJSONOutputStructure(t *testing.T) {
 func TestEmptyRegistryHandling(t *testing.T) {
 	dir := t.TempDir()
 	registryFile := filepath.Join(dir, "registry.yaml")
-	if err := os.WriteFile(registryFile, []byte("default: \"\"\nentries: []\n"), 0644); err != nil {
+	if err := os.WriteFile(registryFile, []byte("default: \"\"\nentries: []\n"), 0600); err != nil {
 		t.Fatalf("failed to write registry: %v", err)
 	}
 

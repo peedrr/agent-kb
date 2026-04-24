@@ -47,10 +47,10 @@ func TestInstallSkill(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MkdirTemp error = %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	installDir := filepath.Join(tmpDir, "skills")
-	if err := os.MkdirAll(installDir, 0755); err != nil {
+	if err := os.MkdirAll(installDir, 0750); err != nil {
 		t.Fatalf("MkdirAll error = %v", err)
 	}
 
@@ -84,10 +84,10 @@ func TestInstallSkillDuplicate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MkdirTemp error = %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	installDir := filepath.Join(tmpDir, "skills")
-	if err := os.MkdirAll(installDir, 0755); err != nil {
+	if err := os.MkdirAll(installDir, 0750); err != nil {
 		t.Fatalf("MkdirAll error = %v", err)
 	}
 
@@ -106,7 +106,7 @@ func TestInstallSkillNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MkdirTemp error = %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	err = InstallSkill("nonexistent", tmpDir)
 	if err == nil {

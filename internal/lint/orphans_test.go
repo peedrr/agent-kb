@@ -140,7 +140,7 @@ func setupDBOrphans(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() }) //nolint:errcheck // test cleanup — failure is non-fatal
 	if err := db.CreateSchema(d); err != nil {
 		t.Fatalf("CreateSchema: %v", err)
 	}

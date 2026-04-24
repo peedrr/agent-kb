@@ -23,7 +23,7 @@ func setupSearchTestKB(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chdir(origCwd) })
+	t.Cleanup(func() { os.Chdir(origCwd) }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	if err := os.Chdir(kbRoot); err != nil {
 		t.Fatal(err)
@@ -43,17 +43,17 @@ func setupSearchDB(t *testing.T, kbRoot string) *sql.DB {
 	}
 
 	if err := db.CreateSchema(sqlDB); err != nil {
-		sqlDB.Close()
+		_ = sqlDB.Close() //nolint:errcheck // close error secondary to schema error
 		t.Fatalf("create schema: %v", err)
 	}
 
 	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		sqlDB.Close()
+		_ = sqlDB.Close() //nolint:errcheck // close error secondary to WAL error
 		t.Fatalf("enable WAL: %v", err)
 	}
 	sqlDB.SetMaxOpenConns(1)
 
-	t.Cleanup(func() { sqlDB.Close() })
+	t.Cleanup(func() { _ = sqlDB.Close() }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 	return sqlDB
 }
 
@@ -81,7 +81,9 @@ func TestSearch_WithResults(t *testing.T) {
 
 	err = runSearch(nil, []string{"test"})
 
-	w.Close()
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
 	os.Stdout = old
 
 	if err != nil {
@@ -89,7 +91,9 @@ func TestSearch_WithResults(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatal(err)
+	}
 	output := buf.String()
 
 	if !strings.Contains(output, "kb/notes/test.md") {
@@ -115,7 +119,9 @@ func TestSearch_NoResults(t *testing.T) {
 
 	err = runSearch(nil, []string{"nonexistent"})
 
-	w.Close()
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
 	os.Stdout = old
 
 	if err != nil {
@@ -123,7 +129,9 @@ func TestSearch_NoResults(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatal(err)
+	}
 	output := buf.String()
 
 	if output != "" {
@@ -163,7 +171,9 @@ func TestSearch_JSONOutput(t *testing.T) {
 
 	err = runSearch(nil, []string{"test"})
 
-	w.Close()
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
 	os.Stdout = old
 
 	if err != nil {
@@ -171,7 +181,9 @@ func TestSearch_JSONOutput(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatal(err)
+	}
 	output := buf.String()
 
 	var results []searchJSONResult
@@ -205,39 +217,43 @@ func TestSearch_MissingDB(t *testing.T) {
 	kbRoot := t.TempDir()
 	kbDir := filepath.Join(kbRoot, "kb")
 	akbDir := filepath.Join(kbRoot, ".akb")
-	if err := os.MkdirAll(kbDir, 0755); err != nil {
+	if err := os.MkdirAll(kbDir, 0750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(akbDir, 0755); err != nil {
+	if err := os.MkdirAll(akbDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 	configContent := "name: test-kb\ncreated: \"2024-01-01T00:00:00Z\"\n"
-	if err := os.WriteFile(filepath.Join(akbDir, ".akb.yaml"), []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(akbDir, ".akb.yaml"), []byte(configContent), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(kbDir, "index.md"), []byte("# Index\n\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(kbDir, "index.md"), []byte("# Index\n\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", kbRoot)
-	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+	os.Setenv("HOME", kbRoot)                         //nolint:errcheck,gosec // test setup — failure is non-fatal
+	t.Cleanup(func() { os.Setenv("HOME", origHome) }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	regPath := filepath.Join(kbRoot, ".config", "agent-kb", "registry.yaml")
-	os.MkdirAll(filepath.Dir(regPath), 0755)
+	if err := os.MkdirAll(filepath.Dir(regPath), 0750); err != nil {
+		t.Fatal(err)
+	}
 	regContent := `default: test-kb
 entries:
   - name: test-kb
     path: ` + kbRoot + `
     created: "2024-01-01T00:00:00Z"
 `
-	os.WriteFile(regPath, []byte(regContent), 0644)
+	if err := os.WriteFile(regPath, []byte(regContent), 0600); err != nil {
+		t.Fatal(err)
+	}
 
 	origCwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chdir(origCwd) })
+	t.Cleanup(func() { os.Chdir(origCwd) }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 	if err := os.Chdir(kbRoot); err != nil {
 		t.Fatal(err)
 	}

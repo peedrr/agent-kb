@@ -11,10 +11,10 @@ func setupKB(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	kbDir := filepath.Join(dir, "kb")
-	if err := os.MkdirAll(kbDir, 0755); err != nil {
+	if err := os.MkdirAll(kbDir, 0750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(kbDir, "index.md"), []byte("# Index\n\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(kbDir, "index.md"), []byte("# Index\n\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	return dir
@@ -23,7 +23,7 @@ func setupKB(t *testing.T) string {
 func writeIndexContent(t *testing.T, kbRoot, content string) {
 	t.Helper()
 	path := filepath.Join(kbRoot, "kb", "index.md")
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -31,7 +31,7 @@ func writeIndexContent(t *testing.T, kbRoot, content string) {
 func readIndexContent(t *testing.T, kbRoot string) string {
 	t.Helper()
 	path := filepath.Join(kbRoot, "kb", "index.md")
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,27 +266,27 @@ func TestRebuildIndex(t *testing.T) {
 	notesDir := filepath.Join(kbDir, "notes")
 	decisionsDir := filepath.Join(kbDir, "decisions")
 
-	if err := os.MkdirAll(notesDir, 0755); err != nil {
+	if err := os.MkdirAll(notesDir, 0750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(decisionsDir, 0755); err != nil {
+	if err := os.MkdirAll(decisionsDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(kbDir, "index.md"), []byte("# Index\n\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(kbDir, "index.md"), []byte("# Index\n\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(kbDir, "log.md"), []byte("# Log\n\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(kbDir, "log.md"), []byte("# Log\n\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	noteContent := "---\ntype: note\ntitle: My Note\nsummary: A test note\n---\nNote body here.\n"
-	if err := os.WriteFile(filepath.Join(notesDir, "my-note.md"), []byte(noteContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(notesDir, "my-note.md"), []byte(noteContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	adrContent := "---\ntype: adr\ntitle: My ADR\nsummary: A test ADR\n---\nADR body here.\n"
-	if err := os.WriteFile(filepath.Join(decisionsDir, "my-adr.md"), []byte(adrContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(decisionsDir, "my-adr.md"), []byte(adrContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 

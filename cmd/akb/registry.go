@@ -3,31 +3,34 @@ package main
 import (
 	"fmt"
 
-	"github.com/peedrr/agent-kb/internal/registry"
 	"github.com/spf13/cobra"
+
+	"github.com/peedrr/agent-kb/internal/registry"
 )
 
 var registryCmd = &cobra.Command{
 	Use:   "registry",
 	Short: "List registered knowledge bases",
 	Long:  `List all registered KBs with the active default marked with *.`,
-	Args:  cobra.NoArgs,
-	RunE:  runRegistry,
+	Example: `  # List all registered KBs
+  akb registry`,
+	Args: cobra.NoArgs,
+	RunE: runRegistry,
 }
 
-func runRegistry(cmd *cobra.Command, args []string) error {
-	regPath, err := registry.RegistryPath()
+func runRegistry(cmd *cobra.Command, _ []string) error {
+	regPath, err := registry.Path()
 	if err != nil {
-		return err
+		return fmt.Errorf("get registry path: %w", err)
 	}
 
 	reg, err := registry.Load(regPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("load registry: %w", err)
 	}
 
 	if len(reg.Entries) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No KBs registered. Use 'akb init <name>' to create one.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No KBs registered. Use 'akb init <name>' to create one.") //nolint:errcheck // stdout write failure non-critical
 		return nil
 	}
 
@@ -36,7 +39,7 @@ func runRegistry(cmd *cobra.Command, args []string) error {
 		if e.Name == reg.Default {
 			marker = "*"
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "%s %s %s\n", marker, e.Name, e.Path)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s %s %s\n", marker, e.Name, e.Path) //nolint:errcheck // stdout write failure non-critical
 	}
 
 	return nil

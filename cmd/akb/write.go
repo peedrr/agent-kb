@@ -8,6 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
+
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
@@ -16,19 +19,39 @@ import (
 	"github.com/peedrr/agent-kb/internal/search"
 	"github.com/peedrr/agent-kb/internal/storage"
 	"github.com/peedrr/agent-kb/internal/template"
-	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 var writeCmd = &cobra.Command{
 	Use:   "write <path>",
 	Short: "Write a page to the knowledge base",
 	Long:  `Read content from stdin, validate frontmatter, and write to the type-derived directory in the KB.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runWrite,
+	Example: `  # Write a simple note
+  echo "# My Note
+
+Content here" | akb write my-note.md
+
+  # Write with frontmatter (type and title required)
+  cat <<'EOF' | akb write adr/use-sqlite-search.md
+  ---
+  type: adr
+  title: Use SQLite for search
+  ---
+  We decided to use SQLite because it provides FTS5 full-text search.
+  EOF
+
+  # Write to a type-derived directory (e.g., notes/)
+  cat <<'EOF' | akb write notes/idea.md
+  ---
+  type: note
+  title: A new idea
+  ---
+  This note goes into the notes/ directory.
+  EOF`,
+	Args: cobra.ExactArgs(1),
+	RunE: runWrite,
 }
 
-func runWrite(cmd *cobra.Command, args []string) error {
+func runWrite(_ *cobra.Command, args []string) error {
 	inputPath := args[0]
 
 	// Read from stdin — error if stdin is a TTY
@@ -48,7 +71,7 @@ func runWrite(cmd *cobra.Command, args []string) error {
 	// Resolve KB root
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	dbConn, err := db.OpenKB(kbRoot)
@@ -56,9 +79,9 @@ func runWrite(cmd *cobra.Command, args []string) error {
 		if isMissingDB(err) {
 			return fmt.Errorf("run `akb index rebuild` to create the search index")
 		}
-		return err
+		return fmt.Errorf("open search database: %w", err)
 	}
-	defer dbConn.Close()
+	defer dbConn.Close() //nolint:errcheck // DB close error non-critical on command exit
 
 	_, err = config.Load(filepath.Join(kbRoot, ".akb", ".akb.yaml"))
 	if err != nil {
@@ -74,17 +97,17 @@ func runWrite(cmd *cobra.Command, args []string) error {
 	// Parse frontmatter
 	fm, body, err := frontmatter.Parse(stdinContent)
 	if err != nil {
-		return err
+		return fmt.Errorf("parse frontmatter: %w", err)
 	}
 
 	// Validate type
 	if err := frontmatter.ValidateType(fm, templates); err != nil {
-		return err
+		return fmt.Errorf("validate type: %w", err)
 	}
 
 	// Validate title
 	if err := frontmatter.ValidateTitle(fm); err != nil {
-		return err
+		return fmt.Errorf("validate title: %w", err)
 	}
 
 	writeContent := stdinContent
@@ -139,15 +162,13 @@ func runWrite(cmd *cobra.Command, args []string) error {
 	// Strip type-dir prefix if it matches the type's Dir
 	if dirFromType != "" {
 		typeDirPrefix := dirFromType + "/"
-		if strings.HasPrefix(cleanPath, typeDirPrefix) {
-			cleanPath = strings.TrimPrefix(cleanPath, typeDirPrefix)
-		}
+		cleanPath = strings.TrimPrefix(cleanPath, typeDirPrefix)
 	}
 
 	// Reject .. and absolute paths via ResolveKBPath
 	_, err = path.ResolveKBPath(kbRoot, inputPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve path: %w", err)
 	}
 
 	// Construct final path

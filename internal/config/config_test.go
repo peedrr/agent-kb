@@ -12,9 +12,13 @@ func TestLoad(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.Remove(f.Name())
-		f.WriteString(content)
-		f.Close()
+		defer os.Remove(f.Name()) //nolint:errcheck // test cleanup — failure is non-fatal
+		if _, err := f.WriteString(content); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
 
 		cfg, err := Load(f.Name())
 		if err != nil {
@@ -41,9 +45,13 @@ name: test-agent
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.Remove(f.Name())
-		f.WriteString(content)
-		f.Close()
+		defer os.Remove(f.Name()) //nolint:errcheck // test cleanup — failure is non-fatal
+		if _, err := f.WriteString(content); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
 
 		_, err = Load(f.Name())
 		if err == nil {
@@ -60,9 +68,13 @@ name: test-agent
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.Remove(f.Name())
-		f.WriteString(content)
-		f.Close()
+		defer os.Remove(f.Name()) //nolint:errcheck // test cleanup — failure is non-fatal
+		if _, err := f.WriteString(content); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
 
 		_, err = Load(f.Name())
 		if err == nil {
@@ -79,9 +91,13 @@ name: test-agent
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.Remove(f.Name())
-		f.WriteString(content)
-		f.Close()
+		defer os.Remove(f.Name()) //nolint:errcheck // test cleanup — failure is non-fatal
+		if _, err := f.WriteString(content); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
 
 		cfg, err := Load(f.Name())
 		if err != nil {
@@ -107,8 +123,10 @@ func TestSave(t *testing.T) {
 			t.Fatal(err)
 		}
 		path := f.Name()
-		f.Close()
-		defer os.Remove(path)
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(path) //nolint:errcheck // test cleanup — failure is non-fatal
 
 		cfg := &Config{
 			Name:    "test-agent",

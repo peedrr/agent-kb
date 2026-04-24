@@ -11,7 +11,8 @@ import (
 func approveRun(kbRoot, inputPath string, extraArgs ...string) (string, error) {
 	args := append([]string{"approve"}, extraArgs...)
 	args = append(args, inputPath)
-	cmd := exec.Command(akbBinPath, args...)
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		akbBinPath, args...) //nolint:gosec // test helper launching akb binary
 	cmd.Dir = kbRoot
 	out, err := cmd.CombinedOutput()
 	return string(out), err
@@ -36,7 +37,7 @@ func TestApproveStripsAnnotations(t *testing.T) {
 		t.Errorf("expected approval message, got: %s", out)
 	}
 
-	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "draft.md"))
+	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "draft.md")) //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatalf("read approved file: %v", err)
 	}
@@ -61,7 +62,7 @@ func TestApproveStripsProvenanceMarkers(t *testing.T) {
 		t.Fatalf("approve failed: %s: %v", out, err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "draft.md"))
+	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "draft.md")) //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatalf("read approved file: %v", err)
 	}
@@ -96,7 +97,7 @@ func TestApprovePreservesMarkersInCodeBlocks(t *testing.T) {
 		t.Fatalf("approve failed: %s: %v", out, err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "draft.md"))
+	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "draft.md")) //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatalf("read approved file: %v", err)
 	}
@@ -125,7 +126,7 @@ func TestApproveSetsIsDraftFalse(t *testing.T) {
 		t.Fatalf("approve failed: %s: %v", out, err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "draft.md"))
+	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "draft.md")) //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatalf("read approved file: %v", err)
 	}
@@ -187,7 +188,8 @@ func TestApproveGitCommitMessage(t *testing.T) {
 		t.Fatalf("approve failed: %s: %v", out, err)
 	}
 
-	cmd := exec.Command("git", "log", "--oneline", "-1")
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "log", "--oneline", "-1")
 	cmd.Dir = kbRoot
 	gitOut, err := cmd.Output()
 	if err != nil {

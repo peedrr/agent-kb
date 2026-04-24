@@ -7,22 +7,25 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/spf13/cobra"
+
+	"github.com/peedrr/agent-kb/internal/path"
 )
 
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all pages in the knowledge base",
 	Long:  `Display all markdown pages in the kb/ directory, sorted alphabetically.`,
-	Args:  cobra.NoArgs,
-	RunE:  runList,
+	Example: `  # List all pages
+  akb list`,
+	Args: cobra.NoArgs,
+	RunE: runList,
 }
 
-func runList(cmd *cobra.Command, args []string) error {
+func runList(_ *cobra.Command, _ []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	pages, err := listPages(kbRoot)
@@ -43,7 +46,7 @@ func listPages(kbRoot string) ([]string, error) {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, fmt.Errorf("check kb directory: %w", err)
 	}
 
 	var pages []string
@@ -67,7 +70,7 @@ func listPages(kbRoot string) ([]string, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("walk kb directory: %w", err)
 	}
 
 	sort.Strings(pages)

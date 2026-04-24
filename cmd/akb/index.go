@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/index"
@@ -15,15 +17,22 @@ import (
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/search"
 	"github.com/peedrr/agent-kb/internal/storage"
-	"github.com/spf13/cobra"
 )
 
 var indexCmd = &cobra.Command{
 	Use:   "index",
 	Short: "Manage the knowledge base index",
 	Long:  `Manage the knowledge base index: show, add, remove, or rebuild entries.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+	Example: `  # Show all index entries
+  akb index show
+
+  # Add a page to the index
+  akb index add notes/my-note.md "A summary of the note"
+
+  # Rebuild the entire index
+  akb index rebuild`,
+	Run: func(cmd *cobra.Command, _ []string) {
+		_ = cmd.Help() //nolint:errcheck // help display failure is non-fatal
 	},
 }
 
@@ -31,32 +40,43 @@ var indexShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Show the index",
 	Long:  `Print the contents of kb/index.md to stdout.`,
-	Args:  cobra.NoArgs,
-	RunE:  runIndexShow,
+	Example: `  # Show the index
+  akb index show`,
+	Args: cobra.NoArgs,
+	RunE: runIndexShow,
 }
 
 var indexAddCmd = &cobra.Command{
 	Use:   "add <path> <summary>",
 	Short: "Add or update an entry in the index",
 	Long:  `Add or update an entry in kb/index.md with the given path and summary.`,
-	Args:  cobra.ExactArgs(2),
-	RunE:  runIndexAdd,
+	Example: `  # Add a page to the index
+  akb index add notes/my-note.md "A simple note about stuff"
+
+  # Add with kb/ prefix (optional)
+  akb index add kb/adr/use-sqlite-search.md "ADR for SQLite search"`,
+	Args: cobra.ExactArgs(2),
+	RunE: runIndexAdd,
 }
 
 var indexRemoveCmd = &cobra.Command{
 	Use:   "remove <path>",
 	Short: "Remove an entry from the index",
 	Long:  `Remove an entry from kb/index.md by path.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runIndexRemove,
+	Example: `  # Remove an entry from the index
+  akb index remove notes/my-note.md`,
+	Args: cobra.ExactArgs(1),
+	RunE: runIndexRemove,
 }
 
 var indexRebuildCmd = &cobra.Command{
 	Use:   "rebuild",
 	Short: "Rebuild the index from the filesystem",
 	Long:  `Regenerate kb/index.md by walking the kb/ directory and parsing frontmatter from each .md file.`,
-	Args:  cobra.NoArgs,
-	RunE:  runIndexRebuild,
+	Example: `  # Rebuild the index
+  akb index rebuild`,
+	Args: cobra.NoArgs,
+	RunE: runIndexRebuild,
 }
 
 func init() {
@@ -66,14 +86,14 @@ func init() {
 	indexCmd.AddCommand(indexRebuildCmd)
 }
 
-func runIndexShow(cmd *cobra.Command, args []string) error {
+func runIndexShow(_ *cobra.Command, _ []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	indexPath := filepath.Join(kbRoot, "kb", "index.md")
-	data, err := os.ReadFile(indexPath)
+	data, err := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
 	if err != nil {
 		return fmt.Errorf("read index: %w", err)
 	}
@@ -82,7 +102,7 @@ func runIndexShow(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runIndexAdd(cmd *cobra.Command, args []string) error {
+func runIndexAdd(_ *cobra.Command, args []string) error {
 	entryPath := args[0]
 	summary := args[1]
 
@@ -94,7 +114,12 @@ func runIndexAdd(cmd *cobra.Command, args []string) error {
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
+	}
+
+	_, err = path.ResolveKBPath(kbRoot, entryPath)
+	if err != nil {
+		return fmt.Errorf("resolve path: %w", err)
 	}
 
 	// Resolve the full file path
@@ -102,7 +127,7 @@ func runIndexAdd(cmd *cobra.Command, args []string) error {
 	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
 
 	// Read the file to get frontmatter for title and type
-	content, err := os.ReadFile(fullPath)
+	content, err := os.ReadFile(fullPath) //nolint:gosec // path validated by ResolveKBPath
 	if err != nil {
 		return fmt.Errorf("read file %s: %w", entryPath, err)
 	}
@@ -129,7 +154,7 @@ func runIndexAdd(cmd *cobra.Command, args []string) error {
 
 	// Read the updated index content for git commit
 	idxPath := filepath.Join(kbRoot, "kb", "index.md")
-	newContent, err := os.ReadFile(idxPath)
+	newContent, err := os.ReadFile(idxPath) //nolint:gosec // path validated by ResolveKBPath
 	if err != nil {
 		return fmt.Errorf("read updated index: %w", err)
 	}
@@ -145,16 +170,21 @@ func runIndexAdd(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runIndexRemove(cmd *cobra.Command, args []string) error {
+func runIndexRemove(_ *cobra.Command, args []string) error {
 	entryPath := args[0]
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
+	}
+
+	_, err = path.ResolveKBPath(kbRoot, entryPath)
+	if err != nil {
+		return fmt.Errorf("resolve path: %w", err)
 	}
 
 	indexPath := filepath.Join(kbRoot, "kb", "index.md")
-	oldContent, _ := os.ReadFile(indexPath)
+	oldContent, _ := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
 
 	// Normalize path to kb/ prefix
 	cleanPath := strings.TrimPrefix(entryPath, "kb/")
@@ -165,7 +195,7 @@ func runIndexRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("remove entry: %w", err)
 	}
 
-	newContent, err := os.ReadFile(indexPath)
+	newContent, err := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
 	if err != nil {
 		return fmt.Errorf("read updated index: %w", err)
 	}
@@ -186,21 +216,21 @@ func runIndexRemove(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runIndexRebuild(cmd *cobra.Command, args []string) error {
+func runIndexRebuild(_ *cobra.Command, _ []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	indexPath := filepath.Join(kbRoot, "kb", "index.md")
-	oldContent, _ := os.ReadFile(indexPath)
+	oldContent, _ := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
 
 	// Open or create search database
 	sqlDB, err := openOrCreateSearchDB(kbRoot)
 	if err != nil {
 		return fmt.Errorf("open search database: %w", err)
 	}
-	defer sqlDB.Close()
+	defer sqlDB.Close() //nolint:errcheck // DB close error non-critical on command exit
 
 	// Rebuild search index (also rebuilds index.md via index.RebuildIndex)
 	ctx := context.Background()
@@ -214,7 +244,7 @@ func runIndexRebuild(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("rebuild link graph: %w", err)
 	}
 
-	newContent, err := os.ReadFile(indexPath)
+	newContent, err := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
 	if err != nil {
 		return fmt.Errorf("read rebuilt index: %w", err)
 	}
@@ -245,12 +275,12 @@ func openOrCreateSearchDB(kbRoot string) (*sql.DB, error) {
 
 	// If error is not about missing DB, return the error
 	if !isSearchDBMissing(kbRoot, err) {
-		return nil, err
+		return nil, fmt.Errorf("open search database: %w", err)
 	}
 
 	// Create the .akb directory if it doesn't exist
 	akbDir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(akbDir, 0755); err != nil {
+	if err := os.MkdirAll(akbDir, 0750); err != nil {
 		return nil, fmt.Errorf("create .akb directory: %w", err)
 	}
 
@@ -261,12 +291,12 @@ func openOrCreateSearchDB(kbRoot string) (*sql.DB, error) {
 	}
 
 	if err := db.CreateSchema(sqlDB); err != nil {
-		sqlDB.Close()
+		_ = sqlDB.Close() //nolint:errcheck // close error secondary to schema error
 		return nil, fmt.Errorf("create schema: %w", err)
 	}
 
 	if _, err := sqlDB.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		sqlDB.Close()
+		_ = sqlDB.Close() //nolint:errcheck // close error secondary to WAL error
 		return nil, fmt.Errorf("enable WAL mode: %w", err)
 	}
 	sqlDB.SetMaxOpenConns(1)

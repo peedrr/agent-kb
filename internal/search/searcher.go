@@ -3,6 +3,8 @@ package search
 import "context"
 
 // SearchResult represents a search result from the index.
+//
+//nolint:revive // intentionally exported for use by consumers
 type SearchResult struct {
 	Path    string
 	Title   string
@@ -12,6 +14,8 @@ type SearchResult struct {
 }
 
 // SearchOptions configures a search query.
+//
+//nolint:revive // intentionally exported for use by consumers
 type SearchOptions struct {
 	Limit int // 0 means default of 10
 }

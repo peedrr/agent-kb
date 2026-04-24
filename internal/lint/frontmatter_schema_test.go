@@ -42,9 +42,9 @@ func TestFrontmatterSchemaChecker(t *testing.T) {
 				},
 			},
 			wantIssues: 1,
-			checkType: "frontmatter_schema",
-			checkPath: "decisions/test.md",
-			checkMsg:  "missing required field 'status'",
+			checkType:  "frontmatter_schema",
+			checkPath:  "decisions/test.md",
+			checkMsg:   "missing required field 'status'",
 		},
 		{
 			name: "ADR page with invalid status enum returns enum violation",
@@ -67,9 +67,9 @@ func TestFrontmatterSchemaChecker(t *testing.T) {
 				},
 			},
 			wantIssues: 1,
-			checkType: "frontmatter_schema",
-			checkPath: "decisions/test.md",
-			checkMsg:  "not valid; must be one of",
+			checkType:  "frontmatter_schema",
+			checkPath:  "decisions/test.md",
+			checkMsg:   "not valid; must be one of",
 		},
 		{
 			name: "ADR page with valid status returns no issues",
@@ -99,8 +99,8 @@ func TestFrontmatterSchemaChecker(t *testing.T) {
 				{
 					RelPath: "notes/test.md",
 					Frontmatter: &frontmatter.ParsedFrontmatter{
-						Type:   "note",
-						Title:  "Test Note",
+						Type:  "note",
+						Title: "Test Note",
 						Fields: map[string]any{
 							"summary": "Test summary",
 							"tags":    []any{"test"},

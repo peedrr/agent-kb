@@ -1,3 +1,4 @@
+// Package log manages kb/log.md parsing and append operations.
 package log
 
 import (
@@ -9,6 +10,9 @@ import (
 	"time"
 )
 
+// LogEntry represents a single entry in kb/log.md.
+//
+//nolint:revive // intentionally exported for use by tests
 type LogEntry struct {
 	Date        string
 	Operation   string
@@ -22,6 +26,7 @@ func logPath(kbRoot string) string {
 	return filepath.Join(kbRoot, "kb", "log.md")
 }
 
+// ReadLog parses kb/log.md and returns its entries.
 func ReadLog(kbRoot string) ([]LogEntry, error) {
 	data, err := os.ReadFile(logPath(kbRoot))
 	if err != nil {
@@ -61,11 +66,12 @@ func ReadLog(kbRoot string) ([]LogEntry, error) {
 	return entries, nil
 }
 
+// AppendLog adds a new entry to kb/log.md.
 func AppendLog(kbRoot string, operation string, description string, title string) error {
 	lp := logPath(kbRoot)
 
 	var entries []LogEntry
-	_, err := os.ReadFile(lp)
+	_, err := os.ReadFile(lp) //nolint:gosec // path constructed by logPath within KB root
 	if err != nil {
 		if os.IsNotExist(err) {
 			entries = []LogEntry{}
@@ -87,13 +93,14 @@ func AppendLog(kbRoot string, operation string, description string, title string
 	})
 
 	rendered := RenderLog(entries)
-	if err := os.WriteFile(lp, []byte(rendered), 0644); err != nil {
+	if err := os.WriteFile(lp, []byte(rendered), 0600); err != nil {
 		return fmt.Errorf("write log.md: %w", err)
 	}
 
 	return nil
 }
 
+// FilterByType returns log entries matching the given operation.
 func FilterByType(entries []LogEntry, operation string) []LogEntry {
 	result := []LogEntry{}
 	for _, e := range entries {
@@ -104,6 +111,7 @@ func FilterByType(entries []LogEntry, operation string) []LogEntry {
 	return result
 }
 
+// FilterByLast returns the last N log entries.
 func FilterByLast(entries []LogEntry, n int) []LogEntry {
 	if n <= 0 {
 		return []LogEntry{}
@@ -114,6 +122,7 @@ func FilterByLast(entries []LogEntry, n int) []LogEntry {
 	return entries[len(entries)-n:]
 }
 
+// RenderLog formats log entries as markdown.
 func RenderLog(entries []LogEntry) string {
 	var b strings.Builder
 	b.WriteString("# Log\n\n")

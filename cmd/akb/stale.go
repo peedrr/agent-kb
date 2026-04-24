@@ -11,13 +11,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/peedrr/agent-kb/internal/registry"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/registry"
 )
 
 const (
-	FreshnessHalfLifeDays     = 30
-	FreshnessScoreThreshold  = 50.0
+	FreshnessHalfLifeDays   = 30
+	FreshnessScoreThreshold = 50.0
 )
 
 type stalePage struct {
@@ -39,11 +39,16 @@ var staleJSON bool
 var staleCmd = &cobra.Command{
 	Use:   "stale",
 	Short: "Report stale pages across all KBs",
-	Long:  `Check all registered KBs for stale pages based on last update time.
+	Long: `Check all registered KBs for stale pages based on last update time.
 
 A page is considered stale if its freshness score drops below 50.0.
 The freshness score decays exponentially based on days since last update,
 weighted by confidence level (high=1.0, medium=0.7, low=0.4).`,
+	Example: `  # Check for stale pages across all KBs
+  akb stale
+
+  # Output as JSON
+  akb stale --json`,
 	RunE: runStale,
 }
 
@@ -51,8 +56,8 @@ func init() {
 	staleCmd.Flags().BoolVar(&staleJSON, "json", false, "output as JSON")
 }
 
-func runStale(cmd *cobra.Command, args []string) error {
-	regPath, err := registry.RegistryPath()
+func runStale(_ *cobra.Command, _ []string) error {
+	regPath, err := registry.Path()
 	if err != nil {
 		return fmt.Errorf("get registry path: %w", err)
 	}
@@ -94,7 +99,7 @@ func runStale(cmd *cobra.Command, args []string) error {
 				return nil
 			}
 
-			content, err := os.ReadFile(path)
+			content, err := os.ReadFile(path) //nolint:gosec // path validated by filepath.WalkDir within KB root
 			if err != nil {
 				return nil
 			}

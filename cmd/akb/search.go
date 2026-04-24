@@ -7,10 +7,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/search"
-	"github.com/spf13/cobra"
 )
 
 var searchJSON bool
@@ -19,20 +20,25 @@ var searchCmd = &cobra.Command{
 	Use:   "search <query>",
 	Short: "Search the knowledge base",
 	Long:  `Perform a full-text search over the knowledge base using BM25 ranking.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runSearch,
+	Example: `  # Search for pages containing "sqlite"
+  akb search sqlite
+
+  # Search with JSON output
+  akb search "database" --json`,
+	Args: cobra.ExactArgs(1),
+	RunE: runSearch,
 }
 
 func init() {
 	searchCmd.Flags().BoolVar(&searchJSON, "json", false, "output results as JSON")
 }
 
-func runSearch(cmd *cobra.Command, args []string) error {
+func runSearch(_ *cobra.Command, args []string) error {
 	query := args[0]
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	sqlDB, err := db.OpenKB(kbRoot)
@@ -40,16 +46,16 @@ func runSearch(cmd *cobra.Command, args []string) error {
 		if isMissingDB(err) {
 			return fmt.Errorf("run `akb index rebuild` to create the search index")
 		}
-		return err
+		return fmt.Errorf("open search database: %w", err)
 	}
-	defer sqlDB.Close()
+	defer sqlDB.Close() //nolint:errcheck // DB close error non-critical on command exit
 
 	searcher := search.NewSQLiteFTS5Searcher(sqlDB)
 
 	ctx := context.Background()
 	results, err := searcher.Search(ctx, query, search.SearchOptions{})
 	if err != nil {
-		return err
+		return fmt.Errorf("search: %w", err)
 	}
 
 	if searchJSON {
@@ -94,7 +100,10 @@ func printSearchJSON(results []search.SearchResult) error {
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	return enc.Encode(out)
+	if err := enc.Encode(out); err != nil {
+		return fmt.Errorf("encode JSON: %w", err)
+	}
+	return nil
 }
 
 func isMissingDB(err error) bool {

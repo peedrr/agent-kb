@@ -5,16 +5,20 @@ import (
 	"fmt"
 )
 
+// CitationsChecker validates Citations issues.
 type CitationsChecker struct{}
 
+// NewCitationsChecker creates a new CitationsChecker.
 func NewCitationsChecker() *CitationsChecker {
 	return &CitationsChecker{}
 }
 
+// Name returns the checker name.
 func (c *CitationsChecker) Name() string {
 	return "citations"
 }
 
+// Check runs the checker and returns issues.
 func (c *CitationsChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error) {
 	manifestFiles := make(map[string]bool)
 	for _, e := range kb.Manifest {

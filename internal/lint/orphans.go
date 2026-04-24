@@ -5,16 +5,20 @@ import (
 	"fmt"
 )
 
+// OrphansChecker validates Orphans issues.
 type OrphansChecker struct{}
 
+// NewOrphansChecker creates a new OrphansChecker.
 func NewOrphansChecker() *OrphansChecker {
 	return &OrphansChecker{}
 }
 
+// Name returns the checker name.
 func (c *OrphansChecker) Name() string {
 	return "orphans"
 }
 
+// Check runs the checker and returns issues.
 func (c *OrphansChecker) Check(ctx context.Context, kb *KB) ([]LintIssue, error) {
 	paths, err := kb.LinkGraph.GetOrphans(ctx)
 	if err != nil {

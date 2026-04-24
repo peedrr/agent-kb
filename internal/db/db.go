@@ -1,3 +1,4 @@
+// Package db provides SQLite database operations for the knowledge base.
 package db
 
 import (
@@ -6,41 +7,53 @@ import (
 	"fmt"
 	"path/filepath"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // SQLite driver
 )
 
+// DB wraps sql.DB with custom operations.
 type DB struct {
 	*sql.DB
 }
 
+// Open opens a SQLite database at the given path.
 func Open(path string) (*DB, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open database: %w", err)
 	}
 	return &DB{db}, nil
 }
 
+// Close closes the database connection.
 func (db *DB) Close() error {
-	return db.DB.Close()
+	if err := db.DB.Close(); err != nil {
+		return fmt.Errorf("close database: %w", err)
+	}
+	return nil
 }
 
+// Ping verifies the database connection.
 func (db *DB) Ping(ctx context.Context) error {
-	return db.DB.PingContext(ctx)
+	if err := db.PingContext(ctx); err != nil {
+		return fmt.Errorf("ping database: %w", err)
+	}
+	return nil
 }
 
+// InitDB opens a new SQLite database, creating it if necessary.
 func InitDB(dbPath string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 	if err := db.Ping(); err != nil {
-		db.Close()
+		_ = db.Close() //nolint:errcheck // close error secondary to ping failure
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 	return db, nil
 }
 
+// VerifySchema checks that all required tables and indexes exist.
 func VerifySchema(db *sql.DB) error {
 	expected := map[string]bool{
 		"documents":          false,
@@ -55,7 +68,7 @@ func VerifySchema(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("query sqlite_master: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Err() checked after iteration; close error non-critical
 
 	for rows.Next() {
 		var name string
@@ -82,6 +95,7 @@ func VerifySchema(db *sql.DB) error {
 	return nil
 }
 
+// CreateSchema creates the required tables and indexes.
 func CreateSchema(db *sql.DB) error {
 	if db == nil {
 		return fmt.Errorf("db is nil")
@@ -127,6 +141,7 @@ func CreateSchema(db *sql.DB) error {
 	return nil
 }
 
+// OpenKB opens the search database for a knowledge base.
 func OpenKB(kbRoot string) (*sql.DB, error) {
 	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
 	db, err := sql.Open("sqlite", dbPath)
@@ -135,14 +150,14 @@ func OpenKB(kbRoot string) (*sql.DB, error) {
 	}
 
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
-		db.Close()
+		_ = db.Close() //nolint:errcheck // close error secondary to WAL error
 		return nil, fmt.Errorf("enable WAL mode: %w", err)
 	}
 
 	db.SetMaxOpenConns(1)
 
 	if err := VerifySchema(db); err != nil {
-		db.Close()
+		_ = db.Close() //nolint:errcheck // close error secondary to schema error
 		return nil, fmt.Errorf("invalid schema: %w (run 'akb init' to fix)", err)
 	}
 

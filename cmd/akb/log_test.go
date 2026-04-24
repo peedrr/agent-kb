@@ -18,7 +18,7 @@ func TestLog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(origCwd)
+	defer os.Chdir(origCwd) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	if err := os.Chdir(kbRoot); err != nil {
 		t.Fatal(err)
@@ -220,17 +220,17 @@ func setupLogTestKB(t *testing.T, kbRoot string) {
 		filepath.Join(kbRoot, ".akb"),
 	}
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	configContent := "name: test-kb\ncreated: \"2024-01-01T00:00:00Z\"\n"
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", ".akb.yaml"), []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", ".akb.yaml"), []byte(configContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(kbRoot, "kb", "index.md"), []byte("# Index\n\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, "kb", "index.md"), []byte("# Index\n\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -243,16 +243,20 @@ func setupLogTestKB(t *testing.T, kbRoot string) {
 	commitInitial(kbRoot)
 
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", kbRoot)
-	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+	os.Setenv("HOME", kbRoot)                         //nolint:errcheck,gosec // test setup — failure is non-fatal
+	t.Cleanup(func() { os.Setenv("HOME", origHome) }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	regPath := filepath.Join(kbRoot, ".config", "agent-kb", "registry.yaml")
-	os.MkdirAll(filepath.Dir(regPath), 0755)
+	if err := os.MkdirAll(filepath.Dir(regPath), 0750); err != nil {
+		t.Fatal(err)
+	}
 	regContent := `default: test-kb
 entries:
   - name: test-kb
     path: ` + kbRoot + `
     created: "2024-01-01T00:00:00Z"
 `
-	os.WriteFile(regPath, []byte(regContent), 0644)
+	if err := os.WriteFile(regPath, []byte(regContent), 0600); err != nil {
+		t.Fatal(err)
+	}
 }

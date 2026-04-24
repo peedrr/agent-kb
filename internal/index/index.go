@@ -1,3 +1,4 @@
+// Package index manages kb/index.md parsing, rendering, and updates.
 package index
 
 import (
@@ -9,6 +10,9 @@ import (
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 )
 
+// IndexEntry represents a single entry in kb/index.md.
+//
+//nolint:revive // intentionally exported for use by tests and external commands
 type IndexEntry struct {
 	Path    string
 	Title   string
@@ -34,9 +38,10 @@ func headingToType(heading string) string {
 	return strings.ToLower(strings.TrimSuffix(heading, "s"))
 }
 
+// ReadIndex parses kb/index.md and returns its entries.
 func ReadIndex(kbRoot string) ([]IndexEntry, error) {
 	path := indexPath(kbRoot)
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path constructed by indexPath within KB root
 	if err != nil {
 		return nil, fmt.Errorf("read index: %w", err)
 	}
@@ -100,16 +105,21 @@ func parseEntryLine(line string, typ string) (IndexEntry, error) {
 	}, nil
 }
 
+// AddEntry adds or updates a page entry in kb/index.md.
 func AddEntry(kbRoot string, entry IndexEntry) error {
 	path := indexPath(kbRoot)
 
 	var entries []IndexEntry
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path constructed by indexPath within KB root
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("read index: %w", err)
 	}
 	if err == nil {
-		entries, _ = parseIndex(string(data))
+		entries, err = parseIndex(string(data))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to parse index: %v — run 'akb index rebuild' to regenerate\n", err)
+			entries = nil
+		}
 	}
 
 	found := false
@@ -125,16 +135,17 @@ func AddEntry(kbRoot string, entry IndexEntry) error {
 	}
 
 	rendered := RenderIndex(entries)
-	if err := os.WriteFile(path, []byte(rendered), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(rendered), 0600); err != nil {
 		return fmt.Errorf("write index: %w", err)
 	}
 	return nil
 }
 
+// RemoveEntry removes a page entry from kb/index.md.
 func RemoveEntry(kbRoot string, entryPath string) error {
 	path := indexPath(kbRoot)
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path constructed by indexPath within KB root
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -142,7 +153,11 @@ func RemoveEntry(kbRoot string, entryPath string) error {
 		return fmt.Errorf("read index: %w", err)
 	}
 
-	entries, _ := parseIndex(string(data))
+	entries, err := parseIndex(string(data))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to parse index: %v — run 'akb index rebuild' to regenerate\n", err)
+		entries = nil
+	}
 
 	filtered := make([]IndexEntry, 0, len(entries))
 	for _, e := range entries {
@@ -152,12 +167,13 @@ func RemoveEntry(kbRoot string, entryPath string) error {
 	}
 
 	rendered := RenderIndex(filtered)
-	if err := os.WriteFile(path, []byte(rendered), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(rendered), 0600); err != nil {
 		return fmt.Errorf("write index: %w", err)
 	}
 	return nil
 }
 
+// RebuildIndex regenerates kb/index.md from the filesystem.
 func RebuildIndex(kbRoot string) error {
 	kbDir := filepath.Join(kbRoot, "kb")
 
@@ -181,7 +197,7 @@ func RebuildIndex(kbRoot string) error {
 			return nil
 		}
 
-		content, err := os.ReadFile(path)
+		content, err := os.ReadFile(path) //nolint:gosec // path from filepath.WalkDir within KB root
 		if err != nil {
 			return nil
 		}
@@ -220,12 +236,13 @@ func RebuildIndex(kbRoot string) error {
 
 	rendered := RenderIndex(entries)
 	idxPath := indexPath(kbRoot)
-	if err := os.WriteFile(idxPath, []byte(rendered), 0644); err != nil {
+	if err := os.WriteFile(idxPath, []byte(rendered), 0600); err != nil {
 		return fmt.Errorf("write index: %w", err)
 	}
 	return nil
 }
 
+// RenderIndex renders index entries as markdown.
 func RenderIndex(entries []IndexEntry) string {
 	var sb strings.Builder
 	sb.WriteString("# Index\n\n")

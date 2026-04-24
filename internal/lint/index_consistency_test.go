@@ -17,7 +17,9 @@ func TestIndexConsistencyChecker(t *testing.T) {
 	t.Run("page in index but not on disk", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		os.MkdirAll(kbDir, 0755)
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
+			t.Fatal(err)
+		}
 
 		indexContent := `# Index
 
@@ -26,10 +28,16 @@ func TestIndexConsistencyChecker(t *testing.T) {
 - [Existing Page](kb/notes/existing.md)
 - [Missing Page](kb/notes/missing.md)
 `
-		os.WriteFile(filepath.Join(kbDir, "index.md"), []byte(indexContent), 0644)
+		if err := os.WriteFile(filepath.Join(kbDir, "index.md"), []byte(indexContent), 0600); err != nil {
+			t.Fatal(err)
+		}
 
-		os.MkdirAll(filepath.Join(kbDir, "notes"), 0755)
-		os.WriteFile(filepath.Join(kbDir, "notes", "existing.md"), []byte("---\ntitle: Existing\ntype: note\n---\nContent"), 0644)
+		if err := os.MkdirAll(filepath.Join(kbDir, "notes"), 0750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(kbDir, "notes", "existing.md"), []byte("---\ntitle: Existing\ntype: note\n---\nContent"), 0600); err != nil {
+			t.Fatal(err)
+		}
 
 		kb := &KB{
 			Root: tmpDir,
@@ -61,7 +69,9 @@ func TestIndexConsistencyChecker(t *testing.T) {
 	t.Run("page on disk but not in index", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		os.MkdirAll(kbDir, 0755)
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
+			t.Fatal(err)
+		}
 
 		indexContent := `# Index
 
@@ -69,11 +79,19 @@ func TestIndexConsistencyChecker(t *testing.T) {
 
 - [Indexed Page](kb/notes/indexed.md)
 `
-		os.WriteFile(filepath.Join(kbDir, "index.md"), []byte(indexContent), 0644)
+		if err := os.WriteFile(filepath.Join(kbDir, "index.md"), []byte(indexContent), 0600); err != nil {
+			t.Fatal(err)
+		}
 
-		os.MkdirAll(filepath.Join(kbDir, "notes"), 0755)
-		os.WriteFile(filepath.Join(kbDir, "notes", "indexed.md"), []byte("---\ntitle: Indexed\ntype: note\n---\nContent"), 0644)
-		os.WriteFile(filepath.Join(kbDir, "notes", "unindexed.md"), []byte("---\ntitle: Unindexed\ntype: note\n---\nContent"), 0644)
+		if err := os.MkdirAll(filepath.Join(kbDir, "notes"), 0750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(kbDir, "notes", "indexed.md"), []byte("---\ntitle: Indexed\ntype: note\n---\nContent"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(kbDir, "notes", "unindexed.md"), []byte("---\ntitle: Unindexed\ntype: note\n---\nContent"), 0600); err != nil {
+			t.Fatal(err)
+		}
 
 		kb := &KB{
 			Root: tmpDir,
@@ -106,7 +124,9 @@ func TestIndexConsistencyChecker(t *testing.T) {
 	t.Run("both missing from index and missing from disk", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		os.MkdirAll(kbDir, 0755)
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
+			t.Fatal(err)
+		}
 
 		indexContent := `# Index
 
@@ -115,10 +135,16 @@ func TestIndexConsistencyChecker(t *testing.T) {
 - [Missing from disk](kb/notes/missing.md)
 - [Also missing](kb/notes/also.md)
 `
-		os.WriteFile(filepath.Join(kbDir, "index.md"), []byte(indexContent), 0644)
+		if err := os.WriteFile(filepath.Join(kbDir, "index.md"), []byte(indexContent), 0600); err != nil {
+			t.Fatal(err)
+		}
 
-		os.MkdirAll(filepath.Join(kbDir, "notes"), 0755)
-		os.WriteFile(filepath.Join(kbDir, "notes", "new.md"), []byte("---\ntitle: New\ntype: note\n---\nContent"), 0644)
+		if err := os.MkdirAll(filepath.Join(kbDir, "notes"), 0750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(kbDir, "notes", "new.md"), []byte("---\ntitle: New\ntype: note\n---\nContent"), 0600); err != nil {
+			t.Fatal(err)
+		}
 
 		kb := &KB{
 			Root: tmpDir,
@@ -158,10 +184,16 @@ func TestIndexConsistencyChecker(t *testing.T) {
 	t.Run("index.md does not exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		os.MkdirAll(kbDir, 0755)
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
+			t.Fatal(err)
+		}
 
-		os.MkdirAll(filepath.Join(kbDir, "notes"), 0755)
-		os.WriteFile(filepath.Join(kbDir, "notes", "test.md"), []byte("---\ntitle: Test\ntype: note\n---\nContent"), 0644)
+		if err := os.MkdirAll(filepath.Join(kbDir, "notes"), 0750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(kbDir, "notes", "test.md"), []byte("---\ntitle: Test\ntype: note\n---\nContent"), 0600); err != nil {
+			t.Fatal(err)
+		}
 
 		kb := &KB{
 			Root: tmpDir,
@@ -179,7 +211,9 @@ func TestIndexConsistencyChecker(t *testing.T) {
 	t.Run("consistent index and pages", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		os.MkdirAll(kbDir, 0755)
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
+			t.Fatal(err)
+		}
 
 		indexContent := `# Index
 
@@ -188,11 +222,19 @@ func TestIndexConsistencyChecker(t *testing.T) {
 - [Page One](kb/notes/one.md)
 - [Page Two](kb/notes/two.md)
 `
-		os.WriteFile(filepath.Join(kbDir, "index.md"), []byte(indexContent), 0644)
+		if err := os.WriteFile(filepath.Join(kbDir, "index.md"), []byte(indexContent), 0600); err != nil {
+			t.Fatal(err)
+		}
 
-		os.MkdirAll(filepath.Join(kbDir, "notes"), 0755)
-		os.WriteFile(filepath.Join(kbDir, "notes", "one.md"), []byte("---\ntitle: One\ntype: note\n---\nContent"), 0644)
-		os.WriteFile(filepath.Join(kbDir, "notes", "two.md"), []byte("---\ntitle: Two\ntype: note\n---\nContent"), 0644)
+		if err := os.MkdirAll(filepath.Join(kbDir, "notes"), 0750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(kbDir, "notes", "one.md"), []byte("---\ntitle: One\ntype: note\n---\nContent"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(kbDir, "notes", "two.md"), []byte("---\ntitle: Two\ntype: note\n---\nContent"), 0600); err != nil {
+			t.Fatal(err)
+		}
 
 		kb := &KB{
 			Root: tmpDir,

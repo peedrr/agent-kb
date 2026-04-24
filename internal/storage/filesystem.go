@@ -1,3 +1,4 @@
+// Package storage provides filesystem and git-backed storage providers.
 package storage
 
 import (
@@ -15,28 +16,30 @@ type FilesystemProvider struct {
 	kbRoot string
 }
 
+// NewFilesystemProvider creates a filesystem-only storage provider.
 func NewFilesystemProvider(kbRoot string) *FilesystemProvider {
 	return &FilesystemProvider{kbRoot: kbRoot}
 }
 
 func (f *FilesystemProvider) Write(_ context.Context, path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 		return fmt.Errorf("create parent directories: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("write file: %w", err)
 	}
 	return nil
 }
 
 func (f *FilesystemProvider) Read(_ context.Context, path string) ([]byte, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path validated by provider
 	if err != nil {
 		return nil, fmt.Errorf("read file: %w", err)
 	}
 	return data, nil
 }
 
+// Delete removes a file from the filesystem.
 func (f *FilesystemProvider) Delete(_ context.Context, path string) error {
 	if err := os.Remove(path); err != nil {
 		return fmt.Errorf("delete file: %w", err)
@@ -44,6 +47,7 @@ func (f *FilesystemProvider) Delete(_ context.Context, path string) error {
 	return nil
 }
 
+// Exists checks whether a file exists on the filesystem.
 func (f *FilesystemProvider) Exists(_ context.Context, path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -55,6 +59,7 @@ func (f *FilesystemProvider) Exists(_ context.Context, path string) (bool, error
 	return false, fmt.Errorf("check file existence: %w", err)
 }
 
+// List returns files with the given extension under a directory.
 func (f *FilesystemProvider) List(_ context.Context, dir string, ext string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
@@ -69,7 +74,7 @@ func (f *FilesystemProvider) List(_ context.Context, dir string, ext string) ([]
 		}
 		relPath, err := filepath.Rel(f.kbRoot, path)
 		if err != nil {
-			return err
+			return fmt.Errorf("compute relative path: %w", err)
 		}
 		files = append(files, filepath.ToSlash(relPath))
 		return nil

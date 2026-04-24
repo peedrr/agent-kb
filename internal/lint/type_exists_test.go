@@ -15,12 +15,12 @@ func TestTypeExistsChecker(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		pages       []PageData
-		wantIssues  int
-		checkType   string
-		checkPath   string
-		checkMsg    string
+		name       string
+		pages      []PageData
+		wantIssues int
+		checkType  string
+		checkPath  string
+		checkMsg   string
 	}{
 		{
 			name: "page with unknown type returns error",
@@ -34,7 +34,7 @@ func TestTypeExistsChecker(t *testing.T) {
 					HasFrontmatter: true,
 				},
 			},
-			wantIssues:  1,
+			wantIssues: 1,
 			checkType:  "type_exists",
 			checkPath:  "decisions/unknown.md",
 			checkMsg:   "unknown type 'unknown_type'",

@@ -22,7 +22,7 @@ func setupLinksTestKB(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chdir(origCwd) })
+	t.Cleanup(func() { os.Chdir(origCwd) }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	if err := os.Chdir(kbRoot); err != nil {
 		t.Fatal(err)
@@ -39,7 +39,7 @@ func setupLinkGraphDB(t *testing.T, kbRoot string) *sql.DB {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 	if err := db.CreateSchema(d); err != nil {
 		t.Fatalf("CreateSchema: %v", err)
 	}
@@ -57,10 +57,10 @@ func insertTestPage(t *testing.T, d *sql.DB, pagePath string) {
 func writeTestPage(t *testing.T, kbRoot, relPath, content string) {
 	t.Helper()
 	fullPath := filepath.Join(kbRoot, "kb", relPath)
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(fullPath, []byte(content), 0600); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -75,11 +75,15 @@ func captureOutput(f func() error) (string, error) {
 
 	err = f()
 
-	w.Close()
+	if err := w.Close(); err != nil {
+		return "", err
+	}
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		return "", err
+	}
 	return buf.String(), err
 }
 
@@ -279,7 +283,7 @@ func TestBacklinks_NonexistentPage(t *testing.T) {
 
 func TestLinksShow_MissingDB(t *testing.T) {
 	kbRoot := setupLinksTestKB(t)
-	os.Remove(filepath.Join(kbRoot, ".akb", "search.db"))
+	_ = os.Remove(filepath.Join(kbRoot, ".akb", "search.db")) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	err := runLinksShow(nil, []string{"some.md"})
 	if err == nil {
@@ -292,7 +296,7 @@ func TestLinksShow_MissingDB(t *testing.T) {
 
 func TestBacklinks_MissingDB(t *testing.T) {
 	kbRoot := setupLinksTestKB(t)
-	os.Remove(filepath.Join(kbRoot, ".akb", "search.db"))
+	_ = os.Remove(filepath.Join(kbRoot, ".akb", "search.db")) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	err := runBacklinks(nil, []string{"some.md"})
 	if err == nil {
@@ -305,7 +309,7 @@ func TestBacklinks_MissingDB(t *testing.T) {
 
 func TestOrphans_MissingDB(t *testing.T) {
 	kbRoot := setupLinksTestKB(t)
-	os.Remove(filepath.Join(kbRoot, ".akb", "search.db"))
+	_ = os.Remove(filepath.Join(kbRoot, ".akb", "search.db")) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	err := runOrphans(nil, nil)
 	if err == nil {
@@ -339,5 +343,57 @@ func TestLinksShow_KbPrefixStripped(t *testing.T) {
 
 	if !strings.Contains(output, "target -> kb/target.md") {
 		t.Error("expected resolved link with kb/ prefix stripped from input")
+	}
+}
+
+func TestLinksShow_ParentDirRejected(t *testing.T) {
+	kbRoot := setupLinksTestKB(t)
+	setupLinkGraphDB(t, kbRoot)
+
+	err := runLinksShow(nil, []string{"../escape.md"})
+	if err == nil {
+		t.Fatal("expected error for .. path, got nil")
+	}
+	if !strings.Contains(err.Error(), "..") {
+		t.Errorf("expected error to contain '..', got: %v", err)
+	}
+}
+
+func TestLinksShow_AbsolutePathRejected(t *testing.T) {
+	kbRoot := setupLinksTestKB(t)
+	setupLinkGraphDB(t, kbRoot)
+
+	err := runLinksShow(nil, []string{"/tmp/evil.md"})
+	if err == nil {
+		t.Fatal("expected error for absolute path, got nil")
+	}
+	if !strings.Contains(err.Error(), "absolute") && !strings.Contains(err.Error(), "relative") {
+		t.Errorf("expected error about absolute/relative path, got: %v", err)
+	}
+}
+
+func TestBacklinks_ParentDirRejected(t *testing.T) {
+	kbRoot := setupLinksTestKB(t)
+	setupLinkGraphDB(t, kbRoot)
+
+	err := runBacklinks(nil, []string{"../escape.md"})
+	if err == nil {
+		t.Fatal("expected error for .. path, got nil")
+	}
+	if !strings.Contains(err.Error(), "..") {
+		t.Errorf("expected error to contain '..', got: %v", err)
+	}
+}
+
+func TestBacklinks_AbsolutePathRejected(t *testing.T) {
+	kbRoot := setupLinksTestKB(t)
+	setupLinkGraphDB(t, kbRoot)
+
+	err := runBacklinks(nil, []string{"/tmp/evil.md"})
+	if err == nil {
+		t.Fatal("expected error for absolute path, got nil")
+	}
+	if !strings.Contains(err.Error(), "absolute") && !strings.Contains(err.Error(), "relative") {
+		t.Errorf("expected error about absolute/relative path, got: %v", err)
 	}
 }

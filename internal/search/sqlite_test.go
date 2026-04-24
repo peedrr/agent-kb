@@ -29,15 +29,15 @@ func setupTestKB(t *testing.T, files map[string]string) string {
 	t.Helper()
 	kbRoot := t.TempDir()
 	kbDir := filepath.Join(kbRoot, "kb")
-	if err := os.MkdirAll(kbDir, 0755); err != nil {
+	if err := os.MkdirAll(kbDir, 0750); err != nil {
 		t.Fatalf("MkdirAll failed: %v", err)
 	}
 	for relPath, content := range files {
 		fullPath := filepath.Join(kbRoot, relPath)
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0750); err != nil {
 			t.Fatalf("MkdirAll failed: %v", err)
 		}
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(fullPath, []byte(content), 0600); err != nil {
 			t.Fatalf("WriteFile failed: %v", err)
 		}
 	}
@@ -46,7 +46,7 @@ func setupTestKB(t *testing.T, files map[string]string) string {
 
 func TestSQLiteFTS5Searcher_IndexPage_InsertsIntoBothTables(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -85,7 +85,7 @@ func TestSQLiteFTS5Searcher_IndexPage_InsertsIntoBothTables(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_IndexPage_UpdatesExistingEntry(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -140,7 +140,7 @@ func TestSQLiteFTS5Searcher_IndexPage_UpdatesExistingEntry(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_RemovePage_DeletesFromBothTables(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -171,7 +171,7 @@ func TestSQLiteFTS5Searcher_RemovePage_DeletesFromBothTables(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_RemovePage_NonexistentPath(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -183,7 +183,7 @@ func TestSQLiteFTS5Searcher_RemovePage_NonexistentPath(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_Search_ReturnsBM25RankedResults(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -225,7 +225,7 @@ func TestSQLiteFTS5Searcher_Search_ReturnsBM25RankedResults(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_Search_TitleRankedHigherThanContent(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -251,7 +251,7 @@ func TestSQLiteFTS5Searcher_Search_TitleRankedHigherThanContent(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_Search_EmptyQuery(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -266,7 +266,7 @@ func TestSQLiteFTS5Searcher_Search_EmptyQuery(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_Search_QueryWithOnlySpecialChars(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -281,7 +281,7 @@ func TestSQLiteFTS5Searcher_Search_QueryWithOnlySpecialChars(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_Search_EscapesFTS5SpecialCharacters(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -324,7 +324,7 @@ func TestSQLiteFTS5Searcher_Search_EscapesFTS5SpecialCharacters(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_Search_DefaultLimit(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -349,7 +349,7 @@ func TestSQLiteFTS5Searcher_Search_DefaultLimit(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_Search_CustomLimit(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -371,7 +371,7 @@ func TestSQLiteFTS5Searcher_Search_CustomLimit(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_RebuildIndex_RepoulatesBothTables(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -423,7 +423,7 @@ func TestSQLiteFTS5Searcher_RebuildIndex_RepoulatesBothTables(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_RebuildIndex_HandlesEmptyKB(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -452,7 +452,7 @@ func TestSQLiteFTS5Searcher_RebuildIndex_HandlesEmptyKB(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_RebuildIndex_SkipsIndexAndLog(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
@@ -507,7 +507,7 @@ func TestEscapeFTS5Query(t *testing.T) {
 
 func TestSQLiteFTS5Searcher_Search_NoResults(t *testing.T) {
 	conn := setupTestDB(t)
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 

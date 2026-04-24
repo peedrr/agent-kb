@@ -9,16 +9,20 @@ import (
 	"github.com/peedrr/agent-kb/internal/markdown"
 )
 
+// ProvenanceChecker validates Provenance issues.
 type ProvenanceChecker struct{}
 
+// NewProvenanceChecker creates a new ProvenanceChecker.
 func NewProvenanceChecker() *ProvenanceChecker {
 	return &ProvenanceChecker{}
 }
 
+// Name returns the checker name.
 func (c *ProvenanceChecker) Name() string {
 	return "provenance"
 }
 
+// Check runs the checker and returns issues.
 func (c *ProvenanceChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error) {
 	var issues []LintIssue
 	for _, page := range kb.Pages {

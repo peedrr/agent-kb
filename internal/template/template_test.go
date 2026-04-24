@@ -64,7 +64,7 @@ optional:
 body: |
   # {{.Title}}
 `
-		err := os.WriteFile(filepath.Join(dir, "note.yaml"), []byte(noteYaml), 0644)
+		err := os.WriteFile(filepath.Join(dir, "note.yaml"), []byte(noteYaml), 0600)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,7 +110,7 @@ optional:
 body: |
   # {{.Title}}
 `
-		err := os.WriteFile(filepath.Join(dir, "adr.yaml"), []byte(adrYaml), 0644)
+		err := os.WriteFile(filepath.Join(dir, "adr.yaml"), []byte(adrYaml), 0600)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -145,11 +145,11 @@ dir: notes
 required:
   - title
 `
-		err := os.WriteFile(filepath.Join(dir, "note.yaml"), []byte(content), 0644)
+		err := os.WriteFile(filepath.Join(dir, "note.yaml"), []byte(content), 0600)
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = os.WriteFile(filepath.Join(dir, "note2.yaml"), []byte(content), 0644)
+		err = os.WriteFile(filepath.Join(dir, "note2.yaml"), []byte(content), 0600)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -169,7 +169,7 @@ required:
 required:
   - title
 `
-		err := os.WriteFile(filepath.Join(dir, "noname.yaml"), []byte(content), 0644)
+		err := os.WriteFile(filepath.Join(dir, "noname.yaml"), []byte(content), 0600)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -186,7 +186,7 @@ required:
 	t.Run("rejects malformed YAML", func(t *testing.T) {
 		dir := t.TempDir()
 		content := `name: [broken yaml {{{`
-		err := os.WriteFile(filepath.Join(dir, "bad.yaml"), []byte(content), 0644)
+		err := os.WriteFile(filepath.Join(dir, "bad.yaml"), []byte(content), 0600)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -220,7 +220,7 @@ func TestCopyDefaults(t *testing.T) {
 		}
 
 		notePath := filepath.Join(dir, "note.yaml")
-		data, err := os.ReadFile(notePath)
+		data, err := os.ReadFile(notePath) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("note.yaml not found: %v", err)
 		}
@@ -229,7 +229,7 @@ func TestCopyDefaults(t *testing.T) {
 		}
 
 		adrPath := filepath.Join(dir, "adr.yaml")
-		data, err = os.ReadFile(adrPath)
+		data, err = os.ReadFile(adrPath) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("adr.yaml not found: %v", err)
 		}
@@ -241,7 +241,7 @@ func TestCopyDefaults(t *testing.T) {
 	t.Run("skips existing files", func(t *testing.T) {
 		dir := t.TempDir()
 		existingContent := "name: my-custom-note\ndir: custom\n"
-		err := os.WriteFile(filepath.Join(dir, "note.yaml"), []byte(existingContent), 0644)
+		err := os.WriteFile(filepath.Join(dir, "note.yaml"), []byte(existingContent), 0600)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -251,7 +251,7 @@ func TestCopyDefaults(t *testing.T) {
 			t.Fatalf("CopyDefaults failed: %v", err)
 		}
 
-		data, err := os.ReadFile(filepath.Join(dir, "note.yaml"))
+		data, err := os.ReadFile(filepath.Join(dir, "note.yaml")) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatal(err)
 		}

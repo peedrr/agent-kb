@@ -5,24 +5,29 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/peedrr/agent-kb/internal/skill"
 	"github.com/spf13/cobra"
+
+	"github.com/peedrr/agent-kb/internal/skill"
 )
 
 var skillCmd = &cobra.Command{
 	Use:   "skill",
 	Short: "Manage skills",
 	Long:  `Install skills from the embedded skill repository.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+	Example: `  # Install a skill
+  akb skill install --location ~/.agents/skills kb-management`,
+	Run: func(cmd *cobra.Command, _ []string) {
+		_ = cmd.Help() //nolint:errcheck // help display failure is non-fatal
 	},
 }
 
 var skillInstallCmd = &cobra.Command{
 	Use:   "install --location <path> <name>",
 	Short: "Install a skill to a directory",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runSkillInstall,
+	Example: `  # Install a skill to the default location
+  akb skill install --location ~/.agents/skills kb-management`,
+	Args: cobra.ExactArgs(1),
+	RunE: runSkillInstall,
 }
 
 var skillLocation string
@@ -41,12 +46,12 @@ func runSkillInstall(cmd *cobra.Command, args []string) error {
 
 	if err := skill.InstallSkill(name, skillLocation); err != nil {
 		if errors.Is(err, skill.ErrAlreadyInstalled) {
-			return fmt.Errorf("Skill '%s' already installed at %s. Remove it first.", name, filepath.Join(skillLocation, name))
+			return fmt.Errorf("skill %q already installed at %s. Remove it first", name, filepath.Join(skillLocation, name))
 		}
 		if errors.Is(err, skill.ErrSkillNotFound) {
-			return fmt.Errorf("Unknown skill '%s'.", name)
+			return fmt.Errorf("unknown skill %q", name)
 		}
-		return err
+		return fmt.Errorf("install skill: %w", err)
 	}
 
 	fmt.Printf("Skill '%s' installed to %s\n", name, filepath.Join(skillLocation, name))

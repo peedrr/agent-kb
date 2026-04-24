@@ -1,0 +1,36 @@
+version: "2"
+
+run:
+  go: "1.23"
+  timeout: 5m
+
+linters:
+  default: standard
+  enable:
+    - errcheck
+    - gocritic
+    - gosec
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+    - wrapcheck
+  exclusions:
+    rules:
+      - path: _test\.go$
+        linters:
+          - wrapcheck
+
+formatters:
+  enable:
+    - goimports
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/peedrr/agent-kb
+
+issues:
+  max-same-issues: 50

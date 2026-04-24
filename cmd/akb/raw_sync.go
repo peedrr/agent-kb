@@ -8,23 +8,26 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/manifest"
 	"github.com/peedrr/agent-kb/internal/path"
-	"github.com/spf13/cobra"
 )
 
 var rawSyncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Synchronize raw file manifest with filesystem",
 	Long:  `Reconcile the manifest with the actual files on disk. Adds untracked files, updates modified files, and removes missing files from the manifest.`,
-	Args:  cobra.NoArgs,
-	RunE:  runRawSync,
+	Example: `  # Sync manifest with filesystem
+  akb raw sync`,
+	Args: cobra.NoArgs,
+	RunE: runRawSync,
 }
 
-func runRawSync(cmd *cobra.Command, args []string) error {
+func runRawSync(_ *cobra.Command, _ []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	// Check that raw/ directory exists
@@ -37,7 +40,7 @@ func runRawSync(cmd *cobra.Command, args []string) error {
 	mgr := manifest.NewManager(kbRoot)
 	existingEntries, err := mgr.ReadManifest()
 	if err != nil {
-		return err
+		return fmt.Errorf("read manifest: %w", err)
 	}
 
 	// Build a map of existing entries by filename
@@ -145,7 +148,7 @@ func runRawSync(cmd *cobra.Command, args []string) error {
 		// Commit with summary
 		commitMsg := fmt.Sprintf("akb: raw sync (%d new, %d modified, %d deleted, %d unchanged)",
 			newCount, modifiedCount, deletedCount, unchangedCount)
-		gitCommit := exec.Command("git", "commit", "-m", commitMsg)
+		gitCommit := exec.Command("git", "commit", "-m", commitMsg) //nolint:gosec // launching trusted git binary with controlled args
 		gitCommit.Dir = kbRoot
 		if out, err := gitCommit.CombinedOutput(); err != nil {
 			return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)

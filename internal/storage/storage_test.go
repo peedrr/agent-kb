@@ -16,7 +16,7 @@ func TestFilesystemProvider_Write(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewFilesystemProvider(tmpDir)
 	ctx := context.Background()
@@ -27,7 +27,7 @@ func TestFilesystemProvider_Write(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Write failed: %v", err)
 		}
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("ReadFile failed: %v", err)
 		}
@@ -42,7 +42,7 @@ func TestFilesystemProvider_Write(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Write failed: %v", err)
 		}
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("ReadFile failed: %v", err)
 		}
@@ -59,7 +59,7 @@ func TestFilesystemProvider_Write(t *testing.T) {
 		if err := p.Write(ctx, path, []byte("second")); err != nil {
 			t.Fatal(err)
 		}
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -74,7 +74,7 @@ func TestFilesystemProvider_Read(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewFilesystemProvider(tmpDir)
 	ctx := context.Background()
@@ -82,10 +82,10 @@ func TestFilesystemProvider_Read(t *testing.T) {
 	t.Run("reads existing file", func(t *testing.T) {
 		path := filepath.Join(tmpDir, "kb", "read-test.md")
 		content := []byte("read me")
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, content, 0644); err != nil {
+		if err := os.WriteFile(path, content, 0600); err != nil {
 			t.Fatal(err)
 		}
 		data, err := p.Read(ctx, path)
@@ -110,17 +110,17 @@ func TestFilesystemProvider_Delete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewFilesystemProvider(tmpDir)
 	ctx := context.Background()
 
 	t.Run("deletes existing file", func(t *testing.T) {
 		path := filepath.Join(tmpDir, "kb", "delete-test.md")
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, []byte("bye"), 0644); err != nil {
+		if err := os.WriteFile(path, []byte("bye"), 0600); err != nil {
 			t.Fatal(err)
 		}
 		err := p.Delete(ctx, path)
@@ -145,17 +145,17 @@ func TestFilesystemProvider_Exists(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewFilesystemProvider(tmpDir)
 	ctx := context.Background()
 
 	t.Run("returns true for existing file", func(t *testing.T) {
 		path := filepath.Join(tmpDir, "kb", "exists.md")
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, []byte("yes"), 0644); err != nil {
+		if err := os.WriteFile(path, []byte("yes"), 0600); err != nil {
 			t.Fatal(err)
 		}
 		exists, err := p.Exists(ctx, path)
@@ -188,19 +188,21 @@ func initGitRepo(t *testing.T) string {
 		t.Fatal(err)
 	}
 
-	gitInit := exec.Command("git", "init")
+	gitInit := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "init")
 	gitInit.Dir = tmpDir
 	if out, err := gitInit.CombinedOutput(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup on failure — secondary to init error
 		t.Fatalf("git init: %s: %v", strings.TrimSpace(string(out)), err)
 	}
 
 	// Set git config for commits
 	gitConfig := func(args ...string) {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", args...)
 		cmd.Dir = tmpDir
 		if out, err := cmd.CombinedOutput(); err != nil {
-			os.RemoveAll(tmpDir)
+			_ = os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup on failure — secondary to config error
 			t.Fatalf("git %v: %s: %v", args, strings.TrimSpace(string(out)), err)
 		}
 	}
@@ -209,20 +211,22 @@ func initGitRepo(t *testing.T) string {
 
 	// Create initial commit so HEAD exists
 	readmePath := filepath.Join(tmpDir, "README.md")
-	if err := os.WriteFile(readmePath, []byte("# Test KB\n"), 0644); err != nil {
-		os.RemoveAll(tmpDir)
+	if err := os.WriteFile(readmePath, []byte("# Test KB\n"), 0600); err != nil {
+		_ = os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup on failure — secondary to write error
 		t.Fatal(err)
 	}
-	gitAdd := exec.Command("git", "add", "README.md")
+	gitAdd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "add", "README.md")
 	gitAdd.Dir = tmpDir
 	if out, err := gitAdd.CombinedOutput(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup on failure — secondary to add error
 		t.Fatalf("git add: %s: %v", strings.TrimSpace(string(out)), err)
 	}
-	gitCommit := exec.Command("git", "commit", "-m", "initial")
+	gitCommit := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "commit", "-m", "initial")
 	gitCommit.Dir = tmpDir
 	if out, err := gitCommit.CombinedOutput(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup on failure — secondary to commit error
 		t.Fatalf("git commit: %s: %v", strings.TrimSpace(string(out)), err)
 	}
 
@@ -231,7 +235,7 @@ func initGitRepo(t *testing.T) string {
 
 func TestGitProvider_Write(t *testing.T) {
 	tmpDir := initGitRepo(t)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewGitProvider(tmpDir, false)
 	ctx := context.Background()
@@ -244,7 +248,7 @@ func TestGitProvider_Write(t *testing.T) {
 		}
 
 		// Verify file exists on disk
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("ReadFile failed: %v", err)
 		}
@@ -253,7 +257,8 @@ func TestGitProvider_Write(t *testing.T) {
 		}
 
 		// Verify git commit was made
-		gitLog := exec.Command("git", "log", "--oneline", "-1")
+		gitLog := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "--oneline", "-1")
 		gitLog.Dir = tmpDir
 		out, err := gitLog.CombinedOutput()
 		if err != nil {
@@ -271,7 +276,7 @@ func TestGitProvider_Write(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Write failed: %v", err)
 		}
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("ReadFile failed: %v", err)
 		}
@@ -287,7 +292,8 @@ func TestGitProvider_Write(t *testing.T) {
 			t.Fatalf("Write failed: %v", err)
 		}
 
-		gitLog := exec.Command("git", "log", "--oneline", "-1")
+		gitLog := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "--oneline", "-1")
 		gitLog.Dir = tmpDir
 		out, err := gitLog.CombinedOutput()
 		if err != nil {
@@ -302,14 +308,15 @@ func TestGitProvider_Write(t *testing.T) {
 
 func TestGitProvider_Write_NoCommit(t *testing.T) {
 	tmpDir := initGitRepo(t)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewGitProvider(tmpDir, true) // noCommit = true
 	ctx := context.Background()
 
 	t.Run("writes file but skips commit", func(t *testing.T) {
 		// Get current commit count
-		gitLog := exec.Command("git", "log", "--oneline")
+		gitLog := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "--oneline")
 		gitLog.Dir = tmpDir
 		out, _ := gitLog.CombinedOutput()
 		commitCountBefore := len(strings.Split(strings.TrimSpace(string(out)), "\n"))
@@ -321,7 +328,7 @@ func TestGitProvider_Write_NoCommit(t *testing.T) {
 		}
 
 		// Verify file exists on disk
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("ReadFile failed: %v", err)
 		}
@@ -330,7 +337,8 @@ func TestGitProvider_Write_NoCommit(t *testing.T) {
 		}
 
 		// Verify file is staged (git add was run)
-		gitStatus := exec.Command("git", "status", "--porcelain")
+		gitStatus := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "status", "--porcelain")
 		gitStatus.Dir = tmpDir
 		out, err = gitStatus.CombinedOutput()
 		if err != nil {
@@ -342,7 +350,8 @@ func TestGitProvider_Write_NoCommit(t *testing.T) {
 		}
 
 		// Verify no new commit was made
-		gitLog = exec.Command("git", "log", "--oneline")
+		gitLog = exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "--oneline")
 		gitLog.Dir = tmpDir
 		out, _ = gitLog.CombinedOutput()
 		commitCountAfter := len(strings.Split(strings.TrimSpace(string(out)), "\n"))
@@ -354,7 +363,7 @@ func TestGitProvider_Write_NoCommit(t *testing.T) {
 
 func TestGitProvider_Read(t *testing.T) {
 	tmpDir := initGitRepo(t)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewGitProvider(tmpDir, false)
 	ctx := context.Background()
@@ -383,7 +392,7 @@ func TestGitProvider_Read(t *testing.T) {
 
 func TestGitProvider_Delete(t *testing.T) {
 	tmpDir := initGitRepo(t)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewGitProvider(tmpDir, false)
 	ctx := context.Background()
@@ -405,7 +414,8 @@ func TestGitProvider_Delete(t *testing.T) {
 		}
 
 		// Verify git commit was made
-		gitLog := exec.Command("git", "log", "--oneline", "-1")
+		gitLog := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "--oneline", "-1")
 		gitLog.Dir = tmpDir
 		out, err := gitLog.CombinedOutput()
 		if err != nil {
@@ -428,7 +438,8 @@ func TestGitProvider_Delete(t *testing.T) {
 			t.Fatalf("Delete failed: %v", err)
 		}
 
-		gitLog := exec.Command("git", "log", "--oneline", "-1")
+		gitLog := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "--oneline", "-1")
 		gitLog.Dir = tmpDir
 		out, err := gitLog.CombinedOutput()
 		if err != nil {
@@ -450,7 +461,7 @@ func TestGitProvider_Delete(t *testing.T) {
 
 func TestGitProvider_Delete_NoCommit(t *testing.T) {
 	tmpDir := initGitRepo(t)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewGitProvider(tmpDir, true) // noCommit = true
 	ctx := context.Background()
@@ -464,7 +475,8 @@ func TestGitProvider_Delete_NoCommit(t *testing.T) {
 		}
 
 		// Get current commit count
-		gitLog := exec.Command("git", "log", "--oneline")
+		gitLog := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "--oneline")
 		gitLog.Dir = tmpDir
 		out, _ := gitLog.CombinedOutput()
 		commitCountBefore := len(strings.Split(strings.TrimSpace(string(out)), "\n"))
@@ -480,7 +492,8 @@ func TestGitProvider_Delete_NoCommit(t *testing.T) {
 		}
 
 		// Verify no new commit was made
-		gitLog = exec.Command("git", "log", "--oneline")
+		gitLog = exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "--oneline")
 		gitLog.Dir = tmpDir
 		out, _ = gitLog.CombinedOutput()
 		commitCountAfter := len(strings.Split(strings.TrimSpace(string(out)), "\n"))
@@ -492,7 +505,7 @@ func TestGitProvider_Delete_NoCommit(t *testing.T) {
 
 func TestGitProvider_WriteWithCommitMsg(t *testing.T) {
 	tmpDir := initGitRepo(t)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewGitProvider(tmpDir, false)
 	ctx := context.Background()
@@ -504,7 +517,7 @@ func TestGitProvider_WriteWithCommitMsg(t *testing.T) {
 			t.Fatalf("WriteWithCommitMsg failed: %v", err)
 		}
 
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("ReadFile failed: %v", err)
 		}
@@ -512,7 +525,8 @@ func TestGitProvider_WriteWithCommitMsg(t *testing.T) {
 			t.Errorf("content = %q, want %q", string(data), "custom content")
 		}
 
-		gitLog := exec.Command("git", "log", "--oneline", "-1")
+		gitLog := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "--oneline", "-1")
 		gitLog.Dir = tmpDir
 		out, err := gitLog.CombinedOutput()
 		if err != nil {
@@ -528,7 +542,8 @@ func TestGitProvider_WriteWithCommitMsg(t *testing.T) {
 		pNoCommit := NewGitProvider(tmpDir, true)
 		path := filepath.Join(tmpDir, "kb", "no-commit-msg.md")
 
-		gitLog := exec.Command("git", "log", "--oneline")
+		gitLog := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "--oneline")
 		gitLog.Dir = tmpDir
 		out, _ := gitLog.CombinedOutput()
 		commitCountBefore := len(strings.Split(strings.TrimSpace(string(out)), "\n"))
@@ -538,7 +553,7 @@ func TestGitProvider_WriteWithCommitMsg(t *testing.T) {
 			t.Fatalf("WriteWithCommitMsg with noCommit failed: %v", err)
 		}
 
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("ReadFile failed: %v", err)
 		}
@@ -546,7 +561,8 @@ func TestGitProvider_WriteWithCommitMsg(t *testing.T) {
 			t.Errorf("content = %q, want %q", string(data), "no commit custom")
 		}
 
-		gitLog = exec.Command("git", "log", "--oneline")
+		gitLog = exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "--oneline")
 		gitLog.Dir = tmpDir
 		out, _ = gitLog.CombinedOutput()
 		commitCountAfter := len(strings.Split(strings.TrimSpace(string(out)), "\n"))
@@ -558,7 +574,7 @@ func TestGitProvider_WriteWithCommitMsg(t *testing.T) {
 
 func TestGitProvider_Exists(t *testing.T) {
 	tmpDir := initGitRepo(t)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewGitProvider(tmpDir, false)
 	ctx := context.Background()
@@ -590,7 +606,7 @@ func TestGitProvider_Exists(t *testing.T) {
 
 func TestGitProvider_MergeConflictDetection(t *testing.T) {
 	tmpDir := initGitRepo(t)
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
 	p := NewGitProvider(tmpDir, false)
 	ctx := context.Background()
@@ -598,61 +614,69 @@ func TestGitProvider_MergeConflictDetection(t *testing.T) {
 	t.Run("detects merge conflict and returns error", func(t *testing.T) {
 		// Create a merge conflict scenario
 		// Create a branch, make changes, then create conflict
-		gitCheckout := exec.Command("git", "checkout", "-b", "feature")
+		gitCheckout := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "checkout", "-b", "feature")
 		gitCheckout.Dir = tmpDir
 		if out, err := gitCheckout.CombinedOutput(); err != nil {
 			t.Fatalf("git checkout -b: %s: %v", strings.TrimSpace(string(out)), err)
 		}
 
 		conflictPath := filepath.Join(tmpDir, "kb", "conflict.md")
-		if err := os.MkdirAll(filepath.Dir(conflictPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(conflictPath), 0750); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(conflictPath, []byte("feature content"), 0644); err != nil {
+		if err := os.WriteFile(conflictPath, []byte("feature content"), 0600); err != nil {
 			t.Fatal(err)
 		}
-		gitAdd := exec.Command("git", "add", "-A")
+		gitAdd := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "add", "-A")
 		gitAdd.Dir = tmpDir
 		if out, err := gitAdd.CombinedOutput(); err != nil {
 			t.Fatalf("git add: %s: %v", strings.TrimSpace(string(out)), err)
 		}
-		gitCommit := exec.Command("git", "commit", "-m", "feature change")
+		gitCommit := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "commit", "-m", "feature change")
 		gitCommit.Dir = tmpDir
 		if out, err := gitCommit.CombinedOutput(); err != nil {
 			t.Fatalf("git commit: %s: %v", strings.TrimSpace(string(out)), err)
 		}
 
-		gitCheckout = exec.Command("git", "checkout", "master")
+		gitCheckout = exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "checkout", "master")
 		gitCheckout.Dir = tmpDir
 		if _, err := gitCheckout.CombinedOutput(); err != nil {
-			gitCheckout = exec.Command("git", "checkout", "main")
+			gitCheckout = exec.Command( //nolint:gosec // test helper launching akb binary
+				"git", "checkout", "main")
 			gitCheckout.Dir = tmpDir
 			if out, err := gitCheckout.CombinedOutput(); err != nil {
 				t.Fatalf("git checkout main: %s: %v", strings.TrimSpace(string(out)), err)
 			}
 		}
 
-		if err := os.MkdirAll(filepath.Dir(conflictPath), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(conflictPath), 0750); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(conflictPath, []byte("main content"), 0644); err != nil {
+		if err := os.WriteFile(conflictPath, []byte("main content"), 0600); err != nil {
 			t.Fatal(err)
 		}
-		gitAdd = exec.Command("git", "add", "-A")
+		gitAdd = exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "add", "-A")
 		gitAdd.Dir = tmpDir
 		if out, err := gitAdd.CombinedOutput(); err != nil {
 			t.Fatalf("git add: %s: %v", strings.TrimSpace(string(out)), err)
 		}
-		gitCommit = exec.Command("git", "commit", "-m", "main change")
+		gitCommit = exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "commit", "-m", "main change")
 		gitCommit.Dir = tmpDir
 		if out, err := gitCommit.CombinedOutput(); err != nil {
 			t.Fatalf("git commit: %s: %v", strings.TrimSpace(string(out)), err)
 		}
 
 		// Merge feature branch to create conflict
-		gitMerge := exec.Command("git", "merge", "feature")
+		gitMerge := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "merge", "feature")
 		gitMerge.Dir = tmpDir
-		gitMerge.CombinedOutput() // expected to fail with conflict
+		_, _ = gitMerge.CombinedOutput() //nolint:errcheck // expected to fail — conflict is the test scenario
 
 		// Now try to write - should detect conflict
 		err := p.Write(ctx, filepath.Join(tmpDir, "kb", "new-file.md"), []byte("test"))
@@ -670,16 +694,18 @@ func TestGitProvider_EnsureGitConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 
-	gitInit := exec.Command("git", "init")
+	gitInit := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "init")
 	gitInit.Dir = tmpDir
 	if out, err := gitInit.CombinedOutput(); err != nil {
 		t.Fatalf("git init: %s: %v", strings.TrimSpace(string(out)), err)
 	}
 
 	gitConfig := func(args ...string) {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", args...)
 		cmd.Dir = tmpDir
 		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
 		if out, err := cmd.CombinedOutput(); err != nil {
@@ -690,17 +716,19 @@ func TestGitProvider_EnsureGitConfig(t *testing.T) {
 	gitConfig("config", "user.email", "test@test.com")
 
 	readmePath := filepath.Join(tmpDir, "README.md")
-	if err := os.WriteFile(readmePath, []byte("# Test\n"), 0644); err != nil {
+	if err := os.WriteFile(readmePath, []byte("# Test\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	gitAdd := exec.Command("git", "add", "README.md")
+	gitAdd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "add", "README.md")
 	gitAdd.Dir = tmpDir
 	gitAdd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@test.com", "GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@test.com")
-	gitAdd.CombinedOutput()
-	gitCommit := exec.Command("git", "commit", "-m", "initial")
+	_, _ = gitAdd.CombinedOutput() //nolint:errcheck // test setup — failure caught by subsequent test assertions
+	gitCommit := exec.Command(     //nolint:gosec // test helper launching akb binary
+		"git", "commit", "-m", "initial")
 	gitCommit.Dir = tmpDir
 	gitCommit.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@test.com", "GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@test.com")
-	gitCommit.CombinedOutput()
+	_, _ = gitCommit.CombinedOutput() //nolint:errcheck // test setup — failure caught by subsequent test assertions
 
 	gitConfig("config", "--unset", "user.name")
 	gitConfig("config", "--unset", "user.email")
@@ -715,7 +743,7 @@ func TestGitProvider_EnsureGitConfig(t *testing.T) {
 			t.Fatalf("Write with auto-config failed: %v", err)
 		}
 
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("ReadFile failed: %v", err)
 		}
@@ -723,7 +751,8 @@ func TestGitProvider_EnsureGitConfig(t *testing.T) {
 			t.Errorf("content = %q, want %q", string(data), "auto config test")
 		}
 
-		cmd := exec.Command("git", "config", "--local", "user.name")
+		cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "config", "--local", "user.name")
 		cmd.Dir = tmpDir
 		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
 		out, err := cmd.Output()
@@ -738,12 +767,12 @@ func TestGitProvider_EnsureGitConfig(t *testing.T) {
 
 // --- Interface Compliance Tests ---
 
-func TestFilesystemProvider_ImplementsStorageProvider(t *testing.T) {
+func TestFilesystemProvider_ImplementsStorageProvider(_ *testing.T) {
 	// Compile-time interface check
-	var _ StorageProvider = (*FilesystemProvider)(nil)
+	var _ Provider = (*FilesystemProvider)(nil)
 }
 
-func TestGitProvider_ImplementsStorageProvider(t *testing.T) {
+func TestGitProvider_ImplementsStorageProvider(_ *testing.T) {
 	// Compile-time interface check
-	var _ StorageProvider = (*GitProvider)(nil)
+	var _ Provider = (*GitProvider)(nil)
 }

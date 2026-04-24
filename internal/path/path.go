@@ -1,7 +1,9 @@
+// Package path resolves and validates knowledge base paths.
 package path
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -90,14 +92,14 @@ func ResolveRawPath(kbRoot, inputPath string) (string, error) {
 
 // ResolveKB returns the path of the default KB from the registry.
 func ResolveKB() (string, error) {
-	regPath, err := registry.RegistryPath()
+	regPath, err := registry.Path()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("get registry path: %w", err)
 	}
 
 	reg, err := registry.Load(regPath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("load registry: %w", err)
 	}
 
 	if reg.Default == "" {
@@ -106,7 +108,7 @@ func ResolveKB() (string, error) {
 
 	entry, err := registry.GetDefault()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("get default registry entry: %w", err)
 	}
 
 	return entry.Path, nil
@@ -117,7 +119,7 @@ func KBRoot() (string, error) {
 	// Start from current working directory
 	dir, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("get working directory: %w", err)
 	}
 
 	// Walk up the directory tree

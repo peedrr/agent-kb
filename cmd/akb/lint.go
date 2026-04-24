@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/linkgraph"
@@ -16,7 +18,6 @@ import (
 	"github.com/peedrr/agent-kb/internal/markdown"
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/template"
-	"github.com/spf13/cobra"
 )
 
 var lintJSON bool
@@ -27,18 +28,23 @@ var lintCmd = &cobra.Command{
 	Use:   "lint",
 	Short: "Validate knowledge base pages",
 	Long:  `Run lint checks on KB pages for validation errors, schema violations, and quality issues.`,
-	Args:  cobra.NoArgs,
-	RunE:  runLint,
+	Example: `  # Run all lint checks
+  akb lint
+
+  # Output results as JSON
+  akb lint --json`,
+	Args: cobra.NoArgs,
+	RunE: runLint,
 }
 
 func init() {
 	lintCmd.Flags().BoolVar(&lintJSON, "json", false, "output results as JSON")
 }
 
-func runLint(cmd *cobra.Command, args []string) error {
+func runLint(_ *cobra.Command, _ []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	sqlDB, err := db.OpenKB(kbRoot)
@@ -46,9 +52,9 @@ func runLint(cmd *cobra.Command, args []string) error {
 		if isMissingDB(err) {
 			return fmt.Errorf("run `akb init` to initialize the knowledge base")
 		}
-		return err
+		return fmt.Errorf("open search database: %w", err)
 	}
-	defer sqlDB.Close()
+	defer sqlDB.Close() //nolint:errcheck // DB close error non-critical on command exit
 
 	templates, err := template.LoadTemplates(filepath.Join(kbRoot, ".akb", "templates"))
 	if err != nil {
@@ -80,7 +86,7 @@ func runLint(cmd *cobra.Command, args []string) error {
 			return nil
 		}
 
-		content, err := os.ReadFile(path)
+		content, err := os.ReadFile(path) //nolint:gosec // path validated by filepath.WalkDir within KB root
 		if err != nil {
 			return nil
 		}
@@ -155,9 +161,6 @@ func runLint(cmd *cobra.Command, args []string) error {
 		err = printLintText(report)
 	}
 	if err != nil {
-		if errors.Is(err, errLintIssues) {
-			os.Exit(1)
-		}
 		return err
 	}
 	return nil
@@ -189,8 +192,8 @@ func printLintText(report *lint.LintReport) error {
 
 func printLintJSON(report *lint.LintReport) error {
 	type jsonOutput struct {
-		Issues       []lint.LintIssue `json:"issues"`
-		Summary      struct {
+		Issues  []lint.LintIssue `json:"issues"`
+		Summary struct {
 			Total        int            `json:"total"`
 			PagesChecked int            `json:"pages_checked"`
 			ByCheck      map[string]int `json:"by_check"`
@@ -206,7 +209,7 @@ func printLintJSON(report *lint.LintReport) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(out); err != nil {
-		return err
+		return fmt.Errorf("encode JSON: %w", err)
 	}
 
 	if len(report.Issues) > 0 {

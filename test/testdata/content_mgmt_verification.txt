@@ -1,4 +1,4 @@
-# Content Management Phase Gate — verify complete list, index, log, enhanced delete contract
+# Content Management Verification — verify complete list, index, log, enhanced delete contract
 
 -- note-input.md --
 ---

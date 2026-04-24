@@ -8,34 +8,41 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/linkgraph"
 	"github.com/peedrr/agent-kb/internal/path"
-	"github.com/spf13/cobra"
 )
 
 var linksCmd = &cobra.Command{
 	Use:   "links <path>",
 	Short: "Show outbound, broken, and ambiguous links for a page",
 	Long:  `Show outbound, broken, and ambiguous links for a page in the knowledge base.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runLinksShow,
+	Example: `  # Show links for a page
+  akb links notes/my-note.md`,
+	Args: cobra.ExactArgs(1),
+	RunE: runLinksShow,
 }
 
 var backlinksCmd = &cobra.Command{
 	Use:   "backlinks <path>",
 	Short: "Show inbound links to a page",
 	Long:  `Show pages that link to the given page in the knowledge base.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runBacklinks,
+	Example: `  # Show backlinks to a page
+  akb backlinks notes/my-note.md`,
+	Args: cobra.ExactArgs(1),
+	RunE: runBacklinks,
 }
 
 var orphansCmd = &cobra.Command{
 	Use:   "orphans",
 	Short: "Show pages with zero inbound links",
 	Long:  `Show pages in the knowledge base that have no inbound links from other pages.`,
-	Args:  cobra.NoArgs,
-	RunE:  runOrphans,
+	Example: `  # Show orphan pages
+  akb orphans`,
+	Args: cobra.NoArgs,
+	RunE: runOrphans,
 }
 
 func openLinkGraphDB(kbRoot string) (*sql.DB, *linkgraph.SQLiteLinkGraph, error) {
@@ -47,28 +54,33 @@ func openLinkGraphDB(kbRoot string) (*sql.DB, *linkgraph.SQLiteLinkGraph, error)
 }
 
 func resolvePagePath(kbRoot, inputPath string) (string, error) {
+	_, err := path.ResolveKBPath(kbRoot, inputPath)
+	if err != nil {
+		return "", fmt.Errorf("resolve path: %w", err)
+	}
+
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
 	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
 
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("page not found: %s", cleanPath)
+		return "", fmt.Errorf("page not found: %s. Use 'akb list' to see available pages", cleanPath)
 	}
 
 	relPath := filepath.Join("kb", cleanPath)
 	return filepath.ToSlash(relPath), nil
 }
 
-func runLinksShow(cmd *cobra.Command, args []string) error {
+func runLinksShow(_ *cobra.Command, args []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	d, g, err := openLinkGraphDB(kbRoot)
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer d.Close() //nolint:errcheck // DB close error non-critical on command exit
 
 	relPath, err := resolvePagePath(kbRoot, args[0])
 	if err != nil {
@@ -126,17 +138,17 @@ func runLinksShow(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runBacklinks(cmd *cobra.Command, args []string) error {
+func runBacklinks(_ *cobra.Command, args []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	d, g, err := openLinkGraphDB(kbRoot)
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer d.Close() //nolint:errcheck // DB close error non-critical on command exit
 
 	relPath, err := resolvePagePath(kbRoot, args[0])
 	if err != nil {
@@ -157,17 +169,17 @@ func runBacklinks(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func runOrphans(cmd *cobra.Command, args []string) error {
+func runOrphans(_ *cobra.Command, _ []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	d, g, err := openLinkGraphDB(kbRoot)
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer d.Close() //nolint:errcheck // DB close error non-critical on command exit
 
 	ctx := context.Background()
 

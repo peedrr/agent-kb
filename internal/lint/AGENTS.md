@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Lint engine with 15 checkers across 3 categories: structural, template-driven, semantic.
+Lint engine with 13 checkers across 3 categories: structural, template-driven, semantic.
 
 ## FILES
 

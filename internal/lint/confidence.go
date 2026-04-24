@@ -5,12 +5,15 @@ import (
 	"fmt"
 )
 
+// ConfidenceChecker validates Confidence issues.
 type ConfidenceChecker struct{}
 
+// NewConfidenceChecker creates a new ConfidenceChecker.
 func NewConfidenceChecker() *ConfidenceChecker {
 	return &ConfidenceChecker{}
 }
 
+// Name returns the checker name.
 func (c *ConfidenceChecker) Name() string {
 	return "confidence"
 }
@@ -21,6 +24,7 @@ var validConfidenceLevels = map[string]bool{
 	"low":    true,
 }
 
+// Check runs the checker and returns issues.
 func (c *ConfidenceChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error) {
 	var issues []LintIssue
 	for _, page := range kb.Pages {

@@ -7,10 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	kblog "github.com/peedrr/agent-kb/internal/log"
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/storage"
-	"github.com/spf13/cobra"
 )
 
 var validOperations = []string{"ingest", "delete", "update", "lint", "query"}
@@ -19,8 +20,13 @@ var logCmd = &cobra.Command{
 	Use:   "log",
 	Short: "Manage the knowledge base log",
 	Long:  `View and append entries in the KB log (kb/log.md).`,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+	Example: `  # Show all log entries
+  akb log show
+
+  # Append a new entry
+  akb log append ingest "Imported pages from old wiki"`,
+	Run: func(cmd *cobra.Command, _ []string) {
+		_ = cmd.Help() //nolint:errcheck // help display failure is non-fatal
 	},
 }
 
@@ -28,16 +34,29 @@ var logShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Show log entries",
 	Long:  `Display log entries from kb/log.md. Supports filtering by type and limiting output.`,
-	Args:  cobra.NoArgs,
-	RunE:  runLogShow,
+	Example: `  # Show all log entries
+  akb log show
+
+  # Show last 10 entries
+  akb log show --last 10
+
+  # Filter by operation type
+  akb log show --type ingest`,
+	Args: cobra.NoArgs,
+	RunE: runLogShow,
 }
 
 var logAppendCmd = &cobra.Command{
 	Use:   "append <operation> <description>",
 	Short: "Append a log entry",
 	Long:  `Add a new entry to the KB log. Operation must be one of: ingest, delete, update, lint, query.`,
-	Args:  cobra.ExactArgs(2),
-	RunE:  runLogAppend,
+	Example: `  # Log an ingestion operation
+  akb log append ingest "Imported 50 pages from old wiki"
+
+  # Log with optional title
+  akb log append update "Updated configuration structure" --title "Config refactor"`,
+	Args: cobra.ExactArgs(2),
+	RunE: runLogAppend,
 }
 
 var logShowLast int
@@ -54,10 +73,10 @@ func init() {
 	logCmd.AddCommand(logAppendCmd)
 }
 
-func runLogShow(cmd *cobra.Command, args []string) error {
+func runLogShow(cmd *cobra.Command, _ []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	entries, err := kblog.ReadLog(kbRoot)
@@ -65,7 +84,7 @@ func runLogShow(cmd *cobra.Command, args []string) error {
 		if os.IsNotExist(err) || strings.Contains(err.Error(), "log.md") {
 			return nil
 		}
-		return err
+		return fmt.Errorf("read log: %w", err)
 	}
 
 	if logShowType != "" {
@@ -81,11 +100,11 @@ func runLogShow(cmd *cobra.Command, args []string) error {
 	}
 
 	rendered := kblog.RenderLog(entries)
-	fmt.Fprint(cmd.OutOrStdout(), rendered)
+	_, _ = fmt.Fprint(cmd.OutOrStdout(), rendered) //nolint:errcheck // stdout write failure non-critical
 	return nil
 }
 
-func runLogAppend(cmd *cobra.Command, args []string) error {
+func runLogAppend(_ *cobra.Command, args []string) error {
 	operation := args[0]
 	description := args[1]
 
@@ -95,7 +114,7 @@ func runLogAppend(cmd *cobra.Command, args []string) error {
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	if err := kblog.AppendLog(kbRoot, operation, description, logAppendTitle); err != nil {
@@ -103,7 +122,7 @@ func runLogAppend(cmd *cobra.Command, args []string) error {
 	}
 
 	logPath := filepath.Join(kbRoot, "kb", "log.md")
-	data, err := os.ReadFile(logPath)
+	data, err := os.ReadFile(logPath) //nolint:gosec // path validated by ResolveKBPath
 	if err != nil {
 		return fmt.Errorf("read log after append: %w", err)
 	}

@@ -1,3 +1,4 @@
+// Package markdown parses wikilinks, annotations, and provenance markers.
 package markdown
 
 import (
@@ -5,6 +6,7 @@ import (
 	"strings"
 )
 
+// Annotation represents an olw-auto HTML comment in page content.
 type Annotation struct {
 	Type     string
 	Fields   map[string]string
@@ -13,6 +15,7 @@ type Annotation struct {
 
 var annotationRe = regexp.MustCompile(`<!--\s*olw-auto:\s*(.+?)\s*-->`)
 
+// ParseAnnotations extracts olw-auto annotations from content.
 func ParseAnnotations(content string) []Annotation {
 	if content == "" {
 		return nil

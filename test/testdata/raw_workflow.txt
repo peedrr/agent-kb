@@ -1,0 +1,45 @@
+# Raw Workflow — focused end-to-end raw file operations
+
+-- csv-input.txt --
+hello,world
+-- csv-input.txt --
+
+-- modified-input.txt --
+modified content
+-- modified-input.txt --
+
+# === INIT ===
+exec akb init raw-kb
+cd raw-kb
+
+# === RAW WRITE ===
+exec akb raw write data.csv <../csv-input.txt
+stdout 'Written to raw/data.csv'
+
+# === RAW STATUS (NO DRIFT) ===
+exec akb raw status
+stdout 'no drift'
+
+# === MODIFY FILE EXTERNALLY ===
+cp ../modified-input.txt raw/data.csv
+
+# === RAW STATUS (DRIFT DETECTED) ===
+exec akb raw status
+stdout 'MODIFIED data.csv'
+
+# === RAW SYNC (FIX DRIFT) ===
+exec akb raw sync
+stdout 'Synced'
+
+# === RAW STATUS (CLEAN AGAIN) ===
+exec akb raw status
+stdout 'no drift'
+
+# === RAW DELETE ===
+exec akb raw delete data.csv
+stdout 'Deleted raw/data.csv'
+! exists raw/data.csv
+
+# === RAW LIST EMPTY ===
+exec akb raw list
+! stdout .

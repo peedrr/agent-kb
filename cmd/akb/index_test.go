@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/peedrr/agent-kb/internal/db"
@@ -19,7 +20,7 @@ func setupIndexTestKB(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { os.Chdir(origCwd) })
+	t.Cleanup(func() { os.Chdir(origCwd) }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	if err := os.Chdir(kbRoot); err != nil {
 		t.Fatal(err)
@@ -40,7 +41,9 @@ func TestIndexShow_FreshKB(t *testing.T) {
 
 	err = runIndexShow(nil, nil)
 
-	w.Close()
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
 	os.Stdout = old
 
 	if err != nil {
@@ -48,7 +51,9 @@ func TestIndexShow_FreshKB(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatal(err)
+	}
 	output := buf.String()
 
 	expected := "# Index\n\n"
@@ -57,7 +62,7 @@ func TestIndexShow_FreshKB(t *testing.T) {
 	}
 
 	indexPath := filepath.Join(kbRoot, "kb", "index.md")
-	data, err := os.ReadFile(indexPath)
+	data, err := os.ReadFile(indexPath) //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatalf("read index file: %v", err)
 	}
@@ -74,13 +79,13 @@ func TestIndexAdd_CreatesHeadingAndEntry(t *testing.T) {
 	t.Cleanup(func() { noCommit = origNoCommit })
 
 	notesDir := filepath.Join(kbRoot, "kb", "notes")
-	if err := os.MkdirAll(notesDir, 0755); err != nil {
+	if err := os.MkdirAll(notesDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 
 	pageContent := "---\ntype: note\ntitle: My Note\n---\nNote body.\n"
 	pagePath := filepath.Join(notesDir, "my-note.md")
-	if err := os.WriteFile(pagePath, []byte(pageContent), 0644); err != nil {
+	if err := os.WriteFile(pagePath, []byte(pageContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -122,13 +127,13 @@ func TestIndexAdd_UpdatesExistingPath(t *testing.T) {
 	t.Cleanup(func() { noCommit = origNoCommit })
 
 	notesDir := filepath.Join(kbRoot, "kb", "notes")
-	if err := os.MkdirAll(notesDir, 0755); err != nil {
+	if err := os.MkdirAll(notesDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 
 	pageContent := "---\ntype: note\ntitle: My Note\n---\nNote body.\n"
 	pagePath := filepath.Join(notesDir, "my-note.md")
-	if err := os.WriteFile(pagePath, []byte(pageContent), 0644); err != nil {
+	if err := os.WriteFile(pagePath, []byte(pageContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -173,6 +178,30 @@ func TestIndexAdd_RejectsLogMd(t *testing.T) {
 	err := runIndexAdd(nil, []string{"kb/log.md", "should fail"})
 	if err == nil {
 		t.Error("expected error for log.md, got nil")
+	}
+}
+
+func TestIndexAdd_RejectsParentDir(t *testing.T) {
+	setupIndexTestKB(t)
+
+	err := runIndexAdd(nil, []string{"../escape.md", "should fail"})
+	if err == nil {
+		t.Fatal("expected error for .. path, got nil")
+	}
+	if !strings.Contains(err.Error(), "..") {
+		t.Errorf("expected error to contain '..', got: %v", err)
+	}
+}
+
+func TestIndexAdd_RejectsAbsolutePath(t *testing.T) {
+	setupIndexTestKB(t)
+
+	err := runIndexAdd(nil, []string{"/tmp/evil.md", "should fail"})
+	if err == nil {
+		t.Fatal("expected error for absolute path, got nil")
+	}
+	if !strings.Contains(err.Error(), "absolute") && !strings.Contains(err.Error(), "relative") {
+		t.Errorf("expected error about absolute/relative path, got: %v", err)
 	}
 }
 
@@ -238,6 +267,30 @@ func TestIndexRemove_NonexistentPath(t *testing.T) {
 	}
 }
 
+func TestIndexRemove_RejectsParentDir(t *testing.T) {
+	setupIndexTestKB(t)
+
+	err := runIndexRemove(nil, []string{"../escape.md"})
+	if err == nil {
+		t.Fatal("expected error for .. path, got nil")
+	}
+	if !strings.Contains(err.Error(), "..") {
+		t.Errorf("expected error to contain '..', got: %v", err)
+	}
+}
+
+func TestIndexRemove_RejectsAbsolutePath(t *testing.T) {
+	setupIndexTestKB(t)
+
+	err := runIndexRemove(nil, []string{"/tmp/evil.md"})
+	if err == nil {
+		t.Fatal("expected error for absolute path, got nil")
+	}
+	if !strings.Contains(err.Error(), "absolute") && !strings.Contains(err.Error(), "relative") {
+		t.Errorf("expected error about absolute/relative path, got: %v", err)
+	}
+}
+
 func TestIndexRebuild_RegeneratesFromFilesystem(t *testing.T) {
 	kbRoot := setupIndexTestKB(t)
 
@@ -248,20 +301,20 @@ func TestIndexRebuild_RegeneratesFromFilesystem(t *testing.T) {
 	notesDir := filepath.Join(kbRoot, "kb", "notes")
 	decisionsDir := filepath.Join(kbRoot, "kb", "decisions")
 
-	if err := os.MkdirAll(notesDir, 0755); err != nil {
+	if err := os.MkdirAll(notesDir, 0750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(decisionsDir, 0755); err != nil {
+	if err := os.MkdirAll(decisionsDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 
 	noteContent := "---\ntype: note\ntitle: My Note\nsummary: A test note\n---\nNote body.\n"
-	if err := os.WriteFile(filepath.Join(notesDir, "my-note.md"), []byte(noteContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(notesDir, "my-note.md"), []byte(noteContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	adrContent := "---\ntype: adr\ntitle: My ADR\nsummary: A test ADR\n---\nADR body.\n"
-	if err := os.WriteFile(filepath.Join(decisionsDir, "my-adr.md"), []byte(adrContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(decisionsDir, "my-adr.md"), []byte(adrContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -304,13 +357,13 @@ func TestIndexRebuild_RepopulatesSQLite(t *testing.T) {
 	t.Cleanup(func() { noCommit = origNoCommit })
 
 	notesDir := filepath.Join(kbRoot, "kb", "notes")
-	if err := os.MkdirAll(notesDir, 0755); err != nil {
+	if err := os.MkdirAll(notesDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 
 	pageContent := "---\ntype: note\ntitle: My Note\ntags: testing\nsummary: A test note\n---\nNote body.\n"
 	pagePath := filepath.Join(notesDir, "my-note.md")
-	if err := os.WriteFile(pagePath, []byte(pageContent), 0644); err != nil {
+	if err := os.WriteFile(pagePath, []byte(pageContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -327,7 +380,7 @@ func TestIndexRebuild_RepopulatesSQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenKB failed: %v", err)
 	}
-	defer sqlDB.Close()
+	defer sqlDB.Close() //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	var docCount int
 	if err := sqlDB.QueryRow("SELECT COUNT(*) FROM documents").Scan(&docCount); err != nil {
@@ -373,7 +426,7 @@ func TestIndexRebuild_EmptyKBSucceeds(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenKB failed: %v", err)
 	}
-	defer sqlDB.Close()
+	defer sqlDB.Close() //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	var docCount int
 	if err := sqlDB.QueryRow("SELECT COUNT(*) FROM documents").Scan(&docCount); err != nil {
@@ -405,13 +458,13 @@ func TestIndexRebuild_CreatesSearchDB(t *testing.T) {
 	}
 
 	notesDir := filepath.Join(kbRoot, "kb", "notes")
-	if err := os.MkdirAll(notesDir, 0755); err != nil {
+	if err := os.MkdirAll(notesDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 
 	pageContent := "---\ntype: note\ntitle: Test Note\nsummary: A test\n---\nContent.\n"
 	pagePath := filepath.Join(notesDir, "test.md")
-	if err := os.WriteFile(pagePath, []byte(pageContent), 0644); err != nil {
+	if err := os.WriteFile(pagePath, []byte(pageContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -431,7 +484,7 @@ func TestIndexRebuild_CreatesSearchDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenKB failed: %v", err)
 	}
-	defer sqlDB.Close()
+	defer sqlDB.Close() //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	var pageCount int
 	if err := sqlDB.QueryRow("SELECT COUNT(*) FROM pages").Scan(&pageCount); err != nil {

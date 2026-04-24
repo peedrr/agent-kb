@@ -7,16 +7,28 @@ import (
 	"github.com/peedrr/agent-kb/internal/index"
 )
 
+// IndexConsistencyChecker detects pages in index.md that don't exist and vice versa.
+//
+//nolint:revive // intentionally exported for use by consumers
 type IndexConsistencyChecker struct{}
 
+// NewIndexConsistencyChecker creates an IndexConsistencyChecker.
+//
+//nolint:revive // intentionally exported for use by consumers
 func NewIndexConsistencyChecker() *IndexConsistencyChecker {
 	return &IndexConsistencyChecker{}
 }
 
+// Name returns the checker name.
+//
+//nolint:revive // intentionally exported for use by consumers
 func (c *IndexConsistencyChecker) Name() string {
 	return "index_consistency"
 }
 
+// Check runs the index consistency check.
+//
+//nolint:revive // intentionally exported for use by consumers
 func (c *IndexConsistencyChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error) {
 	var issues []LintIssue
 
@@ -39,7 +51,7 @@ func (c *IndexConsistencyChecker) Check(_ context.Context, kb *KB) ([]LintIssue,
 		if !pagePaths[path] {
 			issues = append(issues, LintIssue{
 				Type:     "index_consistency",
-				Message: "page listed in index.md but file does not exist",
+				Message:  "page listed in index.md but file does not exist",
 				Path:     path,
 				Severity: "error",
 			})
@@ -50,7 +62,7 @@ func (c *IndexConsistencyChecker) Check(_ context.Context, kb *KB) ([]LintIssue,
 		if !indexPaths[path] {
 			issues = append(issues, LintIssue{
 				Type:     "index_consistency",
-				Message: "page exists but is missing from index.md",
+				Message:  "page exists but is missing from index.md",
 				Path:     path,
 				Severity: "warning",
 			})

@@ -8,26 +8,32 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/storage"
-	"github.com/spf13/cobra"
 )
 
 var readCmd = &cobra.Command{
 	Use:   "read <path>",
 	Short: "Read a page from the knowledge base",
 	Long:  `Display the contents of a page from the knowledge base. The path is relative to the kb/ directory.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runRead,
+	Example: `  # Read a page
+  akb read notes/my-note.md
+
+  # Read from a subdirectory
+  akb read adr/use-sqlite-search.md`,
+	Args: cobra.ExactArgs(1),
+	RunE: runRead,
 }
 
-func runRead(cmd *cobra.Command, args []string) error {
+func runRead(_ *cobra.Command, args []string) error {
 	inputPath := args[0]
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	_, err = config.Load(filepath.Join(kbRoot, ".akb", ".akb.yaml"))
@@ -40,7 +46,7 @@ func runRead(cmd *cobra.Command, args []string) error {
 		if errors.Is(err, path.ErrUseAKBRawWrite) {
 			return fmt.Errorf("use `akb raw read`")
 		}
-		return err
+		return fmt.Errorf("resolve path: %w", err)
 	}
 
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
@@ -51,9 +57,9 @@ func runRead(cmd *cobra.Command, args []string) error {
 	data, err := provider.Read(context.Background(), resolvedPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) || strings.Contains(err.Error(), "no such file") {
-			return fmt.Errorf("page not found: %s", inputPath)
+			return fmt.Errorf("page not found: %s. Use 'akb list' to see available pages", inputPath)
 		}
-		return err
+		return fmt.Errorf("read page: %w", err)
 	}
 
 	fmt.Print(string(data))

@@ -19,19 +19,21 @@ func TestMain(m *testing.M) {
 	}
 	akbPath := filepath.Join(tmpDir, "akb")
 
-	buildCmd := exec.Command("go", "build", "-o", akbPath, "./")
+	buildCmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"go", "build", "-o", akbPath, "./")
 	if out, err := buildCmd.CombinedOutput(); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to build: %s: %v", string(out), err)
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir) //nolint:errcheck // cleanup on build failure
 		os.Exit(1)
 	}
 
 	testVersion := "v0.1.0"
 	akbTestPath := filepath.Join(tmpDir, "akb-test")
-	buildCmdTest := exec.Command("go", "build", "-ldflags", fmt.Sprintf("-X main.version=%s", testVersion), "-o", akbTestPath, "./")
+	buildCmdTest := exec.Command( //nolint:gosec // test helper launching akb binary
+		"go", "build", "-ldflags", fmt.Sprintf("-X main.version=%s", testVersion), "-o", akbTestPath, "./")
 	if out, err := buildCmdTest.CombinedOutput(); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to build test binary: %s: %v", string(out), err)
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir) //nolint:errcheck // cleanup on build failure
 		os.Exit(1)
 	}
 
@@ -41,7 +43,7 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 
 	// Cleanup (must be explicit — defer doesn't run with os.Exit)
-	os.RemoveAll(tmpDir)
+	_ = os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
 	os.Exit(code)
 }
 
@@ -51,7 +53,8 @@ func TestVersionFlag(t *testing.T) {
 	}
 
 	expected := "akb " + version
-	cmd := exec.Command(akbBinPath, "--version")
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		akbBinPath, "--version")
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("akb --version failed: %v", err)
@@ -66,7 +69,8 @@ func TestVersionFlag(t *testing.T) {
 func TestVersionFlagWithLdflags(t *testing.T) {
 	testVersion := "v0.1.0"
 
-	cmd := exec.Command(akbTestBinPath, "--version")
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		akbTestBinPath, "--version")
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("akb --version failed: %v", err)
@@ -80,7 +84,8 @@ func TestVersionFlagWithLdflags(t *testing.T) {
 }
 
 func TestNoArgsShowsHelp(t *testing.T) {
-	cmd := exec.Command(akbBinPath)
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		akbBinPath)
 	out, err := cmd.Output()
 	if err != nil {
 		t.Fatalf("akb (no args) failed: %v", err)

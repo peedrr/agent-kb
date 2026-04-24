@@ -31,7 +31,7 @@ func (s *SQLiteFTS5Searcher) IndexPage(ctx context.Context, path, title, content
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
 
 	_, _ = tx.ExecContext(ctx, "DELETE FROM pages_fts WHERE rowid = (SELECT id FROM documents WHERE path = ?)", path)
 
@@ -68,7 +68,7 @@ func (s *SQLiteFTS5Searcher) RemovePage(ctx context.Context, path string) error 
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
 
 	// Delete from FTS first — requires document id which is deleted next
 	if _, err := tx.ExecContext(ctx, "DELETE FROM pages_fts WHERE rowid = (SELECT id FROM documents WHERE path = ?)", path); err != nil {
@@ -130,7 +130,7 @@ func (s *SQLiteFTS5Searcher) Search(ctx context.Context, query string, opts Sear
 	if err != nil {
 		return nil, fmt.Errorf("search query: %w", err)
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck // rows.Err() checked after iteration; close error non-critical
 
 	results := []SearchResult{}
 	for rows.Next() {
@@ -157,11 +157,11 @@ func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) er
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM pages"); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback() //nolint:errcheck // rollback error secondary to exec error
 		return fmt.Errorf("delete pages: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM documents"); err != nil {
-		tx.Rollback()
+		_ = tx.Rollback() //nolint:errcheck // rollback error secondary to exec error
 		return fmt.Errorf("delete documents: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -193,7 +193,7 @@ func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) er
 			return nil
 		}
 
-		content, err := os.ReadFile(path)
+		content, err := os.ReadFile(path) //nolint:gosec // path from filepath.WalkDir within KB root
 		if err != nil {
 			return nil
 		}

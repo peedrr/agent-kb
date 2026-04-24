@@ -20,7 +20,8 @@ func appendCleanup(kbRoot string) {
 func appendRun(kbRoot, inputPath, stdinContent string, extraArgs ...string) (string, error) {
 	args := append([]string{"append"}, extraArgs...)
 	args = append(args, inputPath)
-	cmd := exec.Command(akbBinPath, args...)
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		akbBinPath, args...) //nolint:gosec // test helper launching akb binary
 	cmd.Dir = kbRoot
 	cmd.Stdin = strings.NewReader(stdinContent)
 	out, err := cmd.CombinedOutput()
@@ -49,7 +50,7 @@ func TestAppendSuccessful(t *testing.T) {
 	}
 
 	writtenPath := filepath.Join(kbRoot, "kb", "notes", "my-note.md")
-	data, err := os.ReadFile(writtenPath)
+	data, err := os.ReadFile(writtenPath) //nolint:gosec // test reading known temp file //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatalf("read written file: %v", err)
 	}
@@ -87,7 +88,7 @@ func TestAppendPreservesFrontmatter(t *testing.T) {
 	}
 
 	writtenPath := filepath.Join(kbRoot, "kb", "notes", "fm-test.md")
-	data, err := os.ReadFile(writtenPath)
+	data, err := os.ReadFile(writtenPath) //nolint:gosec // test reading known temp file //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatalf("read written file: %v", err)
 	}
@@ -153,7 +154,7 @@ func TestAppendBodyContentNotRawAppend(t *testing.T) {
 	}
 
 	writtenPath := filepath.Join(kbRoot, "kb", "notes", "body-test.md")
-	data, err := os.ReadFile(writtenPath)
+	data, err := os.ReadFile(writtenPath) //nolint:gosec // test reading known temp file //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatalf("read written file: %v", err)
 	}
@@ -192,7 +193,8 @@ func TestAppendGitCommit(t *testing.T) {
 		t.Fatalf("akb append failed: %s: %v", out, err)
 	}
 
-	cmd := exec.Command("git", "log", "--oneline", "-1")
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "log", "--oneline", "-1")
 	cmd.Dir = kbRoot
 	gitOut, err := cmd.Output()
 	if err != nil {
@@ -217,7 +219,7 @@ func TestAppendNoCommit(t *testing.T) {
 	}
 
 	writtenPath := filepath.Join(kbRoot, "kb", "notes", "nocommit.md")
-	data, err := os.ReadFile(writtenPath)
+	data, err := os.ReadFile(writtenPath) //nolint:gosec // test reading known temp file //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatalf("read written file: %v", err)
 	}
@@ -226,7 +228,8 @@ func TestAppendNoCommit(t *testing.T) {
 	}
 
 	// Verify no git commit was made for the append
-	cmd := exec.Command("git", "log", "--oneline", "-1", "--", "kb/notes/nocommit.md")
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "log", "--oneline", "-1", "--", "kb/notes/nocommit.md")
 	cmd.Dir = kbRoot
 	gitOut, _ := cmd.Output()
 	// The last commit for this file should be the write, not the append

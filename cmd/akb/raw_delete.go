@@ -8,31 +8,34 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/manifest"
 	"github.com/peedrr/agent-kb/internal/path"
-	"github.com/spf13/cobra"
 )
 
 var rawDeleteCmd = &cobra.Command{
 	Use:   "delete <path>",
 	Short: "Delete a raw file from the knowledge base",
 	Long:  `Remove a raw file from the knowledge base and update the manifest. Warns about KB pages that reference the file in their sources field.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runRawDelete,
+	Example: `  # Delete a raw file
+  akb raw delete data/config.json`,
+	Args: cobra.ExactArgs(1),
+	RunE: runRawDelete,
 }
 
-func runRawDelete(cmd *cobra.Command, args []string) error {
+func runRawDelete(_ *cobra.Command, args []string) error {
 	inputPath := args[0]
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	fullPath, err := path.ResolveRawPath(kbRoot, inputPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve raw path: %w", err)
 	}
 
 	// Get relative path from raw/ directory
@@ -91,7 +94,7 @@ func runRawDelete(cmd *cobra.Command, args []string) error {
 		}
 
 		commitMsg := fmt.Sprintf("akb: raw delete %s", relPath)
-		gitCommit := exec.Command("git", "commit", "-m", commitMsg)
+		gitCommit := exec.Command("git", "commit", "-m", commitMsg) //nolint:gosec // launching trusted git binary with controlled args
 		gitCommit.Dir = kbRoot
 		if out, err := gitCommit.CombinedOutput(); err != nil {
 			return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)
@@ -112,11 +115,11 @@ func runRawDelete(cmd *cobra.Command, args []string) error {
 func scanSources(kbRoot, deletedFile string) []string {
 	var referencing []string
 	kbDir := filepath.Join(kbRoot, "kb")
-	filepath.WalkDir(kbDir, func(p string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(kbDir, func(p string, d fs.DirEntry, err error) error { //nolint:errcheck // best-effort scan; errors handled per-file
 		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".md") {
 			return nil
 		}
-		content, err := os.ReadFile(p)
+		content, err := os.ReadFile(p) //nolint:gosec // path validated by filepath.WalkDir within KB root
 		if err != nil {
 			return nil
 		}

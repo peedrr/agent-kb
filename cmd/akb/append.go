@@ -1,3 +1,4 @@
+// Package main provides the akb CLI commands.
 package main
 
 import (
@@ -9,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
@@ -16,26 +19,28 @@ import (
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/search"
 	"github.com/peedrr/agent-kb/internal/storage"
-	"github.com/spf13/cobra"
 )
 
 var appendCmd = &cobra.Command{
 	Use:   "append <path>",
 	Short: "Append content to an existing page in the knowledge base",
 	Long:  `Read content from stdin and append it to the body of an existing page. Frontmatter is preserved.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runAppend,
+	Example: `  # Append content to a page
+  echo "
+More content here" | akb append notes/my-note.md`,
+	Args: cobra.ExactArgs(1),
+	RunE: runAppend,
 }
 
 var isStdinTTY = func() (bool, error) {
 	stat, err := os.Stdin.Stat()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("check stdin: %w", err)
 	}
 	return (stat.Mode() & os.ModeCharDevice) != 0, nil
 }
 
-func runAppend(cmd *cobra.Command, args []string) error {
+func runAppend(_ *cobra.Command, args []string) error {
 	inputPath := args[0]
 
 	isTTY, err := isStdinTTY()
@@ -53,7 +58,7 @@ func runAppend(cmd *cobra.Command, args []string) error {
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	dbConn, err := db.OpenKB(kbRoot)
@@ -61,9 +66,9 @@ func runAppend(cmd *cobra.Command, args []string) error {
 		if isMissingDB(err) {
 			return fmt.Errorf("run `akb index rebuild` to create the search index")
 		}
-		return err
+		return fmt.Errorf("open search database: %w", err)
 	}
-	defer dbConn.Close()
+	defer dbConn.Close() //nolint:errcheck // DB close error non-critical on command exit
 
 	_, err = config.Load(filepath.Join(kbRoot, ".akb", ".akb.yaml"))
 	if err != nil {
@@ -87,7 +92,7 @@ func runAppend(cmd *cobra.Command, args []string) error {
 
 	_, err = path.ResolveKBPath(kbRoot, inputPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve path: %w", err)
 	}
 
 	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
@@ -97,7 +102,7 @@ func runAppend(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !exists {
-		return fmt.Errorf("page not found: %s. Use `akb write` to create.", inputPath)
+		return fmt.Errorf("page not found: %s. Use `akb write` to create", inputPath)
 	}
 
 	store := storage.NewGitProvider(kbRoot, noCommit)
@@ -147,7 +152,7 @@ func runAppend(cmd *cobra.Command, args []string) error {
 	}
 
 	updater := linkgraph.NewSQLiteLinkGraph(dbConn)
-	if err := updater.UpdatePageLinks(ctx, relPath, string(fullContent)); err != nil {
+	if err := updater.UpdatePageLinks(ctx, relPath, fullContent); err != nil {
 		return fmt.Errorf("update links: %w", err)
 	}
 

@@ -7,23 +7,26 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/path"
-	"github.com/spf13/cobra"
 )
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show KB status information",
 	Long:  `Display the current KB's name, path, page count, and git status.`,
-	Args:  cobra.NoArgs,
-	RunE:  runStatus,
+	Example: `  # Show current KB status
+  akb status`,
+	Args: cobra.NoArgs,
+	RunE: runStatus,
 }
 
-func runStatus(cmd *cobra.Command, args []string) error {
+func runStatus(_ *cobra.Command, _ []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	cfg, err := config.Load(filepath.Join(kbRoot, ".akb", ".akb.yaml"))
@@ -60,7 +63,7 @@ func countPages(kbRoot string) (int, error) {
 		if os.IsNotExist(err) {
 			return 0, nil
 		}
-		return 0, err
+		return 0, fmt.Errorf("check kb directory: %w", err)
 	}
 
 	count := 0
@@ -71,7 +74,7 @@ func countPages(kbRoot string) (int, error) {
 		if !info.IsDir() && strings.HasSuffix(path, ".md") {
 			relPath, err := filepath.Rel(kbDir, path)
 			if err != nil {
-				return err
+				return fmt.Errorf("compute relative path: %w", err)
 			}
 			base := filepath.Base(relPath)
 			parent := filepath.Dir(relPath)
@@ -86,7 +89,7 @@ func countPages(kbRoot string) (int, error) {
 		return nil
 	})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("walk kb directory: %w", err)
 	}
 
 	return count, nil

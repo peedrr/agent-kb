@@ -20,7 +20,7 @@ agent-kb/
 │   ├── frontmatter/# YAML frontmatter parsing
 │   ├── index/      # kb/index.md management
 │   ├── linkgraph/  # SQLite link tracking (wikilinks)
-│   ├── lint/       # 15 lint checkers + engine
+│   ├── lint/       # 13 lint checkers + engine
 │   ├── log/        # kb/log.md append-only log
 │   ├── manifest/   # raw/files.log SHA-256 manifest
 │   ├── markdown/   # Wikilink, annotation, provenance parsers
@@ -51,7 +51,7 @@ agent-kb/
 | Template validation | `internal/template/template.go` | Typed pages (note, adr, custom) |
 | Config format | `internal/config/config.go` | YAML .akb.yaml |
 | Lint engine | `internal/lint/engine.go` | LintEngine, LintChecker interface |
-| Lint checks | `internal/lint/*.go` | 15 checkers (broken_links, orphans, freshness, etc.) |
+| Lint checks | `internal/lint/*.go` | 13 checkers (broken_links, orphans, freshness, etc.) |
 | Manifest | `internal/manifest/manifest.go` | raw/files.log SHA-256 tracking |
 | Skill install | `internal/skill/skill.go` | `//go:embed embedded/*` |
 | Registry | `internal/registry/registry.go` | Multi-KB registry with default |
@@ -131,6 +131,6 @@ nix develop                     # Dev shell (Go, gopls, delve, golangci-lint)
 - Templates embedded in binary via `//go:embed embedded/*.yaml`
 - Skills embedded in binary via `//go:embed embedded/*`
 - Integration tests use testscript framework (`.txt` files in testdata/)
-- 15 lint checks: 5 structural + 6 template-driven + 4 semantic (provenance, freshness, confidence, summary_length)
+- 13 lint checks: 5 structural + 6 template-driven + 2 semantic (provenance, freshness)
 - Provenance drift threshold: 0.20; freshness half-life: 30 days; freshness score threshold: 50.0
 - Lint thresholds are hardcoded constants (not configurable via `.akb.yaml` in v1)

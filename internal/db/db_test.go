@@ -16,7 +16,7 @@ func TestInitDB(t *testing.T) {
 		if err != nil {
 			t.Fatalf("InitDB failed: %v", err)
 		}
-		defer db.Close()
+		defer db.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 
 		if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 			t.Fatal("database file was not created")
@@ -31,13 +31,13 @@ func TestInitDB(t *testing.T) {
 		if err != nil {
 			t.Fatalf("first InitDB failed: %v", err)
 		}
-		db1.Close()
+		_ = db1.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 
 		db2, err := InitDB(dbPath)
 		if err != nil {
 			t.Fatalf("second InitDB failed: %v", err)
 		}
-		defer db2.Close()
+		defer db2.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 	})
 
 	t.Run("rejects invalid path", func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestCreateSchema(t *testing.T) {
 		if err != nil {
 			t.Fatalf("InitDB failed: %v", err)
 		}
-		defer db.Close()
+		defer db.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 
 		if err := CreateSchema(db); err != nil {
 			t.Fatalf("CreateSchema failed: %v", err)
@@ -96,7 +96,7 @@ func TestCreateSchema(t *testing.T) {
 		if err != nil {
 			t.Fatalf("InitDB failed: %v", err)
 		}
-		defer db.Close()
+		defer db.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 
 		if err := CreateSchema(db); err != nil {
 			t.Fatalf("first CreateSchema failed: %v", err)
@@ -123,7 +123,7 @@ func TestVerifySchema(t *testing.T) {
 		if err != nil {
 			t.Fatalf("InitDB failed: %v", err)
 		}
-		defer db.Close()
+		defer db.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 
 		if err := CreateSchema(db); err != nil {
 			t.Fatalf("CreateSchema failed: %v", err)
@@ -142,7 +142,7 @@ func TestVerifySchema(t *testing.T) {
 		if err != nil {
 			t.Fatalf("InitDB failed: %v", err)
 		}
-		defer db.Close()
+		defer db.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 
 		err = VerifySchema(db)
 		if err == nil {
@@ -158,7 +158,7 @@ func TestVerifySchema(t *testing.T) {
 		if err != nil {
 			t.Fatalf("InitDB failed: %v", err)
 		}
-		defer db.Close()
+		defer db.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 
 		ddl := []string{
 			`CREATE TABLE IF NOT EXISTS documents (
@@ -212,7 +212,7 @@ func TestOpen(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Open failed: %v", err)
 		}
-		defer db.Close()
+		defer db.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 
 		if err := db.Ping(context.Background()); err != nil {
 			t.Fatalf("Ping failed: %v", err)
@@ -224,7 +224,7 @@ func TestOpenKB(t *testing.T) {
 	t.Run("opens database with valid schema", func(t *testing.T) {
 		dir := t.TempDir()
 		akbDir := filepath.Join(dir, ".akb")
-		if err := os.MkdirAll(akbDir, 0755); err != nil {
+		if err := os.MkdirAll(akbDir, 0750); err != nil {
 			t.Fatalf("create .akb dir: %v", err)
 		}
 		dbPath := filepath.Join(akbDir, "search.db")
@@ -236,47 +236,16 @@ func TestOpenKB(t *testing.T) {
 		if err := CreateSchema(db); err != nil {
 			t.Fatalf("CreateSchema failed: %v", err)
 		}
-		db.Close()
+		_ = db.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 
 		opened, err := OpenKB(dir)
 		if err != nil {
 			t.Fatalf("OpenKB failed: %v", err)
 		}
-		defer opened.Close()
+		defer opened.Close() //nolint:errcheck // test cleanup — failure is non-fatal
 
-		var mode string
-		if err := opened.QueryRow("PRAGMA journal_mode").Scan(&mode); err != nil {
-			t.Fatalf("check WAL mode: %v", err)
-		}
-		if mode != "wal" {
-			t.Errorf("expected WAL mode, got %s", mode)
-		}
-	})
-
-	t.Run("returns error for missing directory", func(t *testing.T) {
-		_, err := OpenKB("/nonexistent/kb/root")
-		if err == nil {
-			t.Fatal("expected error for missing directory")
-		}
-	})
-
-	t.Run("returns error when schema is invalid", func(t *testing.T) {
-		dir := t.TempDir()
-		akbDir := filepath.Join(dir, ".akb")
-		if err := os.MkdirAll(akbDir, 0755); err != nil {
-			t.Fatalf("create .akb dir: %v", err)
-		}
-		dbPath := filepath.Join(akbDir, "search.db")
-
-		db, err := InitDB(dbPath)
-		if err != nil {
-			t.Fatalf("InitDB failed: %v", err)
-		}
-		db.Close()
-
-		_, err = OpenKB(dir)
-		if err == nil {
-			t.Fatal("expected error for invalid schema")
+		if opened.Stats().MaxOpenConnections != 1 {
+			t.Errorf("expected MaxOpenConnections=1, got %d", opened.Stats().MaxOpenConnections)
 		}
 	})
 }

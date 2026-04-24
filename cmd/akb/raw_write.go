@@ -8,20 +8,26 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/manifest"
 	"github.com/peedrr/agent-kb/internal/path"
-	"github.com/spf13/cobra"
 )
 
 var rawWriteCmd = &cobra.Command{
 	Use:   "write <path>",
 	Short: "Write a raw file to the knowledge base",
 	Long:  `Read content from stdin and write it as a raw file in the knowledge base. Updates the SHA-256 manifest and commits both changes together.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runRawWrite,
+	Example: `  # Write a raw file
+  echo "file content here" | akb raw write data/config.json
+
+  # Write a binary file (base64 encoded)
+  base64 -d <<< "SGVsbG8gV29ybGQ=" | akb raw write hello.txt`,
+	Args: cobra.ExactArgs(1),
+	RunE: runRawWrite,
 }
 
-func runRawWrite(cmd *cobra.Command, args []string) error {
+func runRawWrite(_ *cobra.Command, args []string) error {
 	inputPath := args[0]
 
 	stat, err := os.Stdin.Stat()
@@ -39,12 +45,12 @@ func runRawWrite(cmd *cobra.Command, args []string) error {
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	fullPath, err := path.ResolveRawPath(kbRoot, inputPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve raw path: %w", err)
 	}
 
 	relPath := strings.TrimPrefix(inputPath, "raw/")
@@ -61,14 +67,14 @@ func runRawWrite(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := manifest.ValidateFilename(relPath); err != nil {
-		return err
+		return fmt.Errorf("validate filename: %w", err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0750); err != nil {
 		return fmt.Errorf("create parent directories: %w", err)
 	}
 
-	if err := os.WriteFile(fullPath, stdinContent, 0644); err != nil {
+	if err := os.WriteFile(fullPath, stdinContent, 0600); err != nil {
 		return fmt.Errorf("write file: %w", err)
 	}
 
@@ -83,7 +89,7 @@ func runRawWrite(cmd *cobra.Command, args []string) error {
 	}
 
 	if !noCommit {
-		gitAdd := exec.Command("git", "add", filepath.Join("raw", relPath), filepath.Join("raw", "files.log"))
+		gitAdd := exec.Command("git", "add", filepath.Join("raw", relPath), filepath.Join("raw", "files.log")) //nolint:gosec // launching trusted git binary with controlled args
 		gitAdd.Dir = kbRoot
 		if out, err := gitAdd.CombinedOutput(); err != nil {
 			return fmt.Errorf("git add: %s: %w", strings.TrimSpace(string(out)), err)
@@ -94,7 +100,7 @@ func runRawWrite(cmd *cobra.Command, args []string) error {
 		}
 
 		commitMsg := fmt.Sprintf("akb: raw write %s", relPath)
-		gitCommit := exec.Command("git", "commit", "-m", commitMsg)
+		gitCommit := exec.Command("git", "commit", "-m", commitMsg) //nolint:gosec // launching trusted git binary with controlled args
 		gitCommit.Dir = kbRoot
 		if out, err := gitCommit.CombinedOutput(); err != nil {
 			return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)

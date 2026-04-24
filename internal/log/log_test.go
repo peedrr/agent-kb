@@ -12,11 +12,11 @@ func setupTempKB(t *testing.T, logContent string) string {
 	t.Helper()
 	tmpDir := t.TempDir()
 	kbDir := filepath.Join(tmpDir, "kb")
-	if err := os.MkdirAll(kbDir, 0755); err != nil {
+	if err := os.MkdirAll(kbDir, 0750); err != nil {
 		t.Fatalf("mkdir kb: %v", err)
 	}
 	logPath := filepath.Join(tmpDir, "kb", "log.md")
-	if err := os.WriteFile(logPath, []byte(logContent), 0644); err != nil {
+	if err := os.WriteFile(logPath, []byte(logContent), 0600); err != nil {
 		t.Fatalf("write log.md: %v", err)
 	}
 	return tmpDir
@@ -111,7 +111,7 @@ func TestReadLog(t *testing.T) {
 	t.Run("returns error when log.md does not exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		if err := os.MkdirAll(kbDir, 0755); err != nil {
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
 			t.Fatalf("mkdir kb: %v", err)
 		}
 		_, err := ReadLog(tmpDir)
@@ -160,7 +160,7 @@ func TestAppendLog(t *testing.T) {
 		}
 
 		logPath := filepath.Join(kbRoot, "kb", "log.md")
-		data, err := os.ReadFile(logPath)
+		data, err := os.ReadFile(logPath) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("read log.md: %v", err)
 		}
@@ -178,7 +178,7 @@ func TestAppendLog(t *testing.T) {
 		}
 
 		logPath := filepath.Join(kbRoot, "kb", "log.md")
-		data, err := os.ReadFile(logPath)
+		data, err := os.ReadFile(logPath) //nolint:gosec // test reading known temp file
 		if err != nil {
 			t.Fatalf("read log.md: %v", err)
 		}
@@ -217,7 +217,7 @@ func TestAppendLog(t *testing.T) {
 	t.Run("creates log.md if missing", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		kbDir := filepath.Join(tmpDir, "kb")
-		if err := os.MkdirAll(kbDir, 0755); err != nil {
+		if err := os.MkdirAll(kbDir, 0750); err != nil {
 			t.Fatalf("mkdir kb: %v", err)
 		}
 		err := AppendLog(tmpDir, "query", "Searched for something", "Search")

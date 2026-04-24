@@ -17,7 +17,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() }) //nolint:errcheck // test cleanup — failure is non-fatal
 	if err := db.CreateSchema(d); err != nil {
 		t.Fatalf("CreateSchema: %v", err)
 	}
@@ -451,6 +451,6 @@ func TestSQLiteLinkGraph_GetAmbiguousLinks(t *testing.T) {
 	}
 }
 
-func TestSQLiteLinkGraph_ImplementsInterface(t *testing.T) {
-	var _ LinkGraphUpdater = (*SQLiteLinkGraph)(nil)
+func TestSQLiteLinkGraph_ImplementsInterface(_ *testing.T) {
+	var _ Updater = (*SQLiteLinkGraph)(nil)
 }

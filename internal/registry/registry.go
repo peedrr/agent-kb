@@ -1,3 +1,4 @@
+// Package registry manages the ~/.config/agent-kb/registry.yaml file.
 package registry
 
 import (
@@ -22,8 +23,8 @@ type Registry struct {
 	Entries []Entry `yaml:"entries"`
 }
 
-// RegistryPath returns the path to the registry file (~/.config/agent-kb/registry.yaml).
-func RegistryPath() (string, error) {
+// Path returns the path to the registry file (~/.config/agent-kb/registry.yaml).
+func Path() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("get home directory: %w", err)
@@ -35,7 +36,7 @@ func RegistryPath() (string, error) {
 // Returns an empty Registry if the file does not exist.
 // Supports migration from old flat format ([]Entry) to new Registry format.
 func Load(path string) (*Registry, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path is caller-provided registry file path
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return &Registry{Default: "", Entries: nil}, nil
@@ -73,7 +74,7 @@ func looksLikeOldFormat(data []byte, reg Registry) bool {
 // Save writes the registry to the registry file, creating parent directories as needed.
 func Save(path string, reg *Registry) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("create registry directory: %w", err)
 	}
 
@@ -82,7 +83,7 @@ func Save(path string, reg *Registry) error {
 		return fmt.Errorf("marshal registry: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("write registry: %w", err)
 	}
 	return nil
@@ -91,7 +92,7 @@ func Save(path string, reg *Registry) error {
 // AddEntry adds an entry to the registry file.
 // Returns an error if an entry with the same name already exists.
 func AddEntry(entry Entry) error {
-	regPath, err := RegistryPath()
+	regPath, err := Path()
 	if err != nil {
 		return err
 	}
@@ -113,7 +114,7 @@ func AddEntry(entry Entry) error {
 
 // FindByName looks up an entry by name in the registry.
 func FindByName(name string) (*Entry, error) {
-	regPath, err := RegistryPath()
+	regPath, err := Path()
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +135,7 @@ func FindByName(name string) (*Entry, error) {
 // SetDefault sets the default KB by name.
 // Returns an error if the name is not found in the registry.
 func SetDefault(name string) error {
-	regPath, err := RegistryPath()
+	regPath, err := Path()
 	if err != nil {
 		return err
 	}
@@ -162,7 +163,7 @@ func SetDefault(name string) error {
 // GetDefault returns the default KB entry.
 // Returns an error if no default is set.
 func GetDefault() (Entry, error) {
-	regPath, err := RegistryPath()
+	regPath, err := Path()
 	if err != nil {
 		return Entry{}, err
 	}

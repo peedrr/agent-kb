@@ -1,3 +1,4 @@
+// Package lint provides lint checkers for knowledge base validation.
 package lint
 
 import (
@@ -5,16 +6,28 @@ import (
 	"fmt"
 )
 
+// BrokenLinksChecker detects pages linking to non-existent targets.
+//
+//nolint:revive // intentionally exported for use by consumers
 type BrokenLinksChecker struct{}
 
+// NewBrokenLinksChecker creates a BrokenLinksChecker.
+//
+//nolint:revive // intentionally exported for use by consumers
 func NewBrokenLinksChecker() *BrokenLinksChecker {
 	return &BrokenLinksChecker{}
 }
 
+// Name returns the checker name.
+//
+//nolint:revive // intentionally exported for use by consumers
 func (c *BrokenLinksChecker) Name() string {
 	return "broken_links"
 }
 
+// Check runs the broken links check.
+//
+//nolint:revive // intentionally exported for use by consumers
 func (c *BrokenLinksChecker) Check(ctx context.Context, kb *KB) ([]LintIssue, error) {
 	var issues []LintIssue
 

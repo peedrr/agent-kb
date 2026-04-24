@@ -31,4 +31,4 @@ stderr 'already installed'
 
 # --- Install unknown skill fails ---
 ! exec akb skill install --location $WORK/skills nonexistent
-stderr 'Unknown skill'
+stderr 'unknown skill'

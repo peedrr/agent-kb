@@ -17,21 +17,23 @@ type GitProvider struct {
 	noCommit bool
 }
 
+// NewGitProvider creates a git-tracking storage provider.
 func NewGitProvider(kbRoot string, noCommit bool) *GitProvider {
 	return &GitProvider{kbRoot: kbRoot, noCommit: noCommit}
 }
 
 // WriteWithCommitMsg writes data to a file and commits with a custom message.
-func (g *GitProvider) WriteWithCommitMsg(ctx context.Context, path string, data []byte, commitMsg string) error {
+// WriteWithCommitMsg writes data and commits with a custom message.
+func (g *GitProvider) WriteWithCommitMsg(_ context.Context, path string, data []byte, commitMsg string) error {
 	if err := g.checkMergeConflicts(); err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 		return fmt.Errorf("create parent directories: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("write file: %w", err)
 	}
 
@@ -64,14 +66,15 @@ func (g *GitProvider) Write(ctx context.Context, path string, data []byte) error
 }
 
 func (g *GitProvider) Read(_ context.Context, path string) ([]byte, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // path validated by provider
 	if err != nil {
 		return nil, fmt.Errorf("read file: %w", err)
 	}
 	return data, nil
 }
 
-func (g *GitProvider) Delete(ctx context.Context, path string) error {
+// Delete removes a file and commits the change.
+func (g *GitProvider) Delete(_ context.Context, path string) error {
 	if err := g.checkMergeConflicts(); err != nil {
 		return err
 	}
@@ -101,6 +104,7 @@ func (g *GitProvider) Delete(ctx context.Context, path string) error {
 	return g.gitCommit(commitMsg)
 }
 
+// Exists checks whether a file exists.
 func (g *GitProvider) Exists(_ context.Context, path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
@@ -112,7 +116,8 @@ func (g *GitProvider) Exists(_ context.Context, path string) (bool, error) {
 	return false, fmt.Errorf("check file existence: %w", err)
 }
 
-func (g *GitProvider) List(ctx context.Context, dir string, ext string) ([]string, error) {
+// List returns files with the given extension under a directory.
+func (g *GitProvider) List(_ context.Context, dir string, ext string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -126,7 +131,7 @@ func (g *GitProvider) List(ctx context.Context, dir string, ext string) ([]strin
 		}
 		relPath, err := filepath.Rel(g.kbRoot, path)
 		if err != nil {
-			return err
+			return fmt.Errorf("compute relative path: %w", err)
 		}
 		files = append(files, filepath.ToSlash(relPath))
 		return nil
@@ -159,10 +164,13 @@ func (g *GitProvider) checkMergeConflicts() error {
 
 func (g *GitProvider) ensureGitConfig() error {
 	gitConfig := func(args ...string) error {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command("git", args...) //nolint:gosec // launching trusted git binary with controlled args
 		cmd.Dir = g.kbRoot
 		_, err := cmd.Output()
-		return err
+		if err != nil {
+			return fmt.Errorf("get git config: %w", err)
+		}
+		return nil
 	}
 
 	if err := gitConfig("config", "--local", "user.name"); err != nil {
@@ -181,7 +189,7 @@ func (g *GitProvider) ensureGitConfig() error {
 }
 
 func (g *GitProvider) gitAdd(relPath string) error {
-	cmd := exec.Command("git", "add", relPath)
+	cmd := exec.Command("git", "add", relPath) //nolint:gosec // launching trusted git binary with controlled args
 	cmd.Dir = g.kbRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git add %s: %s: %w", relPath, strings.TrimSpace(string(out)), err)
@@ -190,7 +198,7 @@ func (g *GitProvider) gitAdd(relPath string) error {
 }
 
 func (g *GitProvider) gitCommit(msg string) error {
-	cmd := exec.Command("git", "commit", "-m", msg)
+	cmd := exec.Command("git", "commit", "-m", msg) //nolint:gosec // launching trusted git binary with controlled args
 	cmd.Dir = g.kbRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)

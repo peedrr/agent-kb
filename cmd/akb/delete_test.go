@@ -21,7 +21,7 @@ func TestDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Chdir(origCwd)
+	defer os.Chdir(origCwd) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	if err := os.Chdir(kbRoot); err != nil {
 		t.Fatal(err)
@@ -29,12 +29,12 @@ func TestDelete(t *testing.T) {
 
 	t.Run("successful delete of existing page", func(t *testing.T) {
 		testPage := filepath.Join(kbRoot, "kb", "notes", "test-page.md")
-		if err := os.MkdirAll(filepath.Dir(testPage), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(testPage), 0750); err != nil {
 			t.Fatal(err)
 		}
 		// Write with proper frontmatter for production code path
 		content := "---\ntype: note\ntitle: Test Page\n---\nContent here.\n"
-		if err := os.WriteFile(testPage, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(testPage, []byte(content), 0600); err != nil {
 			t.Fatal(err)
 		}
 
@@ -92,12 +92,12 @@ func TestDelete(t *testing.T) {
 
 	t.Run("successful delete with no-commit flag", func(t *testing.T) {
 		testPage := filepath.Join(kbRoot, "kb", "notes", "no-commit-test.md")
-		if err := os.MkdirAll(filepath.Dir(testPage), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(testPage), 0750); err != nil {
 			t.Fatal(err)
 		}
 		// Write with proper frontmatter for production code path
 		content := "---\ntype: note\ntitle: No Commit Test\n---\nContent here.\n"
-		if err := os.WriteFile(testPage, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(testPage, []byte(content), 0600); err != nil {
 			t.Fatal(err)
 		}
 
@@ -122,12 +122,12 @@ func TestDelete(t *testing.T) {
 
 	t.Run("delete with kb/ prefix", func(t *testing.T) {
 		testPage := filepath.Join(kbRoot, "kb", "notes", "prefix-test.md")
-		if err := os.MkdirAll(filepath.Dir(testPage), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(testPage), 0750); err != nil {
 			t.Fatal(err)
 		}
 		// Write with proper frontmatter for production code path
 		content := "---\ntype: note\ntitle: Prefix Test\n---\nContent here.\n"
-		if err := os.WriteFile(testPage, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(testPage, []byte(content), 0600); err != nil {
 			t.Fatal(err)
 		}
 
@@ -154,7 +154,7 @@ func TestDelete(t *testing.T) {
 
 	t.Run("error on delete index.md", func(t *testing.T) {
 		indexPath := filepath.Join(kbRoot, "kb", "index.md")
-		if err := os.WriteFile(indexPath, []byte("# Index\n"), 0644); err != nil {
+		if err := os.WriteFile(indexPath, []byte("# Index\n"), 0600); err != nil {
 			t.Fatal(err)
 		}
 
@@ -174,7 +174,7 @@ func TestDelete(t *testing.T) {
 
 	t.Run("error on delete log.md", func(t *testing.T) {
 		logPath := filepath.Join(kbRoot, "kb", "log.md")
-		if err := os.WriteFile(logPath, []byte("# Log\n"), 0644); err != nil {
+		if err := os.WriteFile(logPath, []byte("# Log\n"), 0600); err != nil {
 			t.Fatal(err)
 		}
 
@@ -192,14 +192,42 @@ func TestDelete(t *testing.T) {
 		}
 	})
 
+	t.Run("error on parent dir traversal", func(t *testing.T) {
+		origNoCommit := noCommit
+		noCommit = false
+		t.Cleanup(func() { noCommit = origNoCommit })
+
+		err := runDeleteCmd(&cobra.Command{}, []string{"../escape.md"})
+		if err == nil {
+			t.Fatal("expected error for .. path, got nil")
+		}
+		if !strings.Contains(err.Error(), "..") {
+			t.Errorf("expected error to contain '..', got: %v", err)
+		}
+	})
+
+	t.Run("error on absolute path", func(t *testing.T) {
+		origNoCommit := noCommit
+		noCommit = false
+		t.Cleanup(func() { noCommit = origNoCommit })
+
+		err := runDeleteCmd(&cobra.Command{}, []string{"/tmp/evil.md"})
+		if err == nil {
+			t.Fatal("expected error for absolute path, got nil")
+		}
+		if !strings.Contains(err.Error(), "absolute") && !strings.Contains(err.Error(), "relative") {
+			t.Errorf("expected error about absolute/relative path, got: %v", err)
+		}
+	})
+
 	t.Run("successful delete page not in index", func(t *testing.T) {
 		testPage := filepath.Join(kbRoot, "kb", "notes", "not-in-index.md")
-		if err := os.MkdirAll(filepath.Dir(testPage), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(testPage), 0750); err != nil {
 			t.Fatal(err)
 		}
 		// Write with proper frontmatter for production code path
 		content := "---\ntype: note\ntitle: Not In Index\n---\nContent here.\n"
-		if err := os.WriteFile(testPage, []byte(content), 0644); err != nil {
+		if err := os.WriteFile(testPage, []byte(content), 0600); err != nil {
 			t.Fatal(err)
 		}
 
@@ -231,7 +259,7 @@ func setupTestKBWithGit(t *testing.T, kbRoot string) {
 		filepath.Join(kbRoot, ".akb"),
 	}
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0750); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -239,11 +267,11 @@ func setupTestKBWithGit(t *testing.T, kbRoot string) {
 	configContent := `name: test-kb
 created: "2024-01-01T00:00:00Z"
 `
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", ".akb.yaml"), []byte(configContent), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", ".akb.yaml"), []byte(configContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := os.WriteFile(filepath.Join(kbRoot, "kb", "index.md"), []byte("# Index\n\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, "kb", "index.md"), []byte("# Index\n\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -258,44 +286,49 @@ created: "2024-01-01T00:00:00Z"
 	}
 
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", kbRoot)
-	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+	os.Setenv("HOME", kbRoot)                         //nolint:errcheck,gosec // test setup — failure is non-fatal
+	t.Cleanup(func() { os.Setenv("HOME", origHome) }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	regPath := filepath.Join(kbRoot, ".config", "agent-kb", "registry.yaml")
-	os.MkdirAll(filepath.Dir(regPath), 0755)
+	if err := os.MkdirAll(filepath.Dir(regPath), 0750); err != nil {
+		t.Fatal(err)
+	}
 	regContent := `default: test-kb
 entries:
   - name: test-kb
     path: ` + kbRoot + `
     created: "2024-01-01T00:00:00Z"
 `
-	os.WriteFile(regPath, []byte(regContent), 0644)
+	if err := os.WriteFile(regPath, []byte(regContent), 0600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func initGitRepo(kbRoot string) error {
-	cmd := exec.Command("git", "init")
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "init")
 	cmd.Dir = kbRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git init: %s: %w", strings.TrimSpace(string(out)), err)
 	}
 
 	setGitConfig := func(args ...string) error {
-		cmd := exec.Command("git", args...)
+		cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", args...)
 		cmd.Dir = kbRoot
 		_, err := cmd.CombinedOutput()
 		return err
 	}
 
-	if err := setGitConfig("user.name", "akb-test"); err != nil {
-	}
-	if err := setGitConfig("user.email", "akb-test@local"); err != nil {
-	}
+	_ = setGitConfig("user.name", "akb-test")
+	_ = setGitConfig("user.email", "akb-test@local")
 
 	return nil
 }
 
 func addToGit(kbRoot, path string) error {
-	cmd := exec.Command("git", "add", path)
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "add", path)
 	cmd.Dir = kbRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git add: %s: %w", strings.TrimSpace(string(out)), err)
@@ -304,7 +337,8 @@ func addToGit(kbRoot, path string) error {
 }
 
 func commitInitial(kbRoot string) {
-	cmd := exec.Command("git", "commit", "-m", "initial")
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "commit", "-m", "initial")
 	cmd.Dir = kbRoot
-	cmd.CombinedOutput()
+	_, _ = cmd.CombinedOutput() //nolint:errcheck,gosec // best-effort git commit in test helper
 }

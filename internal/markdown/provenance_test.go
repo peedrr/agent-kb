@@ -102,9 +102,9 @@ func TestCountMarkersByType(t *testing.T) {
 	counts := CountMarkersByType(markers)
 
 	expected := map[string]int{
-		"inferred":   2,
+		"inferred":  2,
 		"ambiguous": 1,
-		"extracted":  1,
+		"extracted": 1,
 	}
 
 	if !reflect.DeepEqual(counts, expected) {

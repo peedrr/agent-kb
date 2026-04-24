@@ -1,0 +1,53 @@
+# Empty State — verify commands on a freshly initialized KB with no pages
+
+# === INIT EMPTY KB ===
+exec akb init empty-kb
+cd empty-kb
+
+# === LIST RETURNS NO OUTPUT ===
+exec akb list
+! stdout .
+
+# === SEARCH RETURNS NO OUTPUT ===
+exec akb search 'anything'
+! stdout .
+
+# === ORPHANS RETURNS NO OUTPUT ===
+exec akb orphans
+! stdout .
+
+# === RAW LIST RETURNS NO OUTPUT ===
+exec akb raw list
+! stdout .
+
+# === STATUS SHOWS ZERO PAGES ===
+exec akb status
+stdout 'Pages: 0'
+
+# === LINT SHOWS NO ISSUES ===
+exec akb lint
+stdout 'No issues found.'
+
+# === LINKS SHOWS ERROR FOR NONEXISTENT PAGE ===
+! exec akb links notes/nonexistent.md
+stderr 'page not found'
+
+# === BACKLINKS SHOWS ERROR FOR NONEXISTENT PAGE ===
+! exec akb backlinks notes/nonexistent.md
+stderr 'page not found'
+
+# === READ SHOWS ERROR FOR NONEXISTENT PAGE ===
+! exec akb read notes/nonexistent.md
+stderr 'page not found'
+
+# === DELETE SHOWS ERROR FOR NONEXISTENT PAGE ===
+! exec akb delete notes/nonexistent.md
+stderr 'page not found'
+
+# === SEARCH WITH EMPTY QUERY RETURNS ERROR ===
+! exec akb search ''
+stderr 'search query must not be empty'
+
+# === STATUS ON CLEAN KB ===
+exec akb status
+stdout 'Git: clean'

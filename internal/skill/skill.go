@@ -1,3 +1,4 @@
+// Package skill manages embedded skills for the knowledge base.
 package skill
 
 import (
@@ -12,15 +13,19 @@ import (
 //go:embed embedded/*
 var embeddedFS embed.FS
 
+// Skill represents an embedded skill with its files.
 type Skill struct {
 	Name  string
 	Files map[string][]byte
 }
 
+// ErrSkillNotFound is returned when a skill does not exist.
 var ErrSkillNotFound = errors.New("skill not found")
 
+// ErrAlreadyInstalled is returned when a skill is already installed.
 var ErrAlreadyInstalled = errors.New("skill already installed")
 
+// ListSkills returns the names of all embedded skills.
 func ListSkills() ([]string, error) {
 	entries, err := fs.ReadDir(embeddedFS, "embedded")
 	if err != nil {
@@ -36,6 +41,7 @@ func ListSkills() ([]string, error) {
 	return skills, nil
 }
 
+// GetSkill returns a Skill by name.
 func GetSkill(name string) (Skill, error) {
 	skillPath := filepath.Join("embedded", name)
 
@@ -81,6 +87,7 @@ func GetSkill(name string) (Skill, error) {
 	return skill, nil
 }
 
+// InstallSkill extracts an embedded skill to the given location.
 func InstallSkill(name, location string) error {
 	_, err := GetSkill(name)
 	if err != nil {
@@ -92,12 +99,12 @@ func InstallSkill(name, location string) error {
 		return fmt.Errorf("%w: %s already installed at %s", ErrAlreadyInstalled, name, targetDir)
 	}
 
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, 0750); err != nil {
 		return fmt.Errorf("create target directory: %w", err)
 	}
 
 	skillPath := filepath.Join("embedded", name)
-	return fs.WalkDir(embeddedFS, skillPath, func(path string, d fs.DirEntry, walkErr error) error {
+	if err := fs.WalkDir(embeddedFS, skillPath, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -105,13 +112,13 @@ func InstallSkill(name, location string) error {
 		if d.IsDir() {
 			relPath, err := filepath.Rel(skillPath, path)
 			if err != nil {
-				return err
+				return fmt.Errorf("compute relative path: %w", err)
 			}
 			if relPath == "." {
 				return nil
 			}
 			targetPath := filepath.Join(targetDir, relPath)
-			return os.MkdirAll(targetPath, 0755)
+			return os.MkdirAll(targetPath, 0750)
 		}
 
 		data, err := embeddedFS.ReadFile(path)
@@ -124,10 +131,13 @@ func InstallSkill(name, location string) error {
 			return fmt.Errorf("compute relative path: %w", err)
 		}
 		targetPath := filepath.Join(targetDir, relPath)
-		if err := os.WriteFile(targetPath, data, 0644); err != nil {
+		if err := os.WriteFile(targetPath, data, 0600); err != nil {
 			return fmt.Errorf("write file %s: %w", targetPath, err)
 		}
 
 		return nil
-	})
+	}); err != nil {
+		return fmt.Errorf("walk skill directory: %w", err)
+	}
+	return nil
 }

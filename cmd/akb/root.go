@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -11,8 +13,8 @@ var RootCmd = &cobra.Command{
 	Short:   "Agent Knowledge Base CLI",
 	Long:    `A CLI tool for managing the Agent Knowledge Base.`,
 	Version: version,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+	Run: func(cmd *cobra.Command, _ []string) {
+		_ = cmd.Help() //nolint:errcheck // help display failure is non-fatal
 	},
 }
 
@@ -42,5 +44,8 @@ func init() {
 
 func Execute() error {
 	RootCmd.SetVersionTemplate("akb {{.Version}}\n")
-	return RootCmd.Execute()
+	if err := RootCmd.Execute(); err != nil {
+		return fmt.Errorf("execute command: %w", err)
+	}
+	return nil
 }

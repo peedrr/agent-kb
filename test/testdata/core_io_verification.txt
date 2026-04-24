@@ -1,14 +1,14 @@
-# Core I/O Phase Gate — verify complete write/read/append/delete contract
+# Core I/O Verification — verify complete write/read/append/delete contract
 
 # Input files for note operations
 -- note-input.md --
 ---
 type: note
-title: Phase Gate Note
-summary: Testing core I/O phase gate
+title: Verification Note
+summary: Testing core I/O verification
 tags: test
 ---
-Note content for phase gate verification.
+Note content for verification.
 -- note-input.md --
 
 -- append-input.md --
@@ -19,15 +19,15 @@ Appended content line.
 -- adr-input.md --
 ---
 type: adr
-title: Phase Gate ADR
+title: Verification ADR
 status: proposed
 deciders: team
-summary: Testing core I/O phase gate
+summary: Testing core I/O verification
 tags: test
 created: '2026-01-01'
 updated: '2026-01-01'
 ---
-ADR content for phase gate verification.
+ADR content for verification.
 -- adr-input.md --
 
 # Input files for error cases
@@ -53,7 +53,7 @@ type: note
 Content
 -- no-title-input.md --
 
-# === PHASE GATE SETUP ===
+# === VERIFICATION SETUP ===
 
 # Initialize KB
 exec akb init test-kb
@@ -87,15 +87,15 @@ exists kb/decisions/gate-adr.md
 
 # Read the note back
 exec akb read gate-note.md
-stdout 'Phase Gate Note'
+stdout 'Verification Note'
 stdout 'type: note'
-stdout 'Note content for phase gate verification.'
+stdout 'Note content for verification.'
 
 # Read the ADR back
 exec akb read gate-adr.md
-stdout 'Phase Gate ADR'
+stdout 'Verification ADR'
 stdout 'type: adr'
-stdout 'ADR content for phase gate verification.'
+stdout 'ADR content for verification.'
 
 # === APPEND OPERATIONS ===
 
@@ -106,8 +106,8 @@ stdout 'Appended to kb/notes/gate-note.md'
 # Verify frontmatter preserved and content extended
 exec akb read gate-note.md
 stdout 'type: note'
-stdout 'Phase Gate Note'
-stdout 'Note content for phase gate verification.'
+stdout 'Verification Note'
+stdout 'Note content for verification.'
 stdout 'Appended content line.'
 
 # === DELETE OPERATIONS ===

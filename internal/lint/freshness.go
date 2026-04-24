@@ -7,18 +7,22 @@ import (
 	"time"
 )
 
+// FreshnessChecker validates Freshness issues.
 type FreshnessChecker struct {
 	nowFunc func() time.Time
 }
 
+// NewFreshnessChecker creates a new FreshnessChecker.
 func NewFreshnessChecker() *FreshnessChecker {
 	return &FreshnessChecker{nowFunc: time.Now}
 }
 
+// Name returns the checker name.
 func (c *FreshnessChecker) Name() string {
 	return "freshness"
 }
 
+// Check runs the checker and returns issues.
 func (c *FreshnessChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error) {
 	var issues []LintIssue
 	now := c.nowFunc()

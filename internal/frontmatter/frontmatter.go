@@ -1,3 +1,4 @@
+// Package frontmatter parses and validates YAML frontmatter from markdown pages.
 package frontmatter
 
 import (
@@ -5,15 +6,18 @@ import (
 	"fmt"
 
 	"github.com/adrg/frontmatter"
+
 	"github.com/peedrr/agent-kb/internal/template"
 )
 
+// ParsedFrontmatter holds the extracted frontmatter fields from a page.
 type ParsedFrontmatter struct {
 	Type   string
 	Title  string
 	Fields map[string]any
 }
 
+// Parse extracts frontmatter from markdown content.
 func Parse(content []byte) (*ParsedFrontmatter, []byte, error) {
 	var raw map[string]any
 	body, err := frontmatter.MustParse(bytes.NewReader(content), &raw)
@@ -54,16 +58,18 @@ func Parse(content []byte) (*ParsedFrontmatter, []byte, error) {
 	return fm, body, nil
 }
 
+// ValidateType checks that the frontmatter type matches a known template.
 func ValidateType(fm *ParsedFrontmatter, templates map[string]template.Template) error {
 	if fm.Type == "" {
 		return fmt.Errorf("missing required field 'type' in frontmatter")
 	}
 	if _, ok := templates[fm.Type]; !ok {
-		return fmt.Errorf("unknown type '%s'. Create .akb/templates/%s.yaml first.", fm.Type, fm.Type)
+		return fmt.Errorf("unknown type '%s'. Create .akb/templates/%s.yaml first", fm.Type, fm.Type)
 	}
 	return nil
 }
 
+// ValidateTitle checks that the frontmatter has a non-empty title.
 func ValidateTitle(fm *ParsedFrontmatter) error {
 	if fm.Title == "" {
 		return fmt.Errorf("missing required field 'title' in frontmatter")

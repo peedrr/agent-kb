@@ -1,3 +1,4 @@
+// Package search provides full-text search over the knowledge base.
 package search
 
 import "context"
@@ -6,21 +7,21 @@ import "context"
 type NoOpSearcher struct{}
 
 // IndexPage is a no-op stub. Replaced by real implementation in internal/search/sqlite.go.
-func (n *NoOpSearcher) IndexPage(ctx context.Context, path, title, content, tags, summary string) error {
+func (n *NoOpSearcher) IndexPage(_ context.Context, _, _, _, _, _ string) error {
 	return nil
 }
 
 // RemovePage is a no-op stub. Replaced by real implementation in internal/search/sqlite.go.
-func (n *NoOpSearcher) RemovePage(ctx context.Context, path string) error {
+func (n *NoOpSearcher) RemovePage(_ context.Context, _ string) error {
 	return nil
 }
 
 // Search is a no-op stub. Replaced by real implementation in internal/search/sqlite.go.
-func (n *NoOpSearcher) Search(ctx context.Context, query string, opts SearchOptions) ([]SearchResult, error) {
+func (n *NoOpSearcher) Search(_ context.Context, _ string, _ SearchOptions) ([]SearchResult, error) {
 	return []SearchResult{}, nil
 }
 
 // RebuildIndex is a no-op stub. Replaced by real implementation in internal/search/sqlite.go.
-func (n *NoOpSearcher) RebuildIndex(ctx context.Context, kbRoot string) error {
+func (n *NoOpSearcher) RebuildIndex(_ context.Context, _ string) error {
 	return nil
 }

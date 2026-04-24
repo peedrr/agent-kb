@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// Wikilink represents a [[target]] or [[target|display]] link.
 type Wikilink struct {
 	Target     string
 	Display    string
@@ -14,6 +15,7 @@ type Wikilink struct {
 
 var wikilinkRe = regexp.MustCompile(`\[\[([^\]]+?)\]\]`)
 
+// ParseWikilinks extracts wikilinks from markdown content.
 func ParseWikilinks(content string) []Wikilink {
 	if content == "" {
 		return nil

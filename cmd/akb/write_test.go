@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,77 +26,86 @@ func writeSetupTestKB(t *testing.T) string {
 		filepath.Join(kbRoot, ".akb", "templates"),
 	}
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			os.RemoveAll(tmpDir)
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			_ = os.RemoveAll(tmpDir) //nolint:errcheck // cleanup on setup failure
 			t.Fatalf("create dir %s: %v", dir, err)
 		}
 	}
 
 	configContent := "name: write-test\ncreated: \"2024-01-01T00:00:00Z\"\n"
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", ".akb.yaml"), []byte(configContent), 0644); err != nil {
-		os.RemoveAll(tmpDir)
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", ".akb.yaml"), []byte(configContent), 0600); err != nil {
+		_ = os.RemoveAll(tmpDir) //nolint:errcheck // cleanup on setup failure
 		t.Fatalf("write config: %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(kbRoot, "kb", "index.md"), []byte("# Index\n\n"), 0644); err != nil {
-		os.RemoveAll(tmpDir)
+	if err := os.WriteFile(filepath.Join(kbRoot, "kb", "index.md"), []byte("# Index\n\n"), 0600); err != nil {
+		_ = os.RemoveAll(tmpDir) //nolint:errcheck // cleanup on setup failure
 		t.Fatalf("write index.md: %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(kbRoot, "kb", "log.md"), []byte("# Log\n\n"), 0644); err != nil {
-		os.RemoveAll(tmpDir)
+	if err := os.WriteFile(filepath.Join(kbRoot, "kb", "log.md"), []byte("# Log\n\n"), 0600); err != nil {
+		_ = os.RemoveAll(tmpDir) //nolint:errcheck // cleanup on setup failure
 		t.Fatalf("write log.md: %v", err)
 	}
 
 	if err := template.CopyDefaults(filepath.Join(kbRoot, ".akb", "templates")); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir) //nolint:errcheck // cleanup on setup failure
 		t.Fatalf("copy templates: %v", err)
 	}
 
 	initTestSearchDB(t, kbRoot)
 
-	cmd := exec.Command("git", "init")
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "init")
 	cmd.Dir = kbRoot
 	if out, err := cmd.CombinedOutput(); err != nil {
-		os.RemoveAll(tmpDir)
+		_ = os.RemoveAll(tmpDir) //nolint:errcheck // cleanup on setup failure
 		t.Fatalf("git init: %s: %v", strings.TrimSpace(string(out)), err)
 	}
 
-	cmd = exec.Command("git", "config", "user.name", "akb-test")
+	cmd = exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "config", "user.name", "akb-test")
 	cmd.Dir = kbRoot
-	cmd.Run()
+	_ = cmd.Run() //nolint:errcheck,gosec // best-effort git setup in test helper
 
-	cmd = exec.Command("git", "config", "user.email", "akb-test@local")
+	cmd = exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "config", "user.email", "akb-test@local")
 	cmd.Dir = kbRoot
-	cmd.Run()
+	_ = cmd.Run() //nolint:errcheck,gosec // best-effort git setup in test helper
 
-	cmd = exec.Command("git", "add", "-A")
+	cmd = exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "add", "-A")
 	cmd.Dir = kbRoot
-	cmd.Run()
+	_ = cmd.Run() //nolint:errcheck,gosec // best-effort git setup in test helper
 
-	cmd = exec.Command("git", "commit", "-m", "init test kb")
+	cmd = exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "commit", "-m", "init test kb")
 	cmd.Dir = kbRoot
-	cmd.Run()
+	_ = cmd.Run() //nolint:errcheck,gosec // best-effort git setup in test helper
 
 	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", kbRoot)
-	t.Cleanup(func() { os.Setenv("HOME", origHome) })
+	os.Setenv("HOME", kbRoot)                         //nolint:errcheck,gosec // test setup — failure is non-fatal
+	t.Cleanup(func() { os.Setenv("HOME", origHome) }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	regPath := filepath.Join(kbRoot, ".config", "agent-kb", "registry.yaml")
-	os.MkdirAll(filepath.Dir(regPath), 0755)
+	if err := os.MkdirAll(filepath.Dir(regPath), 0750); err != nil {
+		t.Fatal(err)
+	}
 	regContent := `default: write-test
 entries:
   - name: write-test
     path: ` + kbRoot + `
     created: "2024-01-01T00:00:00Z"
 `
-	os.WriteFile(regPath, []byte(regContent), 0644)
+	if err := os.WriteFile(regPath, []byte(regContent), 0600); err != nil {
+		t.Fatal(err)
+	}
 
 	return kbRoot
 }
 
 func writeCleanup(kbRoot string) {
-	os.RemoveAll(kbRoot)
+	_ = os.RemoveAll(kbRoot) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 }
 
 func initTestSearchDB(t *testing.T, kbRoot string) {
@@ -107,7 +115,7 @@ func initTestSearchDB(t *testing.T, kbRoot string) {
 	if err != nil {
 		t.Fatalf("init test search DB: %v", err)
 	}
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	if _, err := conn.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		t.Fatalf("enable WAL mode: %v", err)
@@ -122,7 +130,8 @@ func initTestSearchDB(t *testing.T, kbRoot string) {
 func writeRun(kbRoot, inputPath, stdinContent string, extraArgs ...string) (string, error) {
 	args := append([]string{"write"}, extraArgs...)
 	args = append(args, inputPath)
-	cmd := exec.Command(akbBinPath, args...)
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		akbBinPath, args...)
 	cmd.Dir = kbRoot
 	cmd.Stdin = strings.NewReader(stdinContent)
 	out, err := cmd.CombinedOutput()
@@ -144,7 +153,7 @@ func TestWriteNoteToTypeDir(t *testing.T) {
 		t.Errorf("expected file at %s, not found", writtenPath)
 	}
 
-	data, err := os.ReadFile(writtenPath)
+	data, err := os.ReadFile(writtenPath) //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatalf("read written file: %v", err)
 	}
@@ -303,14 +312,16 @@ func TestWriteNoCommit(t *testing.T) {
 		t.Errorf("expected file at %s, not found", writtenPath)
 	}
 
-	cmd := exec.Command("git", "log", "--oneline", "-1", "--", "kb/notes/nocommit.md")
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "log", "--oneline", "-1", "--", "kb/notes/nocommit.md")
 	cmd.Dir = kbRoot
 	gitOut, _ := cmd.Output()
 	if strings.Contains(string(gitOut), "write") {
 		t.Errorf("expected no git commit for nocommit.md, but found: %s", string(gitOut))
 	}
 
-	cmd = exec.Command("git", "status", "--porcelain")
+	cmd = exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "status", "--porcelain")
 	cmd.Dir = kbRoot
 	statusOut, _ := cmd.Output()
 	if !strings.Contains(string(statusOut), "nocommit.md") {
@@ -328,7 +339,8 @@ func TestWriteGitCommit(t *testing.T) {
 		t.Fatalf("akb write failed: %s: %v", out, err)
 	}
 
-	cmd := exec.Command("git", "log", "--oneline", "-1")
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "log", "--oneline", "-1")
 	cmd.Dir = kbRoot
 	gitOut, err := cmd.Output()
 	if err != nil {
@@ -356,7 +368,7 @@ func TestWriteOverwrite(t *testing.T) {
 	}
 
 	writtenPath := filepath.Join(kbRoot, "kb", "notes", "overwrite.md")
-	data, err := os.ReadFile(writtenPath)
+	data, err := os.ReadFile(writtenPath) //nolint:gosec // test reading known temp file
 	if err != nil {
 		t.Fatalf("read written file: %v", err)
 	}
@@ -449,7 +461,7 @@ func TestWriteIndexHint(t *testing.T) {
 		t.Fatalf("akb write failed: %s: %v", out, err)
 	}
 
-	expected := fmt.Sprintf("akb index add kb/notes/hint-test.md <summary>")
+	expected := "akb index add kb/notes/hint-test.md <summary>"
 	if !strings.Contains(out, expected) {
 		t.Errorf("expected index hint %q, got: %s", expected, out)
 	}
@@ -465,7 +477,8 @@ func TestWriteGitCommitMessageADR(t *testing.T) {
 		t.Fatalf("akb write failed: %s: %v", out, err)
 	}
 
-	cmd := exec.Command("git", "log", "--oneline", "-1")
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		"git", "log", "--oneline", "-1")
 	cmd.Dir = kbRoot
 	gitOut, err := cmd.Output()
 	if err != nil {

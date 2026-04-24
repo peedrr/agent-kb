@@ -7,25 +7,28 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/storage"
-	"github.com/spf13/cobra"
 )
 
 var rawReadCmd = &cobra.Command{
 	Use:   "read <path>",
 	Short: "Read a raw file from the knowledge base",
 	Long:  `Output the contents of a raw file from the knowledge base. The path is relative to the raw/ directory.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runRawRead,
+	Example: `  # Read a raw file
+  akb raw read data/config.json`,
+	Args: cobra.ExactArgs(1),
+	RunE: runRawRead,
 }
 
-func runRawRead(cmd *cobra.Command, args []string) error {
+func runRawRead(_ *cobra.Command, args []string) error {
 	inputPath := args[0]
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return err
+		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	fullPath, err := path.ResolveRawPath(kbRoot, inputPath)
@@ -33,7 +36,7 @@ func runRawRead(cmd *cobra.Command, args []string) error {
 		if errors.Is(err, path.ErrUseAKBWrite) {
 			return fmt.Errorf("use `akb read`")
 		}
-		return err
+		return fmt.Errorf("resolve raw path: %w", err)
 	}
 
 	provider := storage.NewFilesystemProvider(kbRoot)
@@ -43,7 +46,7 @@ func runRawRead(cmd *cobra.Command, args []string) error {
 		if errors.Is(err, os.ErrNotExist) || strings.Contains(err.Error(), "no such file") {
 			return fmt.Errorf("raw file not found: %s", inputPath)
 		}
-		return err
+		return fmt.Errorf("read file: %w", err)
 	}
 
 	fmt.Print(string(data))
