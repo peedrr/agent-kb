@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-CLI commands using Cobra framework. Each subcommand is a separate file.
+CLI commands using Cobra framework. Each subcommand is a separate file. 25+ commands total.
 
 ## FILES
 
@@ -13,23 +13,39 @@ CLI commands using Cobra framework. Each subcommand is a separate file.
 | init | `init.go` | Initialize new KB |
 | write | `write.go` | Write page (stdin → frontmatter → git → search → links) |
 | read | `read.go` | Read page content |
-| delete | `delete.go` | Delete page |
-| list | `list.go` | List pages |
-| search | `search.go` | Full-text search via FTS5 |
-| index | `index.go` | Manage kb/index.md |
-| log | `log.go` | Append to kb/log.md |
-| links | `links.go` | Show outbound/inbound links |
-| backlinks | `links.go` | Backlinks command |
-| orphans | `links.go` | Pages with no inbound links |
-| append | `append.go` | Append content to page |
-| status | `status.go` | Git status of KB |
+| append | `append.go` | Append content to existing page |
+| delete | `delete.go` | Delete page from KB, SQLite, index.md, log.md |
+| list | `list.go` | List pages in kb/ |
+| search | `search.go` | FTS5 BM25-ranked search |
+| index | `index.go` | Manage kb/index.md (show/add/remove/rebuild) |
+| log | `log.go` | Manage kb/log.md (show/append) |
+| links | `links.go` | Show outbound/inbound/broken/ambiguous links |
+| backlinks | `links.go` | Inbound links only |
+| orphans | `links.go` | Pages with zero inbound links |
+| status | `status.go` | KB name, path, page count, git status |
+| lint | `lint.go` | Run all lint checks |
+| registry | `registry.go` | List registered KBs |
+| use | `use.go` | Set default KB in registry |
+| approve | `approve.go` | Strip annotations, set `is_draft: false`, commit |
+| stale | `stale.go` | Cross-KB freshness report |
+| skill | `skill.go` | `skill install` — extract embedded skill |
+| raw | `raw.go` | Parent command for raw namespace |
+| raw write | `raw_write.go` | Write raw file with SHA-256 manifest |
+| raw read | `raw_read.go` | Read raw file content |
+| raw list | `raw_list.go` | List raw files |
+| raw status | `raw_status.go` | Drift detection (exit 0/1/2) |
+| raw sync | `raw_sync.go` | Reconcile manifest with filesystem |
+| raw delete | `raw_delete.go` | Delete raw file, scan dependent pages |
 
 ## CONVENTIONS
 
 - `noCommit` flag: `RootCmd.PersistentFlags().BoolVar(&noCommit, "no-commit", false, ...)`
 - Commands validate stdin with `os.Stdin.Stat()` checking `ModeCharDevice`
 - KB root resolved via `path.KBRoot()` at start of each command
-- DB opened via `db.OpenKB(kbRoot)` for search/linkgraph operations
+- DB opened via `db.OpenKB(kbRoot)` for search/linkgraph/lint operations
+- `approve` strips provenance markers via `markdown.StripProvenanceMarkers()`
+- `stale` iterates ALL KBs in registry; `--json` flag supported
+- `raw delete` scans KB pages for frontmatter `sources` referencing the deleted file
 
 ## KEY DEPENDENCIES
 
@@ -40,4 +56,5 @@ dbConn, err := db.OpenKB(kbRoot)       // Open search DB
 store := storage.NewGitProvider(...)    // Git-backed storage
 searcher := search.NewSQLiteFTS5Searcher(dbConn)
 updater := linkgraph.NewSQLiteLinkGraph(dbConn)
+engine := lint.NewLintEngine()          // Add checkers, then Run()
 ```
