@@ -62,4 +62,4 @@ If lint identifies pages that should be removed (e.g., empty pages, duplicates):
 - Use `akb lint --json` for structured output.
 - Use `akb stale --json` for structured freshness data.
 - Run `akb lint` regularly, especially after batch ingests.
-- `akb stale` checks ALL registered KBs, not just the active one.
+- `akb stale` checks only the active KB by default. Use `--all` to check all registered KBs.

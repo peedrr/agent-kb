@@ -150,7 +150,6 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 				continue
 			}
 			if fm.Type == tmpl.Name {
-				fullPath = candidatePath
 				content = candidateContent
 				break
 			}
