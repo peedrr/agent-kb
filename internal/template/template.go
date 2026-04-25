@@ -156,6 +156,33 @@ func LoadTemplatesFromFS(fsys fs.FS) (map[string]Template, error) {
 	return templates, nil
 }
 
+// AllowedFields returns all declared field names (required + optional) for this template,
+// plus the built-in 'is_draft' field.
+func (t Template) AllowedFields() []string {
+	seen := make(map[string]struct{})
+	var fields []string
+
+	for _, f := range t.Required {
+		if _, ok := seen[f.Name]; !ok {
+			seen[f.Name] = struct{}{}
+			fields = append(fields, f.Name)
+		}
+	}
+	for _, f := range t.Optional {
+		if _, ok := seen[f.Name]; !ok {
+			seen[f.Name] = struct{}{}
+			fields = append(fields, f.Name)
+		}
+	}
+
+	// is_draft is always allowed as a built-in system field
+	if _, ok := seen["is_draft"]; !ok {
+		fields = append(fields, "is_draft")
+	}
+
+	return fields
+}
+
 // CopyDefaults extracts embedded default templates to a directory.
 func CopyDefaults(targetDir string) error {
 	if err := os.MkdirAll(targetDir, 0750); err != nil {

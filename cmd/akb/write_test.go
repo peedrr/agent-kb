@@ -237,6 +237,39 @@ func TestWriteMissingTitle(t *testing.T) {
 	}
 }
 
+func TestWriteUnknownFieldRejected(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	content := "---\ntype: note\ntitle: Bad Field\nsummary: test\ntags: test\nconfidence: high\n---\nContent."
+	out, err := writeRun(kbRoot, "bad-field.md", content)
+	if err == nil {
+		t.Fatal("expected error for unknown field, got nil")
+	}
+	if !strings.Contains(out, "unknown field 'confidence'") {
+		t.Errorf("expected error to contain \"unknown field 'confidence'\", got: %s", out)
+	}
+	if !strings.Contains(out, "Allowed fields:") {
+		t.Errorf("expected error to contain 'Allowed fields:', got: %s", out)
+	}
+}
+
+func TestWriteIsDraftAllowed(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	content := "---\ntype: note\ntitle: Draft Note\nsummary: test\ntags: test\nis_draft: true\n---\nContent."
+	out, err := writeRun(kbRoot, "draft-note.md", content)
+	if err != nil {
+		t.Fatalf("akb write with is_draft failed: %s: %v", out, err)
+	}
+
+	writtenPath := filepath.Join(kbRoot, "kb", "notes", "draft-note.md")
+	if _, err := os.Stat(writtenPath); os.IsNotExist(err) {
+		t.Errorf("expected file at %s, not found", writtenPath)
+	}
+}
+
 func TestWriteRawPrefixRejected(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)

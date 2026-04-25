@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -20,6 +21,8 @@ import (
 	"github.com/peedrr/agent-kb/internal/storage"
 	"github.com/peedrr/agent-kb/internal/template"
 )
+
+var writeAppend bool
 
 var writeCmd = &cobra.Command{
 	Use:   "write <path>",
@@ -49,6 +52,10 @@ Content here" | akb write my-note.md
   EOF`,
 	Args: cobra.ExactArgs(1),
 	RunE: runWrite,
+}
+
+func init() {
+	writeCmd.Flags().BoolVar(&writeAppend, "append", false, "append stdin to existing page body")
 }
 
 func runWrite(_ *cobra.Command, args []string) error {
@@ -94,26 +101,133 @@ func runWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("load templates: %w", err)
 	}
 
-	// Parse frontmatter
-	fm, body, err := frontmatter.Parse(stdinContent)
-	if err != nil {
-		return fmt.Errorf("parse frontmatter: %w", err)
-	}
+	var fm *frontmatter.ParsedFrontmatter
+	var body []byte
+	var writeContent []byte
+	var fullPath string
+	var relPath string
 
-	// Validate type
-	if err := frontmatter.ValidateType(fm, templates); err != nil {
-		return fmt.Errorf("validate type: %w", err)
-	}
+	if writeAppend {
+		// Validate .md extension
+		if !strings.HasSuffix(inputPath, ".md") {
+			return fmt.Errorf("page filename must end with .md")
+		}
 
-	// Validate title
-	if err := frontmatter.ValidateTitle(fm); err != nil {
-		return fmt.Errorf("validate title: %w", err)
-	}
+		// Reject raw/ prefix
+		if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
+			return fmt.Errorf("use `akb raw write`")
+		}
 
-	writeContent := stdinContent
-	if val, ok := fm.Fields["is_draft"]; ok {
-		if val == true || val == "true" {
-			delete(fm.Fields, "is_draft")
+		// Strip kb/ prefix
+		cleanPath := strings.TrimPrefix(inputPath, "kb/")
+
+		// Guard: block write to managed files
+		base := filepath.Base(cleanPath)
+		if base == "index.md" {
+			return fmt.Errorf("cannot write index.md; use 'akb index add' to update")
+		}
+		if base == "log.md" {
+			return fmt.Errorf("cannot write log.md; it is a managed file")
+		}
+
+		// Reject .. and absolute paths via ResolveKBPath
+		_, err = path.ResolveKBPath(kbRoot, inputPath)
+		if err != nil {
+			return fmt.Errorf("resolve path: %w", err)
+		}
+
+		fullPath = filepath.Join(kbRoot, "kb", cleanPath)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			return fmt.Errorf("page does not exist; use 'akb write' without --append to create")
+		}
+
+		existingContent, err := os.ReadFile(fullPath)
+		if err != nil {
+			return fmt.Errorf("read existing page: %w", err)
+		}
+
+		fm, body, err = frontmatter.Parse(existingContent)
+		if err != nil {
+			return fmt.Errorf("parse existing frontmatter: %w", err)
+		}
+
+		// Validate type
+		if err := frontmatter.ValidateType(fm, templates); err != nil {
+			return fmt.Errorf("validate type: %w", err)
+		}
+
+		// Validate title
+		if err := frontmatter.ValidateTitle(fm); err != nil {
+			return fmt.Errorf("validate title: %w", err)
+		}
+
+		newBody := string(body) + "\n" + string(stdinContent)
+
+		allFields := map[string]any{
+			"type":  fm.Type,
+			"title": fm.Title,
+		}
+		for k, v := range fm.Fields {
+			allFields[k] = v
+		}
+		yamlBytes, err := yaml.Marshal(allFields)
+		if err != nil {
+			return fmt.Errorf("re-serialize frontmatter: %w", err)
+		}
+		writeContent = []byte("---\n" + string(yamlBytes) + "---\n" + newBody)
+		body = []byte(newBody)
+
+		relPath = filepath.ToSlash(filepath.Join("kb", cleanPath))
+	} else {
+		// Parse frontmatter from stdin
+		fm, body, err = frontmatter.Parse(stdinContent)
+		if err != nil {
+			return fmt.Errorf("parse frontmatter: %w", err)
+		}
+
+		// Validate type
+		if err := frontmatter.ValidateType(fm, templates); err != nil {
+			return fmt.Errorf("validate type: %w", err)
+		}
+
+		// Validate title
+		if err := frontmatter.ValidateTitle(fm); err != nil {
+			return fmt.Errorf("validate title: %w", err)
+		}
+
+		// Validate strict field compliance against template
+		tmpl, ok := templates[fm.Type]
+		if !ok {
+			// Should not happen after ValidateType, but be safe
+			return fmt.Errorf("unknown type %q", fm.Type)
+		}
+		allowed := tmpl.AllowedFields()
+		allowedSet := make(map[string]struct{}, len(allowed))
+		for _, f := range allowed {
+			allowedSet[f] = struct{}{}
+		}
+		for key := range fm.Fields {
+			if _, ok := allowedSet[key]; !ok {
+				return fmt.Errorf("unknown field '%s' in frontmatter for type '%s'. Allowed fields: [%s]", key, fm.Type, strings.Join(allowed, ", "))
+			}
+		}
+
+		writeContent = stdinContent
+		needsReserialize := false
+
+		if _, ok := fm.Fields["created"]; !ok {
+			fm.Fields["created"] = time.Now().UTC().Format(time.RFC3339)
+			needsReserialize = true
+		}
+
+		if val, ok := fm.Fields["is_draft"]; ok {
+			if val == true || val == "true" {
+				delete(fm.Fields, "is_draft")
+				needsReserialize = true
+			}
+		}
+
+		if needsReserialize {
 			allFields := map[string]any{
 				"type":  fm.Type,
 				"title": fm.Title,
@@ -127,66 +241,59 @@ func runWrite(_ *cobra.Command, args []string) error {
 			}
 			writeContent = []byte("---\n" + string(yamlBytes) + "---\n" + string(body))
 		}
-	}
 
-	// Resolve type-derived directory
-	tmpl, ok := templates[fm.Type]
-	if !ok {
-		// Should not happen after ValidateType, but be safe
-		return fmt.Errorf("unknown type %q", fm.Type)
-	}
-	dirFromType := tmpl.Dir
+		// Resolve type-derived directory
+		dirFromType := tmpl.Dir
 
-	// Validate .md extension
-	if !strings.HasSuffix(inputPath, ".md") {
-		return fmt.Errorf("page filename must end with .md")
-	}
+		// Validate .md extension
+		if !strings.HasSuffix(inputPath, ".md") {
+			return fmt.Errorf("page filename must end with .md")
+		}
 
-	// Reject raw/ prefix
-	if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
-		return fmt.Errorf("use `akb raw write`")
-	}
+		// Reject raw/ prefix
+		if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
+			return fmt.Errorf("use `akb raw write`")
+		}
 
-	// Strip kb/ prefix
-	cleanPath := strings.TrimPrefix(inputPath, "kb/")
+		// Strip kb/ prefix
+		cleanPath := strings.TrimPrefix(inputPath, "kb/")
 
-	// Guard: block write to managed files
-	base := filepath.Base(cleanPath)
-	if base == "index.md" {
-		return fmt.Errorf("cannot write index.md; use 'akb index add' to update")
-	}
-	if base == "log.md" {
-		return fmt.Errorf("cannot write log.md; it is a managed file")
-	}
+		// Guard: block write to managed files
+		base := filepath.Base(cleanPath)
+		if base == "index.md" {
+			return fmt.Errorf("cannot write index.md; use 'akb index add' to update")
+		}
+		if base == "log.md" {
+			return fmt.Errorf("cannot write log.md; it is a managed file")
+		}
 
-	// Strip type-dir prefix if it matches the type's Dir
-	if dirFromType != "" {
-		typeDirPrefix := dirFromType + "/"
-		cleanPath = strings.TrimPrefix(cleanPath, typeDirPrefix)
-	}
+		// Strip type-dir prefix if it matches the type's Dir
+		if dirFromType != "" {
+			typeDirPrefix := dirFromType + "/"
+			cleanPath = strings.TrimPrefix(cleanPath, typeDirPrefix)
+		}
 
-	// Reject .. and absolute paths via ResolveKBPath
-	_, err = path.ResolveKBPath(kbRoot, inputPath)
-	if err != nil {
-		return fmt.Errorf("resolve path: %w", err)
-	}
+		// Reject .. and absolute paths via ResolveKBPath
+		_, err = path.ResolveKBPath(kbRoot, inputPath)
+		if err != nil {
+			return fmt.Errorf("resolve path: %w", err)
+		}
 
-	// Construct final path
-	var fullPath string
-	if dirFromType != "" {
-		fullPath = filepath.Join(kbRoot, "kb", dirFromType, cleanPath)
-	} else {
-		fullPath = filepath.Join(kbRoot, "kb", cleanPath)
-	}
+		// Construct final path
+		if dirFromType != "" {
+			fullPath = filepath.Join(kbRoot, "kb", dirFromType, cleanPath)
+		} else {
+			fullPath = filepath.Join(kbRoot, "kb", cleanPath)
+		}
 
-	// Compute relative path for output and indexing
-	var relPath string
-	if dirFromType != "" {
-		relPath = filepath.Join("kb", dirFromType, cleanPath)
-	} else {
-		relPath = filepath.Join("kb", cleanPath)
+		// Compute relative path for output and indexing
+		if dirFromType != "" {
+			relPath = filepath.Join("kb", dirFromType, cleanPath)
+		} else {
+			relPath = filepath.Join("kb", cleanPath)
+		}
+		relPath = filepath.ToSlash(relPath)
 	}
-	relPath = filepath.ToSlash(relPath)
 
 	// Extract tags and summary from frontmatter fields
 	tags := search.ExtractTags(fm.Fields)
@@ -212,8 +319,12 @@ func runWrite(_ *cobra.Command, args []string) error {
 	}
 
 	// Output
-	fmt.Printf("Written to %s\n", relPath)
-	fmt.Printf("Don't forget to update the index! `akb index add %s <summary>`\n", relPath)
+	if writeAppend {
+		fmt.Printf("Appended to %s\n", relPath)
+	} else {
+		fmt.Printf("Written to %s\n", relPath)
+		fmt.Printf("Don't forget to update the index! `akb index add %s <summary>`\n", relPath)
+	}
 
 	return nil
 }
