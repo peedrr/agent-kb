@@ -19,6 +19,19 @@
    akb read <path>
    ```
 
+## Batch Approval
+
+To approve all draft pages at once:
+
+```bash
+akb approve --all-drafts
+```
+
+This approves every page with `is_draft: true` (or implicit draft status). Already-approved pages are skipped silently. A summary count is printed.
+
+**When to use batch:** After a batch ingest where all pages have been reviewed and are ready to publish.
+**When to use single:** When reviewing individual pages for quality before publishing.
+
 ## What Approve Does
 
 - Strips quality annotations (`<!-- olw-auto: ... -->` HTML comments)

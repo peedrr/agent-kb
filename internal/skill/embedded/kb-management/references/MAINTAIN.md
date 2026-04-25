@@ -13,7 +13,7 @@
    ```bash
    akb orphans                 # pages with zero inbound links
    akb links <path>            # outbound, broken, and ambiguous links
-   akb stale                   # freshness report across all registered KBs
+   akb stale [--all]           # freshness report; --all checks all registered KBs
    akb status                  # overview: name, path, page count, git status
    ```
 
@@ -23,7 +23,21 @@
    - **Ambiguous links:** Use `[[path-form]]` instead of short names.
    - **Stale pages:** Update outdated content, or mark as deprecated.
 
-4. Log maintenance:
+4. Batch orphan cleanup (if needed):
+
+   To remove all pages with zero inbound links:
+
+   ```bash
+   # Preview what would be deleted
+   akb delete --orphans
+
+   # Actually delete (requires --force)
+   akb delete --orphans --force
+   ```
+
+   **Warning:** This deletes pages permanently. Preview first. Managed files (`index.md`, `log.md`) are never deleted.
+
+5. Log maintenance:
    ```bash
    akb log append lint "<description of fixes>"
    ```
@@ -44,7 +58,7 @@ If lint identifies pages that should be removed (e.g., empty pages, duplicates):
 
 ## Rules
 
-- `akb lint` exits 0 if no issues, 1 if issues found.
+- `akb lint` exits 0 for warnings only, 1 if errors found.
 - Use `akb lint --json` for structured output.
 - Use `akb stale --json` for structured freshness data.
 - Run `akb lint` regularly, especially after batch ingests.

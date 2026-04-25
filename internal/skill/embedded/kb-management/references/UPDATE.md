@@ -18,7 +18,20 @@
    EOF
    ```
 
-3. If changing frontmatter or rewriting the page, use write with the FULL content:
+3. Append via write command (preferred)
+
+   `akb write --append` is the preferred way to append content:
+   ```bash
+   akb write <path> --append <<'EOF'
+   ## <New Section>
+
+   <new content>
+   EOF
+   ```
+
+   The standalone `akb append` command still works but `akb write --append` is preferred.
+
+4. If changing frontmatter or rewriting the page, use write with the FULL content:
    ```bash
    akb write <path> <<'EOF'
    ---
@@ -37,12 +50,21 @@
    EOF
    ```
 
-4. Update the index:
+5. Partial frontmatter updates
+
+   To update only specific frontmatter fields without rewriting the body:
+   ```bash
+   akb write <path> --frontmatter summary="Updated summary" --frontmatter tags="[go, cli]"
+   ```
+
+   This preserves the body and all other frontmatter fields. The page must already exist.
+
+6. Update the index:
    ```bash
    akb index add "<path>" "<updated summary>"
    ```
 
-5. Log the update:
+7. Log the update:
    ```bash
    akb log append update "Updated <path>; <reason>"
    ```

@@ -10,7 +10,7 @@ description: >
   Do NOT use for generic chat, unrelated file operations, or off-wiki trivia.
 metadata:
   author: peedrr
-  version: "1.1"
+  version: "1.2"
   tool: akb
 ---
 
@@ -69,18 +69,18 @@ These rules apply to ALL KB operations. The reference files assume you know thes
 |-----------|---------|
 | Initialize KB | `akb init <name>` |
 | Read page | `akb read <path>` |
-| Write page (stdin) | `akb write <path> <<'EOF' ... EOF` |
+| Write page (stdin) | `akb write <path> [--frontmatter key=val] [--append] <<'EOF' ... EOF` |
 | Append to page | `akb append <path> <<'EOF' ... EOF` |
-| Delete page | `akb delete <path>` |
-| List pages | `akb list` |
-| Search | `akb search <query>` |
+| Delete page | `akb delete <path> [--orphans] [--force]` |
+| List pages | `akb list [--json]` (shows [DRAFT] indicators) |
+| Search | `akb search <query> [--tag <tag>] [--type <type>] [--after <date>] [--json]` |
 | Show links | `akb links <path>` |
-| Show backlinks | `akb backlinks <path>` |
+| Show backlinks | `akb backlinks <path> [--json]` |
 | Show orphans | `akb orphans` |
 | Lint | `akb lint [--json]` |
-| Stale report | `akb stale [--json]` |
+| Stale report | `akb stale [--all] [--json]` |
 | Status | `akb status` |
-| Approve draft | `akb approve <path>` |
+| Approve draft | `akb approve <path> [--all-drafts]` |
 | Index management | `akb index show|add|remove|rebuild` |
 | Log management | `akb log show|append` |
 | Raw write | `akb raw write <path>` |

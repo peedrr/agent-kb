@@ -31,6 +31,28 @@ Never answer from general knowledge. The KB is the source of truth. Search and r
    akb log append query "<user's question>"
    ```
 
+## Filtered Search
+
+Narrow results with dimensional filters:
+
+```bash
+# Search by tag
+akb search "database" --tag go
+
+# Search by page type
+akb search "architecture" --type adr
+
+# Search by creation date
+akb search "API" --after 2025-01-01
+
+# Combined filters
+akb search "deployment" --tag kubernetes --type note --after 2025-01-01
+```
+
+Filters work with `--json` for structured output.
+
+Note: Search without filters continues to work as before, returning all matching results.
+
 ## Rules
 
 - Search first, read selectively. `akb search` ranks by relevance.
