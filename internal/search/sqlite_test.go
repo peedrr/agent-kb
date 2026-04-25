@@ -50,7 +50,7 @@ func TestSQLiteFTS5Searcher_IndexPage_InsertsIntoBothTables(t *testing.T) {
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
-	err := s.IndexPage(ctx, "notes/test.md", "Test Title", "test content here", "tag1 tag2", "a summary")
+	err := s.IndexPage(ctx, "notes/test.md", "Test Title", "test content here", "tag1 tag2", "a summary", "")
 	if err != nil {
 		t.Fatalf("IndexPage failed: %v", err)
 	}
@@ -89,10 +89,10 @@ func TestSQLiteFTS5Searcher_IndexPage_UpdatesExistingEntry(t *testing.T) {
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
-	if err := s.IndexPage(ctx, "notes/test.md", "Original Title", "original content", "tag1", "original summary"); err != nil {
+	if err := s.IndexPage(ctx, "notes/test.md", "Original Title", "original content", "tag1", "original summary", ""); err != nil {
 		t.Fatalf("first IndexPage failed: %v", err)
 	}
-	if err := s.IndexPage(ctx, "notes/test.md", "Updated Title", "updated content", "tag2", "updated summary"); err != nil {
+	if err := s.IndexPage(ctx, "notes/test.md", "Updated Title", "updated content", "tag2", "updated summary", ""); err != nil {
 		t.Fatalf("second IndexPage failed: %v", err)
 	}
 
@@ -144,7 +144,7 @@ func TestSQLiteFTS5Searcher_RemovePage_DeletesFromBothTables(t *testing.T) {
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
-	if err := s.IndexPage(ctx, "notes/test.md", "Test Title", "test content", "tag1", "summary"); err != nil {
+	if err := s.IndexPage(ctx, "notes/test.md", "Test Title", "test content", "tag1", "summary", ""); err != nil {
 		t.Fatalf("IndexPage failed: %v", err)
 	}
 
@@ -187,13 +187,13 @@ func TestSQLiteFTS5Searcher_Search_ReturnsBM25RankedResults(t *testing.T) {
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
-	if err := s.IndexPage(ctx, "notes/go.md", "Go Programming", "Go is a statically typed language", "programming", "about go"); err != nil {
+	if err := s.IndexPage(ctx, "notes/go.md", "Go Programming", "Go is a statically typed language", "programming", "about go", ""); err != nil {
 		t.Fatalf("IndexPage go.md failed: %v", err)
 	}
-	if err := s.IndexPage(ctx, "notes/rust.md", "Rust Programming", "Rust is a systems language", "programming", "about rust"); err != nil {
+	if err := s.IndexPage(ctx, "notes/rust.md", "Rust Programming", "Rust is a systems language", "programming", "about rust", ""); err != nil {
 		t.Fatalf("IndexPage rust.md failed: %v", err)
 	}
-	if err := s.IndexPage(ctx, "notes/python.md", "Python Programming", "Python is a dynamic language", "programming", "about python"); err != nil {
+	if err := s.IndexPage(ctx, "notes/python.md", "Python Programming", "Python is a dynamic language", "programming", "about python", ""); err != nil {
 		t.Fatalf("IndexPage python.md failed: %v", err)
 	}
 
@@ -229,10 +229,10 @@ func TestSQLiteFTS5Searcher_Search_TitleRankedHigherThanContent(t *testing.T) {
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
-	if err := s.IndexPage(ctx, "notes/alpha.md", "UniqueKeyword Guide", "some general content", "tag1", "summary1"); err != nil {
+	if err := s.IndexPage(ctx, "notes/alpha.md", "UniqueKeyword Guide", "some general content", "tag1", "summary1", ""); err != nil {
 		t.Fatalf("IndexPage alpha failed: %v", err)
 	}
-	if err := s.IndexPage(ctx, "notes/beta.md", "General Title", "UniqueKeyword appears in content here", "tag2", "summary2"); err != nil {
+	if err := s.IndexPage(ctx, "notes/beta.md", "General Title", "UniqueKeyword appears in content here", "tag2", "summary2", ""); err != nil {
 		t.Fatalf("IndexPage beta failed: %v", err)
 	}
 
@@ -285,7 +285,7 @@ func TestSQLiteFTS5Searcher_Search_EscapesFTS5SpecialCharacters(t *testing.T) {
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
-	if err := s.IndexPage(ctx, "notes/test.md", "Test Page", "some content about testing", "tag1", "summary"); err != nil {
+	if err := s.IndexPage(ctx, "notes/test.md", "Test Page", "some content about testing", "tag1", "summary", ""); err != nil {
 		t.Fatalf("IndexPage failed: %v", err)
 	}
 
@@ -333,7 +333,7 @@ func TestSQLiteFTS5Searcher_Search_DefaultLimit(t *testing.T) {
 		if i > 0 {
 			path = filepath.ToSlash(filepath.Join("notes", fmt.Sprintf("page%d.md", i)))
 		}
-		if err := s.IndexPage(ctx, path, "Test Page", "test content number "+string(rune('0'+i)), "tag", "summary"); err != nil {
+		if err := s.IndexPage(ctx, path, "Test Page", "test content number "+string(rune('0'+i)), "tag", "summary", ""); err != nil {
 			t.Fatalf("IndexPage %d failed: %v", i, err)
 		}
 	}
@@ -355,7 +355,7 @@ func TestSQLiteFTS5Searcher_Search_CustomLimit(t *testing.T) {
 
 	for i := 0; i < 5; i++ {
 		path := filepath.ToSlash(filepath.Join("notes", "page"+string(rune('0'+i))+".md"))
-		if err := s.IndexPage(ctx, path, "UniqueKeyword Page", "content "+string(rune('0'+i)), "tag", "summary"); err != nil {
+		if err := s.IndexPage(ctx, path, "UniqueKeyword Page", "content "+string(rune('0'+i)), "tag", "summary", ""); err != nil {
 			t.Fatalf("IndexPage %d failed: %v", i, err)
 		}
 	}
@@ -380,7 +380,7 @@ func TestSQLiteFTS5Searcher_RebuildIndex_RepoulatesBothTables(t *testing.T) {
 		"kb/agents/agent1.md": "---\ntype: agent\ntitle: Agent One\nsummary: First agent\n---\nAgent one body content.\n",
 	})
 
-	if err := s.IndexPage(ctx, "kb/old.md", "Old Page", "old content", "old", "old summary"); err != nil {
+	if err := s.IndexPage(ctx, "kb/old.md", "Old Page", "old content", "old", "old summary", ""); err != nil {
 		t.Fatalf("IndexPage old page failed: %v", err)
 	}
 
@@ -512,7 +512,7 @@ func TestSQLiteFTS5Searcher_Search_NoResults(t *testing.T) {
 	s := NewSQLiteFTS5Searcher(conn)
 	ctx := context.Background()
 
-	if err := s.IndexPage(ctx, "notes/test.md", "Test Title", "test content", "tag1", "summary"); err != nil {
+	if err := s.IndexPage(ctx, "notes/test.md", "Test Title", "test content", "tag1", "summary", ""); err != nil {
 		t.Fatalf("IndexPage failed: %v", err)
 	}
 

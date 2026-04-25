@@ -26,7 +26,7 @@ func NewSQLiteFTS5Searcher(db *sql.DB) *SQLiteFTS5Searcher {
 
 // IndexPage adds or updates a page in the search index.
 // It writes to both the documents and pages tables to maintain consistency.
-func (s *SQLiteFTS5Searcher) IndexPage(ctx context.Context, path, title, content, tags, summary string) error {
+func (s *SQLiteFTS5Searcher) IndexPage(ctx context.Context, path, title, content, tags, summary, pageType string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
@@ -36,8 +36,8 @@ func (s *SQLiteFTS5Searcher) IndexPage(ctx context.Context, path, title, content
 	_, _ = tx.ExecContext(ctx, "DELETE FROM pages_fts WHERE rowid = (SELECT id FROM documents WHERE path = ?)", path)
 
 	_, err = tx.ExecContext(ctx,
-		"INSERT OR REPLACE INTO documents (path, title, content, tags, summary, created, updated) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))",
-		path, title, content, tags, summary)
+		"INSERT OR REPLACE INTO documents (path, title, content, tags, summary, created, updated, type) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)",
+		path, title, content, tags, summary, pageType)
 	if err != nil {
 		return fmt.Errorf("insert document: %w", err)
 	}
@@ -120,15 +120,35 @@ func (s *SQLiteFTS5Searcher) Search(ctx context.Context, query string, opts Sear
 		limit = 10
 	}
 
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT documents.path, documents.title, documents.summary,
+	args := []any{escaped}
+	whereClause := ""
+
+	if opts.Tag != "" {
+		whereClause += " AND d.tags LIKE ?"
+		args = append(args, "%"+opts.Tag+"%")
+	}
+	if opts.Type != "" {
+		whereClause += " AND d.type = ?"
+		args = append(args, opts.Type)
+	}
+	if opts.After != "" {
+		whereClause += " AND d.created >= ?"
+		args = append(args, opts.After)
+	}
+
+	args = append(args, limit)
+
+	query = fmt.Sprintf(`
+		SELECT d.path, d.title, d.summary,
 		       snippet(pages_fts, 0, '→', '←', '...', 32) as snippet,
 		       bm25(pages_fts, 10.0, 1.0, 5.0, 3.0) as rank
 		FROM pages_fts
-		JOIN documents ON pages_fts.rowid = documents.id
-		WHERE pages_fts MATCH ?
+		JOIN documents d ON pages_fts.rowid = d.id
+		WHERE pages_fts MATCH ?%s
 		ORDER BY rank
-		LIMIT ?`, escaped, limit)
+		LIMIT ?`, whereClause)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("search query: %w", err)
 	}
@@ -168,6 +188,12 @@ func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) er
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
+	}
+
+	// Ensure type column exists (migration for existing databases)
+	var typeColCount int
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM pragma_table_info('documents') WHERE name = 'type'").Scan(&typeColCount); err == nil && typeColCount == 0 {
+		_, _ = s.db.ExecContext(ctx, "ALTER TABLE documents ADD COLUMN type TEXT NOT NULL DEFAULT ''")
 	}
 
 	// Drop and recreate FTS5 table to handle schema migration (adding summary column)
@@ -214,7 +240,7 @@ func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) er
 		tags := ExtractTags(fm.Fields)
 		summary := ExtractSummary(fm.Fields)
 
-		if err := s.IndexPage(ctx, relPath, fm.Title, string(body), tags, summary); err != nil {
+		if err := s.IndexPage(ctx, relPath, fm.Title, string(body), tags, summary, fm.Type); err != nil {
 			return fmt.Errorf("index page %s: %w", relPath, err)
 		}
 

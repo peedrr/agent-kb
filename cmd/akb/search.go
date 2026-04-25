@@ -15,6 +15,7 @@ import (
 )
 
 var searchJSON bool
+var searchTag, searchType, searchAfter string
 
 var searchCmd = &cobra.Command{
 	Use:   "search <query>",
@@ -31,6 +32,9 @@ var searchCmd = &cobra.Command{
 
 func init() {
 	searchCmd.Flags().BoolVar(&searchJSON, "json", false, "output results as JSON")
+	searchCmd.Flags().StringVar(&searchTag, "tag", "", "filter by tag")
+	searchCmd.Flags().StringVar(&searchType, "type", "", "filter by page type")
+	searchCmd.Flags().StringVar(&searchAfter, "after", "", "filter by creation date (YYYY-MM-DD)")
 }
 
 func runSearch(_ *cobra.Command, args []string) error {
@@ -53,7 +57,12 @@ func runSearch(_ *cobra.Command, args []string) error {
 	searcher := search.NewSQLiteFTS5Searcher(sqlDB)
 
 	ctx := context.Background()
-	results, err := searcher.Search(ctx, query, search.SearchOptions{})
+	opts := search.SearchOptions{
+		Tag:   searchTag,
+		Type:  searchType,
+		After: searchAfter,
+	}
+	results, err := searcher.Search(ctx, query, opts)
 	if err != nil {
 		return fmt.Errorf("search: %w", err)
 	}

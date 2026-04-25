@@ -10,7 +10,7 @@ func TestNoOpSearcher(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("IndexPage returns nil", func(t *testing.T) {
-		err := searcher.IndexPage(ctx, "notes/test.md", "Test Title", "content here", "tag1,tag2", "summary")
+		err := searcher.IndexPage(ctx, "notes/test.md", "Test Title", "content here", "tag1,tag2", "summary", "")
 		if err != nil {
 			t.Errorf("expected nil, got %v", err)
 		}

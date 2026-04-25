@@ -7,7 +7,7 @@ import "context"
 type NoOpSearcher struct{}
 
 // IndexPage is a no-op stub. Replaced by real implementation in internal/search/sqlite.go.
-func (n *NoOpSearcher) IndexPage(_ context.Context, _, _, _, _, _ string) error {
+func (n *NoOpSearcher) IndexPage(_ context.Context, _, _, _, _, _, _ string) error {
 	return nil
 }
 

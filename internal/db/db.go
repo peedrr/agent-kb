@@ -62,6 +62,7 @@ func VerifySchema(db *sql.DB) error {
 		"links":              false,
 		"idx_links_source":   false,
 		"idx_links_resolved": false,
+		"idx_documents_type": false,
 	}
 
 	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type IN ('table', 'index')")
@@ -109,7 +110,8 @@ func CreateSchema(db *sql.DB) error {
 			path TEXT NOT NULL UNIQUE,
 			summary TEXT NOT NULL DEFAULT '',
 			created TEXT NOT NULL DEFAULT '',
-			updated TEXT NOT NULL DEFAULT ''
+			updated TEXT NOT NULL DEFAULT '',
+			type TEXT NOT NULL DEFAULT ''
 		)`,
 		`CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
 			title, content, tags, summary,
@@ -131,6 +133,7 @@ func CreateSchema(db *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_page)`,
 		`CREATE INDEX IF NOT EXISTS idx_links_resolved ON links(resolved_to)`,
+		`CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(type)`,
 	}
 
 	for _, stmt := range ddl {

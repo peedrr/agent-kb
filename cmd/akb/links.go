@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,8 @@ import (
 	"github.com/peedrr/agent-kb/internal/linkgraph"
 	"github.com/peedrr/agent-kb/internal/path"
 )
+
+var backlinksJSON bool
 
 var linksCmd = &cobra.Command{
 	Use:   "links <path>",
@@ -43,6 +46,10 @@ var orphansCmd = &cobra.Command{
   akb orphans`,
 	Args: cobra.NoArgs,
 	RunE: runOrphans,
+}
+
+func init() {
+	backlinksCmd.Flags().BoolVar(&backlinksJSON, "json", false, "output results as JSON")
 }
 
 func openLinkGraphDB(kbRoot string) (*sql.DB, *linkgraph.SQLiteLinkGraph, error) {
@@ -162,8 +169,40 @@ func runBacklinks(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("query inbound links: %w", err)
 	}
 
-	for _, l := range inbound {
-		fmt.Println(l.SourcePage)
+	if len(inbound) == 0 {
+		if backlinksJSON {
+			fmt.Println(`{"backlinks": []}`)
+		} else {
+			fmt.Println("No backlinks found")
+		}
+		return nil
+	}
+
+	if backlinksJSON {
+		type backlinkJSON struct {
+			SourcePage string `json:"source_page"`
+			RawTarget  string `json:"raw_target"`
+			Display    string `json:"display"`
+			ResolvedTo string `json:"resolved_to"`
+		}
+		out := make([]backlinkJSON, len(inbound))
+		for i, l := range inbound {
+			out[i] = backlinkJSON{
+				SourcePage: l.SourcePage,
+				RawTarget:  l.RawTarget,
+				Display:    l.Display,
+				ResolvedTo: l.ResolvedTo,
+			}
+		}
+		data, err := json.Marshal(out)
+		if err != nil {
+			return fmt.Errorf("marshal JSON: %w", err)
+		}
+		fmt.Println(string(data))
+	} else {
+		for _, l := range inbound {
+			fmt.Println(l.SourcePage)
+		}
 	}
 
 	return nil

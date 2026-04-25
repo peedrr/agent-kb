@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"os/exec"
@@ -20,6 +21,11 @@ import (
 	"github.com/peedrr/agent-kb/internal/storage"
 )
 
+var (
+	deleteOrphans bool
+	deleteForce   bool
+)
+
 var deleteCmd = &cobra.Command{
 	Use:   "delete <path>",
 	Short: "Delete a page from the knowledge base",
@@ -29,12 +35,25 @@ var deleteCmd = &cobra.Command{
 
   # Delete with kb/ prefix (optional)
   akb delete kb/adr/use-sqlite-search.md`,
-	Args: cobra.ExactArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if deleteOrphans {
+			if len(args) > 0 {
+				return fmt.Errorf("accepts no args when --orphans is set, received %d", len(args))
+			}
+			return nil
+		}
+		return cobra.ExactArgs(1)(cmd, args)
+	},
 	RunE: runDeleteCmd,
 }
 
+func init() {
+	deleteCmd.Flags().BoolVar(&deleteOrphans, "orphans", false, "delete all orphan pages")
+	deleteCmd.Flags().BoolVar(&deleteForce, "force", false, "force deletion without confirmation")
+}
+
 func runDeleteCmd(_ *cobra.Command, args []string) error {
-	inputPath := args[0]
+	ctx := context.Background()
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
@@ -49,6 +68,71 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("open search database: %w", err)
 	}
 	defer dbConn.Close() //nolint:errcheck // DB close error non-critical on command exit
+
+	if deleteOrphans {
+		g := linkgraph.NewSQLiteLinkGraph(dbConn)
+		orphans, err := g.GetOrphans(ctx)
+		if err != nil {
+			return fmt.Errorf("query orphans: %w", err)
+		}
+
+		var filtered []string
+		for _, p := range orphans {
+			base := filepath.Base(p)
+			if base == "index.md" || base == "log.md" {
+				continue
+			}
+			filtered = append(filtered, p)
+		}
+
+		if len(filtered) == 0 {
+			fmt.Println("No orphan pages found")
+			return nil
+		}
+
+		if !deleteForce {
+			fmt.Println("Would delete:")
+			for _, p := range filtered {
+				fmt.Printf("  %s\n", p)
+			}
+			fmt.Println("use --force to confirm deletion")
+			return nil
+		}
+
+		deleted := 0
+		for _, relPath := range filtered {
+			cleanPath := strings.TrimPrefix(relPath, "kb/")
+			fullPath := filepath.Join(kbRoot, relPath)
+
+			exists, err := fileExists(fullPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "warning: check file existence for %s: %v\n", relPath, err)
+				continue
+			}
+			if !exists {
+				fmt.Fprintf(os.Stderr, "warning: page not found: %s — skipping\n", relPath)
+				continue
+			}
+
+			title := ""
+			if content, err := os.ReadFile(fullPath); err == nil { //nolint:gosec // path validated
+				if fm, _, err := frontmatter.Parse(content); err == nil {
+					title = fm.Title
+				}
+			}
+
+			if err := deletePage(ctx, kbRoot, dbConn, relPath, fullPath, cleanPath, title); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: failed to delete %s: %v\n", relPath, err)
+				continue
+			}
+			deleted++
+		}
+
+		fmt.Printf("Deleted %d orphan pages\n", deleted)
+		return nil
+	}
+
+	inputPath := args[0]
 
 	if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
 		return fmt.Errorf("use `akb raw delete`")
@@ -90,8 +174,16 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 		}
 	}
 
-	ctx := context.Background()
+	if err := deletePage(ctx, kbRoot, dbConn, relPath, fullPath, cleanPath, title); err != nil {
+		return err
+	}
 
+	fmt.Printf("Deleted %s\n", relPath)
+
+	return nil
+}
+
+func deletePage(ctx context.Context, kbRoot string, dbConn *sql.DB, relPath, fullPath, cleanPath, title string) error {
 	searcher := search.NewSQLiteFTS5Searcher(dbConn)
 	if err := searcher.RemovePage(ctx, relPath); err != nil {
 		return fmt.Errorf("remove from search index: %w", err)
@@ -127,8 +219,6 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 	if err := store.Delete(ctx, fullPath); err != nil {
 		return fmt.Errorf("delete page: %w", err)
 	}
-
-	fmt.Printf("Deleted %s\n", relPath)
 
 	return nil
 }

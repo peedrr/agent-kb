@@ -60,7 +60,7 @@ func setupSearchDB(t *testing.T, kbRoot string) *sql.DB {
 func indexTestPage(t *testing.T, sqlDB *sql.DB, path, title, content, tags, summary string) {
 	t.Helper()
 	searcher := search.NewSQLiteFTS5Searcher(sqlDB)
-	if err := searcher.IndexPage(context.Background(), path, title, content, tags, summary); err != nil {
+	if err := searcher.IndexPage(context.Background(), path, title, content, tags, summary, ""); err != nil {
 		t.Fatalf("index page %s: %v", path, err)
 	}
 }

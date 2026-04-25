@@ -433,7 +433,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 	}
 
 	searcher := search.NewSQLiteFTS5Searcher(dbConn)
-	if err := searcher.IndexPage(ctx, relPath, fm.Title, string(body), tags, summary); err != nil {
+	if err := searcher.IndexPage(ctx, relPath, fm.Title, string(body), tags, summary, fm.Type); err != nil {
 		return fmt.Errorf("index page: %w", err)
 	}
 

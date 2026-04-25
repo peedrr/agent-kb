@@ -205,8 +205,9 @@ func TestBacklinks_NoInboundLinks(t *testing.T) {
 		t.Fatalf("runBacklinks: %v", err)
 	}
 
-	if strings.TrimSpace(output) != "" {
-		t.Errorf("expected empty output for no backlinks, got %q", output)
+	expected := "No backlinks found"
+	if strings.TrimSpace(output) != expected {
+		t.Errorf("expected %q, got %q", expected, output)
 	}
 }
 

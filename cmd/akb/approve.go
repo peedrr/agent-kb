@@ -18,48 +18,81 @@ import (
 	"github.com/peedrr/agent-kb/internal/storage"
 )
 
+var approveAllDrafts bool
+
 var approveCmd = &cobra.Command{
 	Use:   "approve <path>",
 	Short: "Approve a page by removing draft status and annotations",
 	Long:  `Read a page, strip olw-auto annotations and provenance markers, set is_draft to false, and write it back.`,
 	Example: `  # Approve a draft page
   akb approve notes/my-draft.md`,
-	Args: cobra.ExactArgs(1),
+	Args: func(_ *cobra.Command, args []string) error {
+		if approveAllDrafts {
+			if len(args) > 0 {
+				return errors.New("path argument not allowed with --all-drafts")
+			}
+			return nil
+		}
+		if len(args) != 1 {
+			return errors.New("requires exactly 1 arg(s), only received 0")
+		}
+		return nil
+	},
 	RunE: runApprove,
+}
+
+func init() {
+	approveCmd.Flags().BoolVar(&approveAllDrafts, "all-drafts", false, "approve all draft pages")
 }
 
 var annotationRe = regexp.MustCompile(`(?s)<!--\s*olw-auto:.*?-->`)
 
 func runApprove(_ *cobra.Command, args []string) error {
-	inputPath := args[0]
-
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
+	ctx := context.Background()
+
+	if approveAllDrafts {
+		return approveAllDraftPages(ctx, kbRoot)
+	}
+
+	inputPath := args[0]
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
 	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
 
-	ctx := context.Background()
+	approved, err := approvePage(ctx, kbRoot, fullPath, inputPath)
+	if err != nil {
+		return err
+	}
+	if !approved {
+		fmt.Printf("Page '%s' is already approved\n", inputPath)
+		return nil
+	}
+	fmt.Printf("Approved '%s'\n", inputPath)
+	return nil
+}
+
+func approvePage(ctx context.Context, kbRoot, fullPath, inputPath string) (bool, error) {
 	store := storage.NewGitProvider(kbRoot, noCommit)
 
 	content, err := store.Read(ctx, fullPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) || strings.Contains(err.Error(), "no such file") {
-			return fmt.Errorf("page '%s' not found. Use 'akb list' to see available pages", inputPath)
+			return false, fmt.Errorf("page '%s' not found. Use 'akb list' to see available pages", inputPath)
 		}
-		return fmt.Errorf("read page: %w", err)
+		return false, fmt.Errorf("read page: %w", err)
 	}
 
 	fm, body, err := frontmatter.Parse(content)
 	if err != nil {
-		return fmt.Errorf("parse frontmatter: %w", err)
+		return false, fmt.Errorf("parse frontmatter: %w", err)
 	}
 
 	if !frontmatter.IsDraft(fm.Fields) {
-		fmt.Printf("Page '%s' is already approved\n", inputPath)
-		return nil
+		return false, nil
 	}
 
 	bodyStr := string(body)
@@ -78,15 +111,51 @@ func runApprove(_ *cobra.Command, args []string) error {
 
 	yamlBytes, err := yaml.Marshal(allFields)
 	if err != nil {
-		return fmt.Errorf("re-serialize frontmatter: %w", err)
+		return false, fmt.Errorf("re-serialize frontmatter: %w", err)
 	}
 
 	finalContent := []byte("---\n" + string(yamlBytes) + "---\n" + bodyStr)
 
 	if err := store.WriteWithCommitMsg(ctx, fullPath, finalContent, fmt.Sprintf("akb: approve %s", inputPath)); err != nil {
-		return fmt.Errorf("write page: %w", err)
+		return false, fmt.Errorf("write page: %w", err)
 	}
 
-	fmt.Printf("Approved '%s'\n", inputPath)
+	return true, nil
+}
+
+func approveAllDraftPages(ctx context.Context, kbRoot string) error {
+	kbDir := filepath.Join(kbRoot, "kb")
+	var approvedCount int
+
+	err := filepath.WalkDir(kbDir, func(fullPath string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(fullPath, ".md") {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(kbDir, fullPath)
+		if err != nil {
+			return err
+		}
+		if relPath == "index.md" || relPath == "log.md" {
+			return nil
+		}
+
+		approved, err := approvePage(ctx, kbRoot, fullPath, relPath)
+		if err != nil {
+			return err
+		}
+		if approved {
+			approvedCount++
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Approved %d drafts\n", approvedCount)
 	return nil
 }

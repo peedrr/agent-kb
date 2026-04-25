@@ -17,14 +17,17 @@ type SearchResult struct {
 //
 //nolint:revive // intentionally exported for use by consumers
 type SearchOptions struct {
-	Limit int // 0 means default of 10
+	Limit int
+	Tag   string
+	Type  string
+	After string
 }
 
 // Searcher provides full-text search over the knowledge base.
 type Searcher interface {
 	// IndexPage adds or updates a page in the search index.
 	// The path is relative to KB root (e.g., "notes/my-note.md").
-	IndexPage(ctx context.Context, path, title, content, tags, summary string) error
+	IndexPage(ctx context.Context, path, title, content, tags, summary, pageType string) error
 
 	// RemovePage removes a page from the search index.
 	// The path is relative to KB root (e.g., "notes/my-note.md").
