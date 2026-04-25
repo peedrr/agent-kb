@@ -17,6 +17,7 @@ import (
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/search"
 	"github.com/peedrr/agent-kb/internal/storage"
+	"github.com/peedrr/agent-kb/internal/template"
 )
 
 var indexCmd = &cobra.Command{
@@ -129,7 +130,35 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 	// Read the file to get frontmatter for title and type
 	content, err := os.ReadFile(fullPath) //nolint:gosec // path validated by ResolveKBPath
 	if err != nil {
-		return fmt.Errorf("read file %s: %w", entryPath, err)
+		// Direct path not found — try template-aware resolution
+		templates, tmplErr := template.LoadTemplates(filepath.Join(kbRoot, ".akb", "templates"))
+		if tmplErr != nil {
+			return fmt.Errorf("read file %s: %w", entryPath, err)
+		}
+
+		for _, tmpl := range templates {
+			if tmpl.Dir == "" {
+				continue
+			}
+			candidatePath := filepath.Join(kbRoot, "kb", tmpl.Dir, cleanPath)
+			candidateContent, readErr := os.ReadFile(candidatePath) //nolint:gosec
+			if readErr != nil {
+				continue
+			}
+			fm, _, parseErr := frontmatter.Parse(candidateContent)
+			if parseErr != nil {
+				continue
+			}
+			if fm.Type == tmpl.Name {
+				fullPath = candidatePath
+				content = candidateContent
+				break
+			}
+		}
+
+		if content == nil {
+			return fmt.Errorf("read file %s: %w", entryPath, err)
+		}
 	}
 
 	fm, _, err := frontmatter.Parse(content)
