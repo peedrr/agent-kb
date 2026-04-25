@@ -43,9 +43,12 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 - Commands validate stdin with `os.Stdin.Stat()` checking `ModeCharDevice`
 - KB root resolved via `path.KBRoot()` at start of each command
 - DB opened via `db.OpenKB(kbRoot)` for search/linkgraph/lint operations
-- `approve` strips provenance markers via `markdown.StripProvenanceMarkers()`
-- `stale` iterates ALL KBs in registry; `--json` flag supported
+- `approve` strips provenance markers via `markdown.StripProvenanceMarkers()`; `--all-drafts` for batch approval
+- `stale` iterates ALL KBs in registry; `--json` and `--all` flags supported
 - `raw delete` scans KB pages for frontmatter `sources` referencing the deleted file
+- `write` supports `--append` (append to body) and `--frontmatter key=val` (partial updates)
+- `search` supports `--tag`, `--type`, `--after` dimensional filters
+- `list` `--json` includes `is_draft` field
 
 ## KEY DEPENDENCIES
 

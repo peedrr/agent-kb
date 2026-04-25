@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-04-24
-**Commit:** 4ee9316
+**Generated:** 2026-04-25
+**Commit:** f361e81
 **Branch:** master
 **Status:** WIP/prototype - APIs subject to change
 
@@ -56,13 +56,19 @@ agent-kb/
 | Skill install | `internal/skill/skill.go` | `//go:embed embedded/*` |
 | Registry | `internal/registry/registry.go` | Multi-KB registry with default |
 | Raw drift | `cmd/akb/raw_status.go` | `akb raw status` exits 0/1/2 |
+| Write append | `cmd/akb/write.go` | `--append` to append to existing page body |
+| Write frontmatter | `cmd/akb/write.go` | `--frontmatter key=val` for partial updates |
+| Batch approve | `cmd/akb/approve.go` | `--all-drafts` to approve all draft pages |
+| Dimensional search | `cmd/akb/search.go` | `--tag`, `--type`, `--after` filters |
+| Stale all KBs | `cmd/akb/stale.go` | `--all` checks all registered KBs |
+| List drafts | `cmd/akb/list.go` | `--json` includes `is_draft` field |
 
 ## CODE MAP
 
 | Symbol | Type | Location | Role |
 |--------|------|----------|------|
 | RootCmd | Cobra.Command | cmd/akb/root.go:9 | Base CLI command |
-| version | string | cmd/akb/main.go:8 | CLI version (0.8.0) |
+| version | string | cmd/akb/main.go:8 | CLI version (injected at build via LDFLAGS) |
 | StorageProvider | interface | internal/storage/provider.go:6 | Write/Read/Delete/Exists/List |
 | GitProvider | struct | internal/storage/git.go:13 | Git-tracked file operations |
 | Searcher | interface | internal/search/searcher.go:20 | IndexPage/Search/RebuildIndex |
@@ -134,3 +140,4 @@ nix develop                     # Dev shell (Go, gopls, delve, golangci-lint)
 - 13 lint checks: 5 structural + 6 template-driven + 2 semantic (provenance, freshness)
 - Provenance drift threshold: 0.20; freshness half-life: 30 days; freshness score threshold: 50.0
 - Lint thresholds are hardcoded constants (not configurable via `.akb.yaml` in v1)
+- Recent additions: `--append`, `--frontmatter`, `--all-drafts`, dimensional search (`--tag`/`--type`/`--after`), `--all` for stale
