@@ -7,6 +7,8 @@
     { self, ... }@inputs:
 
     let
+      akbVersion = "0.8.0";
+
       goVersion = 26; # Change this to update the whole stack
 
       supportedSystems = [
@@ -58,6 +60,45 @@
 
               tmux
             ];
+          };
+        }
+      );
+
+      packages = forEachSupportedSystem (
+        { pkgs, ... }:
+        {
+          default = pkgs.buildGoModule {
+            pname = "agent-kb";
+            version = akbVersion;
+            src = ./.;
+
+            # To update the hash:
+            # 1. Set vendorHash = lib.fakeHash;
+            # 2. Run 'nix build'
+            # 3. Copy the 'got:' hash from the error message
+            vendorHash = pkgs.lib.fakeHash;
+
+            subPackages = [ "cmd/akb" ];
+
+            ldflags = [
+              "-X main.version=${akbVersion}"
+            ];
+
+            # Ensure we use the Go version specified in the flake
+            nativeBuildInputs = [ pkgs.go ];
+
+            # Required for integration tests that run git commands
+            nativeCheckInputs = [ pkgs.git ];
+          };
+        }
+      );
+
+      apps = forEachSupportedSystem (
+        { system, ... }:
+        {
+          default = {
+            type = "app";
+            program = "${self.packages.${system}.default}/bin/akb";
           };
         }
       );
