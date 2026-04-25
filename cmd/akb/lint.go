@@ -214,7 +214,11 @@ func printLintJSON(report *lint.LintReport) error {
 	}
 
 	var out jsonOutput
-	out.Issues = report.Issues
+	if report.Issues != nil {
+		out.Issues = report.Issues
+	} else {
+		out.Issues = []lint.LintIssue{}
+	}
 	out.Summary.Total = len(report.Issues)
 	out.Summary.PagesChecked = report.PagesChecked
 	out.Summary.ByCheck = report.ByCheck

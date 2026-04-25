@@ -35,6 +35,7 @@ type kbResult struct {
 }
 
 var staleJSON bool
+var staleAll bool
 
 var staleCmd = &cobra.Command{
 	Use:   "stale",
@@ -43,9 +44,14 @@ var staleCmd = &cobra.Command{
 
 A page is considered stale if its freshness score drops below 50.0.
 The freshness score decays exponentially based on days since last update,
-weighted by confidence level (high=1.0, medium=0.7, low=0.4).`,
-	Example: `  # Check for stale pages across all KBs
+weighted by confidence level (high=1.0, medium=0.7, low=0.4).
+
+By default, only the active KB is checked. Use --all to check all registered KBs.`,
+	Example: `  # Check for stale pages in the active KB
   akb stale
+
+  # Check all registered KBs
+  akb stale --all
 
   # Output as JSON
   akb stale --json`,
@@ -54,6 +60,7 @@ weighted by confidence level (high=1.0, medium=0.7, low=0.4).`,
 
 func init() {
 	staleCmd.Flags().BoolVar(&staleJSON, "json", false, "output as JSON")
+	staleCmd.Flags().BoolVar(&staleAll, "all", false, "check all registered KBs")
 }
 
 func runStale(_ *cobra.Command, _ []string) error {
@@ -72,11 +79,23 @@ func runStale(_ *cobra.Command, _ []string) error {
 		return nil
 	}
 
+	var entriesToCheck []registry.Entry
+
+	if staleAll {
+		entriesToCheck = reg.Entries
+	} else {
+		defaultEntry, err := registry.GetDefault()
+		if err != nil {
+			return fmt.Errorf("get active KB: %w", err)
+		}
+		entriesToCheck = []registry.Entry{defaultEntry}
+	}
+
 	now := time.Now()
 	var results []kbResult
 	totalStale := 0
 
-	for _, entry := range reg.Entries {
+	for _, entry := range entriesToCheck {
 		kbPath := entry.Path
 		kbDir := filepath.Join(kbPath, "kb")
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,8 +10,17 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/path"
 )
+
+// pageInfo holds page metadata for list output.
+type pageInfo struct {
+	Path    string `json:"path"`
+	IsDraft bool   `json:"is_draft"`
+}
+
+var listJSON bool
 
 var listCmd = &cobra.Command{
 	Use:   "list",
@@ -20,6 +30,10 @@ var listCmd = &cobra.Command{
   akb list`,
 	Args: cobra.NoArgs,
 	RunE: runList,
+}
+
+func init() {
+	listCmd.Flags().BoolVar(&listJSON, "json", false, "output as JSON")
 }
 
 func runList(_ *cobra.Command, _ []string) error {
@@ -33,14 +47,27 @@ func runList(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
+	if listJSON {
+		data, err := json.Marshal(pages)
+		if err != nil {
+			return fmt.Errorf("marshal JSON: %w", err)
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+
 	for _, page := range pages {
-		fmt.Println(page)
+		if page.IsDraft {
+			fmt.Printf("[DRAFT] %s\n", page.Path)
+		} else {
+			fmt.Println(page.Path)
+		}
 	}
 
 	return nil
 }
 
-func listPages(kbRoot string) ([]string, error) {
+func listPages(kbRoot string) ([]pageInfo, error) {
 	kbDir := filepath.Join(kbRoot, "kb")
 	if _, err := os.Stat(kbDir); err != nil {
 		if os.IsNotExist(err) {
@@ -49,7 +76,7 @@ func listPages(kbRoot string) ([]string, error) {
 		return nil, fmt.Errorf("check kb directory: %w", err)
 	}
 
-	var pages []string
+	var pages []pageInfo
 	err := filepath.Walk(kbDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -66,13 +93,28 @@ func listPages(kbRoot string) ([]string, error) {
 			return nil
 		}
 
-		pages = append(pages, relPath)
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read file %s: %w", path, err)
+		}
+
+		var isDraft bool
+		fm, _, err := frontmatter.Parse(content)
+		if err != nil {
+			isDraft = true
+		} else {
+			isDraft = frontmatter.IsDraft(fm.Fields)
+		}
+
+		pages = append(pages, pageInfo{Path: relPath, IsDraft: isDraft})
 		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("walk kb directory: %w", err)
 	}
 
-	sort.Strings(pages)
+	sort.Slice(pages, func(i, j int) bool {
+		return pages[i].Path < pages[j].Path
+	})
 	return pages, nil
 }

@@ -41,8 +41,8 @@ func TestListPages(t *testing.T) {
 		if len(pages) != 1 {
 			t.Fatalf("expected 1 page, got %d", len(pages))
 		}
-		if pages[0] != "note.md" {
-			t.Errorf("expected 'note.md', got %q", pages[0])
+		if pages[0].Path != "note.md" {
+			t.Errorf("expected 'note.md', got %q", pages[0].Path)
 		}
 	})
 
@@ -66,7 +66,7 @@ func TestListPages(t *testing.T) {
 		if len(pages) != 3 {
 			t.Fatalf("expected 3 pages, got %d", len(pages))
 		}
-		if pages[0] != "apple.md" || pages[1] != "mango.md" || pages[2] != "zebra.md" {
+		if pages[0].Path != "apple.md" || pages[1].Path != "mango.md" || pages[2].Path != "zebra.md" {
 			t.Errorf("expected alphabetical order, got %v", pages)
 		}
 	})
@@ -92,8 +92,8 @@ func TestListPages(t *testing.T) {
 			t.Fatalf("expected 2 pages, got %d", len(pages))
 		}
 		for _, p := range pages {
-			if p == "index.md" || p == "log.md" {
-				t.Errorf("index.md or log.md should be excluded, got %q", p)
+			if p.Path == "index.md" || p.Path == "log.md" {
+				t.Errorf("index.md or log.md should be excluded, got %q", p.Path)
 			}
 		}
 	})
@@ -124,11 +124,11 @@ func TestListPages(t *testing.T) {
 			t.Fatalf("expected 2 pages, got %d", len(pages))
 		}
 		for _, p := range pages {
-			if strings.HasPrefix(p, "kb/") {
-				t.Errorf("path should not have kb/ prefix, got %q", p)
+			if strings.HasPrefix(p.Path, "kb/") {
+				t.Errorf("path should not have kb/ prefix, got %q", p.Path)
 			}
-			if !strings.HasPrefix(p, "notes/") {
-				t.Errorf("expected notes/ prefix, got %q", p)
+			if !strings.HasPrefix(p.Path, "notes/") {
+				t.Errorf("expected notes/ prefix, got %q", p.Path)
 			}
 		}
 	})
@@ -171,13 +171,13 @@ func TestListPages(t *testing.T) {
 			t.Fatalf("expected 3 pages, got %d: %v", len(pages), pages)
 		}
 
-		if pages[0] != "aaa/first.md" || pages[1] != "aaa/second.md" || pages[2] != "zzz/top.md" {
+		if pages[0].Path != "aaa/first.md" || pages[1].Path != "aaa/second.md" || pages[2].Path != "zzz/top.md" {
 			t.Errorf("expected alphabetical sorted, got %v", pages)
 		}
 
 		for _, p := range pages {
-			if strings.HasPrefix(p, "kb/") {
-				t.Errorf("path should not have kb/ prefix, got %q", p)
+			if strings.HasPrefix(p.Path, "kb/") {
+				t.Errorf("path should not have kb/ prefix, got %q", p.Path)
 			}
 		}
 	})
