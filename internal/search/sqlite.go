@@ -102,6 +102,8 @@ func escapeFTS5Query(query string) string {
 		"(", " ",
 		")", " ",
 		"*", " ",
+		":", " ",
+		" ", " ",
 	)
 	return strings.TrimSpace(replacer.Replace(query))
 }

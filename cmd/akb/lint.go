@@ -42,6 +42,8 @@ func init() {
 }
 
 func runLint(_ *cobra.Command, _ []string) error {
+	ctx := context.Background()
+
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
@@ -67,6 +69,9 @@ func runLint(_ *cobra.Command, _ []string) error {
 	}
 
 	lg := linkgraph.NewSQLiteLinkGraph(sqlDB)
+	if err := lg.RebuildLinks(ctx, kbRoot); err != nil {
+		return fmt.Errorf("rebuild link graph: %w", err)
+	}
 
 	kbDir := filepath.Join(kbRoot, "kb")
 	var pages []lint.PageData
@@ -149,7 +154,6 @@ func runLint(_ *cobra.Command, _ []string) error {
 	engine.AddChecker(lint.NewProvenanceChecker())
 	engine.AddChecker(lint.NewFreshnessChecker())
 
-	ctx := context.Background()
 	report, err := engine.Run(ctx, kb)
 	if err != nil {
 		return fmt.Errorf("lint: %w", err)
@@ -187,7 +191,16 @@ func printLintText(report *lint.LintReport) error {
 
 	fmt.Printf("%d issue(s) found across %d page(s).\n", len(report.Issues), report.PagesChecked)
 
-	return errLintIssues
+	var errorCount int
+	for _, issue := range report.Issues {
+		if issue.Severity == "error" {
+			errorCount++
+		}
+	}
+	if errorCount > 0 {
+		return errLintIssues
+	}
+	return nil
 }
 
 func printLintJSON(report *lint.LintReport) error {
@@ -212,7 +225,13 @@ func printLintJSON(report *lint.LintReport) error {
 		return fmt.Errorf("encode JSON: %w", err)
 	}
 
-	if len(report.Issues) > 0 {
+	var errorCount int
+	for _, issue := range report.Issues {
+		if issue.Severity == "error" {
+			errorCount++
+		}
+	}
+	if errorCount > 0 {
 		return errLintIssues
 	}
 	return nil

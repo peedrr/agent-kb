@@ -490,6 +490,7 @@ func TestEscapeFTS5Query(t *testing.T) {
 		{"strip NOT operator", "hello NOT world", "hello   world"},
 		{"strip parentheses", "(hello)", "hello"},
 		{"strip asterisk", "hello*", "hello"},
+		{"strip colon", "title:hello", "title hello"},
 		{"strip all special", `"hello" AND (world OR test)*`, "hello     world   test"},
 		{"empty after strip", "***", ""},
 		{"only operators", "AND OR NOT", ""},
