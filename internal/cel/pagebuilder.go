@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/storage"
@@ -13,6 +14,34 @@ import (
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
 )
+
+// convertDateField converts ISO-8601 date strings to time.Time for CEL compatibility.
+// It handles both RFC3339 ("2024-01-01T00:00:00Z") and date-only ("2024-01-01") formats.
+// Returns the original value if parsing fails or the field is not a date field.
+func convertDateField(key string, value any) any {
+	str, ok := value.(string)
+	if !ok {
+		return value
+	}
+
+	// Only convert fields that are commonly date fields
+	if key != "created" && key != "updated" {
+		return value
+	}
+
+	// Try RFC3339 first (includes time)
+	if t, err := time.Parse(time.RFC3339, str); err == nil {
+		return t
+	}
+
+	// Fall back to date-only format (YYYY-MM-DD)
+	if t, err := time.Parse("2006-01-02", str); err == nil {
+		return t
+	}
+
+	// Keep original string if parsing fails
+	return value
+}
 
 // BuildPage assembles the page map used by CEL expressions from a page's
 // constituent parts.
@@ -27,7 +56,7 @@ func BuildPage(relPath string, fm *frontmatter.ParsedFrontmatter, body []byte, a
 
 	fmMap := make(map[string]any, len(fm.Fields)+2)
 	for k, v := range fm.Fields {
-		fmMap[k] = v
+		fmMap[k] = convertDateField(k, v)
 	}
 	fmMap["type"] = fm.Type
 	fmMap["title"] = fm.Title
