@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/cel-go/common/types"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/text"
@@ -188,6 +189,33 @@ four	five
 	}
 	if contentMap["char_count"] != len(body) {
 		t.Errorf("char_count = %v, want %d", contentMap["char_count"], len(body))
+	}
+}
+
+func TestBuildPageHasOnNil(t *testing.T) {
+	env, err := NewEnv()
+	if err != nil {
+		t.Fatalf("NewEnv: %v", err)
+	}
+
+	prg, err := CompileRule(env, "old_page != null && has(old_page.frontmatter) && has(old_page.frontmatter.type)")
+	if err != nil {
+		t.Fatalf("CompileRule: %v", err)
+	}
+
+	vars := map[string]any{
+		"page": map[string]any{
+			"frontmatter": map[string]any{"type": "note"},
+		},
+		"old_page": nil,
+	}
+
+	result, err := Evaluate(context.Background(), prg, vars, 1000)
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if result != types.False {
+		t.Errorf("has(nil.frontmatter.type) = %v, want false", result)
 	}
 }
 
