@@ -153,6 +153,7 @@ func runLint(_ *cobra.Command, _ []string) error {
 	engine.AddChecker(lint.NewSummaryLengthChecker())
 	engine.AddChecker(lint.NewProvenanceChecker())
 	engine.AddChecker(lint.NewFreshnessChecker())
+	engine.AddChecker(lint.NewCELLintChecker())
 
 	report, err := engine.Run(ctx, kb)
 	if err != nil {
