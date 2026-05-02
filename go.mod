@@ -8,15 +8,16 @@ require (
 )
 
 require (
+	github.com/goccy/go-yaml v1.19.2
 	github.com/rogpeppe/go-internal v1.14.1
-	gopkg.in/yaml.v3 v3.0.1
+	github.com/yuin/goldmark v1.8.2
+	go.abhg.dev/goldmark/frontmatter v0.3.0
 )
 
 require (
-	github.com/BurntSushi/toml v0.3.1 // indirect
-	github.com/adrg/frontmatter v0.2.0 // indirect
+	github.com/BurntSushi/toml v1.5.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
-	gopkg.in/yaml.v2 v2.3.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 require (

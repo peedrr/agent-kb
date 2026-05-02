@@ -5,7 +5,11 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/adrg/frontmatter"
+	"github.com/goccy/go-yaml"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/text"
+	"go.abhg.dev/goldmark/frontmatter"
 
 	"github.com/peedrr/agent-kb/internal/template"
 )
@@ -19,17 +23,40 @@ type ParsedFrontmatter struct {
 
 // Parse extracts frontmatter from markdown content.
 func Parse(content []byte) (*ParsedFrontmatter, []byte, error) {
+	yamlFmt := frontmatter.Format{
+		Name:  "YAML",
+		Delim: '-',
+		Unmarshal: func(data []byte, v any) error {
+			return yaml.Unmarshal(data, v)
+		},
+	}
+
+	md := goldmark.New(
+		goldmark.WithExtensions(&frontmatter.Extender{
+			Formats: []frontmatter.Format{yamlFmt},
+		}),
+	)
+
+	ctx := parser.NewContext()
+	_ = md.Parser().Parse(text.NewReader(content), parser.WithContext(ctx))
+
+	data := frontmatter.Get(ctx)
+	if data == nil {
+		return nil, nil, fmt.Errorf("no frontmatter found in content")
+	}
+
 	var raw map[string]any
-	body, err := frontmatter.MustParse(bytes.NewReader(content), &raw)
-	if err != nil {
-		if err == frontmatter.ErrNotFound {
-			return nil, nil, fmt.Errorf("no frontmatter found in content")
-		}
+	if err := data.Decode(&raw); err != nil {
 		return nil, nil, fmt.Errorf("parse frontmatter: %w", err)
 	}
 
 	if len(raw) == 0 {
 		return nil, nil, fmt.Errorf("empty frontmatter")
+	}
+
+	body, err := extractBody(content)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	fm := &ParsedFrontmatter{
@@ -56,6 +83,45 @@ func Parse(content []byte) (*ParsedFrontmatter, []byte, error) {
 	}
 
 	return fm, body, nil
+}
+
+func extractBody(content []byte) ([]byte, error) {
+	idx := bytes.Index(content, []byte("\n"))
+	if idx == -1 {
+		return nil, fmt.Errorf("no frontmatter found in content")
+	}
+
+	firstLine := bytes.TrimRight(content[:idx], "\r")
+	if !bytes.HasPrefix(firstLine, []byte("---")) {
+		return nil, fmt.Errorf("no frontmatter found in content")
+	}
+
+	rest := content[idx+1:]
+	for {
+		nextIdx := bytes.Index(rest, []byte("\n"))
+		var line []byte
+		if nextIdx == -1 {
+			line = rest
+			rest = nil
+		} else {
+			line = rest[:nextIdx]
+			rest = rest[nextIdx+1:]
+		}
+
+		trimmed := bytes.TrimRight(line, "\r")
+		if bytes.Equal(trimmed, []byte("---")) {
+			if rest == nil {
+				return []byte{}, nil
+			}
+			return rest, nil
+		}
+
+		if nextIdx == -1 {
+			break
+		}
+	}
+
+	return nil, fmt.Errorf("no frontmatter found in content")
 }
 
 // ValidateType checks that the frontmatter type matches a known template.
