@@ -1,0 +1,361 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func setupTemplatesWriteTestKB(t *testing.T) string {
+	t.Helper()
+	kbRoot := t.TempDir()
+	setupTestKBWithGit(t, kbRoot)
+
+	if err := os.MkdirAll(filepath.Join(kbRoot, ".akb", "templates"), 0750); err != nil {
+		t.Fatal(err)
+	}
+
+	origCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chdir(origCwd) }) //nolint:errcheck,gosec // test cleanup
+
+	if err := os.Chdir(kbRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	return kbRoot
+}
+
+func TestTemplatesWrite_AcceptValid(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	tmplPath := filepath.Join(kbRoot, "new.yaml")
+	tmplData := `name: new
+description: A new template
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+`
+	if err := os.WriteFile(tmplPath, []byte(tmplData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	passPath := filepath.Join(kbRoot, "new_pass.md")
+	passData := `---
+type: new
+title: Hello
+---
+# Hello
+`
+	if err := os.WriteFile(passPath, []byte(passData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	failPath := filepath.Join(kbRoot, "new_fail.md")
+	failData := `---
+type: new
+title: ""
+---
+# Empty
+`
+	if err := os.WriteFile(failPath, []byte(failData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	twTemplate = tmplPath
+	twPass = passPath
+	twFail = failPath
+	defer func() {
+		twTemplate = ""
+		twPass = ""
+		twFail = ""
+	}()
+
+	if err := runTemplatesWrite(nil, []string{"new"}); err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"new.yaml", "new_pass.md", "new_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); os.IsNotExist(err) {
+			t.Errorf("expected file %s to exist", f)
+		}
+	}
+}
+
+func TestTemplatesWrite_RejectCELSyntaxError(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	tmplPath := filepath.Join(kbRoot, "bad.yaml")
+	tmplData := `name: bad
+description: Bad template
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: bad_rule
+    rule: 'page.frontmatter.title =='
+    expect: syntax error
+`
+	if err := os.WriteFile(tmplPath, []byte(tmplData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	passPath := filepath.Join(kbRoot, "bad_pass.md")
+	passData := `---
+type: bad
+title: Hello
+---
+# Hello
+`
+	if err := os.WriteFile(passPath, []byte(passData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	failPath := filepath.Join(kbRoot, "bad_fail.md")
+	failData := `---
+type: bad
+title: ""
+---
+# Empty
+`
+	if err := os.WriteFile(failPath, []byte(failData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	twTemplate = tmplPath
+	twPass = passPath
+	twFail = failPath
+	defer func() {
+		twTemplate = ""
+		twPass = ""
+		twFail = ""
+	}()
+
+	err := runTemplatesWrite(nil, []string{"bad"})
+	if err == nil {
+		t.Fatal("expected error for CEL syntax error, got nil")
+	}
+	if !strings.Contains(err.Error(), "compile") {
+		t.Errorf("expected compile error, got: %v", err)
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"bad.yaml", "bad_pass.md", "bad_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
+			t.Errorf("expected file %s to NOT exist", f)
+		}
+	}
+}
+
+func TestTemplatesWrite_RejectPassFailsRules(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	tmplPath := filepath.Join(kbRoot, "badpass.yaml")
+	tmplData := `name: badpass
+description: Bad pass
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+`
+	if err := os.WriteFile(tmplPath, []byte(tmplData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	passPath := filepath.Join(kbRoot, "badpass_pass.md")
+	passData := `---
+type: badpass
+title: ""
+---
+# Empty
+`
+	if err := os.WriteFile(passPath, []byte(passData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	failPath := filepath.Join(kbRoot, "badpass_fail.md")
+	failData := `---
+type: badpass
+title: Hello
+---
+# Hello
+`
+	if err := os.WriteFile(failPath, []byte(failData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	twTemplate = tmplPath
+	twPass = passPath
+	twFail = failPath
+	defer func() {
+		twTemplate = ""
+		twPass = ""
+		twFail = ""
+	}()
+
+	err := runTemplatesWrite(nil, []string{"badpass"})
+	if err == nil {
+		t.Fatal("expected error when pass mockup fails rules, got nil")
+	}
+	if !strings.Contains(err.Error(), "pass mockup") {
+		t.Errorf("expected pass mockup error, got: %v", err)
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"badpass.yaml", "badpass_pass.md", "badpass_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
+			t.Errorf("expected file %s to NOT exist", f)
+		}
+	}
+}
+
+func TestTemplatesWrite_RejectFailPassesRules(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	tmplPath := filepath.Join(kbRoot, "badfail.yaml")
+	tmplData := `name: badfail
+description: Bad fail
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+`
+	if err := os.WriteFile(tmplPath, []byte(tmplData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	passPath := filepath.Join(kbRoot, "badfail_pass.md")
+	passData := `---
+type: badfail
+title: Hello
+---
+# Hello
+`
+	if err := os.WriteFile(passPath, []byte(passData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	failPath := filepath.Join(kbRoot, "badfail_fail.md")
+	failData := `---
+type: badfail
+title: Hello
+---
+# Hello
+`
+	if err := os.WriteFile(failPath, []byte(failData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	twTemplate = tmplPath
+	twPass = passPath
+	twFail = failPath
+	defer func() {
+		twTemplate = ""
+		twPass = ""
+		twFail = ""
+	}()
+
+	err := runTemplatesWrite(nil, []string{"badfail"})
+	if err == nil {
+		t.Fatal("expected error when fail mockup passes all rules, got nil")
+	}
+	if !strings.Contains(err.Error(), "fail mockup") {
+		t.Errorf("expected fail mockup error, got: %v", err)
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"badfail.yaml", "badfail_pass.md", "badfail_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
+			t.Errorf("expected file %s to NOT exist", f)
+		}
+	}
+}
+
+func TestTemplatesWrite_AtomicWrite(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	tmplPath := filepath.Join(kbRoot, "atomic.yaml")
+	tmplData := `name: atomic
+description: Atomic test
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+`
+	if err := os.WriteFile(tmplPath, []byte(tmplData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	passPath := filepath.Join(kbRoot, "atomic_pass.md")
+	passData := `---
+type: atomic
+title: ""
+---
+# Empty
+`
+	if err := os.WriteFile(passPath, []byte(passData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	failPath := filepath.Join(kbRoot, "atomic_fail.md")
+	failData := `---
+type: atomic
+title: Hello
+---
+# Hello
+`
+	if err := os.WriteFile(failPath, []byte(failData), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	twTemplate = tmplPath
+	twPass = passPath
+	twFail = failPath
+	defer func() {
+		twTemplate = ""
+		twPass = ""
+		twFail = ""
+	}()
+
+	if err := runTemplatesWrite(nil, []string{"atomic"}); err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	entries, err := os.ReadDir(targetDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "atomic") {
+			t.Errorf("expected no atomic files, found: %s", entry.Name())
+		}
+	}
+}

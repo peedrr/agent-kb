@@ -38,7 +38,6 @@ func init() {
 	RootCmd.AddCommand(registryCmd)
 	RootCmd.AddCommand(useCmd)
 	RootCmd.AddCommand(approveCmd)
-	RootCmd.AddCommand(staleCmd)
 	RootCmd.AddCommand(skillCmd)
 	RootCmd.AddCommand(templateCmd)
 }
