@@ -184,7 +184,11 @@ func printLintText(report *lint.LintReport) error {
 	for path, issues := range byPath {
 		fmt.Printf("=== %s ===\n", path)
 		for _, issue := range issues {
-			fmt.Printf("  [%s] %s: %s\n", issue.Type, issue.Severity, issue.Message)
+			if issue.RuleID != "" {
+				fmt.Printf("  [%s] rule_id=%s %s: %s\n", issue.Type, issue.RuleID, issue.Severity, issue.Message)
+			} else {
+				fmt.Printf("  [%s] %s: %s\n", issue.Type, issue.Severity, issue.Message)
+			}
 		}
 		fmt.Println()
 	}

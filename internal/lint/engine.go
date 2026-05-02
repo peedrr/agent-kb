@@ -16,6 +16,7 @@ import (
 //nolint:revive // intentionally exported for use by consumers
 type LintIssue struct {
 	Type     string `json:"check"`
+	RuleID   string `json:"rule_id,omitempty"`
 	Message  string `json:"message"`
 	Path     string `json:"path"`
 	Severity string `json:"severity"`

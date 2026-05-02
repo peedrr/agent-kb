@@ -46,6 +46,7 @@ func (c *SummaryLengthChecker) Check(_ context.Context, kb *KB) ([]LintIssue, er
 		if len(summary) < SummaryMinLength {
 			issues = append(issues, LintIssue{
 				Type:     "summary_length",
+				RuleID:   "summary_length",
 				Message:  fmt.Sprintf("summary is too short (%d chars, minimum is %d)", len(summary), SummaryMinLength),
 				Path:     page.RelPath,
 				Severity: "warning",
@@ -54,6 +55,7 @@ func (c *SummaryLengthChecker) Check(_ context.Context, kb *KB) ([]LintIssue, er
 		if len(summary) > SummaryMaxLength {
 			issues = append(issues, LintIssue{
 				Type:     "summary_length",
+				RuleID:   "summary_length",
 				Message:  fmt.Sprintf("summary is too long (%d chars, maximum is %d)", len(summary), SummaryMaxLength),
 				Path:     page.RelPath,
 				Severity: "warning",

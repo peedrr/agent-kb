@@ -67,6 +67,7 @@ func (c *FreshnessChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error)
 		if score < FreshnessScoreThreshold {
 			issues = append(issues, LintIssue{
 				Type:     "freshness",
+				RuleID:   "freshness",
 				Message:  fmt.Sprintf("page is stale (freshness score: %.1f, threshold: %.1f). Last updated %.0f days ago.", score, FreshnessScoreThreshold, daysSince),
 				Path:     page.RelPath,
 				Severity: "warning",

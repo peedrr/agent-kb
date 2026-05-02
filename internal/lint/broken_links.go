@@ -38,6 +38,7 @@ func (c *BrokenLinksChecker) Check(ctx context.Context, kb *KB) ([]LintIssue, er
 	for _, l := range broken {
 		issues = append(issues, LintIssue{
 			Type:     "broken_links",
+			RuleID:   "broken_links",
 			Message:  fmt.Sprintf("broken link to [[%s]]", l.RawTarget),
 			Path:     l.SourcePage,
 			Severity: "error",
@@ -51,6 +52,7 @@ func (c *BrokenLinksChecker) Check(ctx context.Context, kb *KB) ([]LintIssue, er
 	for _, l := range ambiguous {
 		issues = append(issues, LintIssue{
 			Type:     "broken_links",
+			RuleID:   "broken_links",
 			Message:  fmt.Sprintf("ambiguous link [[%s]] resolves to multiple pages: %s", l.RawTarget, l.ResolvedTo),
 			Path:     l.SourcePage,
 			Severity: "warning",

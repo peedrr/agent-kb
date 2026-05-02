@@ -36,6 +36,7 @@ func (c *EmptyPagesChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error
 		if len(strings.TrimSpace(string(page.Body))) == 0 {
 			issues = append(issues, LintIssue{
 				Type:     "empty_pages",
+				RuleID:   "empty_pages",
 				Message:  "page has no content after frontmatter",
 				Path:     page.RelPath,
 				Severity: "warning",

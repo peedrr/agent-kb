@@ -53,6 +53,7 @@ func (c *CitationsChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error)
 			if !manifestFiles[fn] {
 				issues = append(issues, LintIssue{
 					Type:     "citations",
+					RuleID:   "citations",
 					Message:  fmt.Sprintf("source '%s' not found in raw manifest; run 'akb raw sync' to update", fn),
 					Path:     page.RelPath,
 					Severity: "error",

@@ -32,6 +32,7 @@ func (c *MissingFrontmatterChecker) Check(_ context.Context, kb *KB) ([]LintIssu
 		if !page.HasFrontmatter {
 			issues = append(issues, LintIssue{
 				Type:     "missing_frontmatter",
+				RuleID:   "missing_frontmatter",
 				Message:  "page lacks YAML frontmatter delimiters",
 				Path:     page.RelPath,
 				Severity: "error",

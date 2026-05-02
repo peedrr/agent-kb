@@ -49,6 +49,7 @@ func (c *CategoryDirsChecker) Check(_ context.Context, kb *KB) ([]LintIssue, err
 		if actualDir != expectedDir {
 			issues = append(issues, LintIssue{
 				Type:     "category_dirs",
+				RuleID:   "category_dirs",
 				Message:  fmt.Sprintf("page of type '%s' should be in kb/%s/ but is in kb/%s/", page.Frontmatter.Type, expectedDir, actualDir),
 				Path:     page.RelPath,
 				Severity: "warning",

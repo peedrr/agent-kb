@@ -59,6 +59,7 @@ func (c *ProvenanceChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error
 			if drift > ProvenanceDriftThreshold {
 				issues = append(issues, LintIssue{
 					Type:     "provenance",
+					RuleID:   "provenance",
 					Message:  fmt.Sprintf("provenance drift for '%s': declared %.2f but actual ratio is %.2f (drift: %.2f)", markerType, frontmatterConfidence, inlineRatio, drift),
 					Path:     page.RelPath,
 					Severity: "warning",

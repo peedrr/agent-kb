@@ -29,6 +29,7 @@ func (c *OrphansChecker) Check(ctx context.Context, kb *KB) ([]LintIssue, error)
 	for _, p := range paths {
 		issues = append(issues, LintIssue{
 			Type:     "orphans",
+			RuleID:   "orphans",
 			Message:  "page has no inbound links",
 			Path:     p,
 			Severity: "warning",

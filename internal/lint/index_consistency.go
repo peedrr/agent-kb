@@ -51,6 +51,7 @@ func (c *IndexConsistencyChecker) Check(_ context.Context, kb *KB) ([]LintIssue,
 		if !pagePaths[path] {
 			issues = append(issues, LintIssue{
 				Type:     "index_consistency",
+				RuleID:   "index_consistency",
 				Message:  "page listed in index.md but file does not exist",
 				Path:     path,
 				Severity: "error",
@@ -62,6 +63,7 @@ func (c *IndexConsistencyChecker) Check(_ context.Context, kb *KB) ([]LintIssue,
 		if !indexPaths[path] {
 			issues = append(issues, LintIssue{
 				Type:     "index_consistency",
+				RuleID:   "index_consistency",
 				Message:  "page exists but is missing from index.md",
 				Path:     path,
 				Severity: "warning",

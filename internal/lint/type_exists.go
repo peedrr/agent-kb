@@ -40,6 +40,7 @@ func (c *TypeExistsChecker) Check(_ context.Context, kb *KB) ([]LintIssue, error
 		if _, ok := kb.Templates[fm.Type]; !ok {
 			issues = append(issues, LintIssue{
 				Type:     "type_exists",
+				RuleID:   "type_exists",
 				Message:  fmt.Sprintf("unknown type '%s'. Create .akb/templates/%s.yaml first.", fm.Type, fm.Type),
 				Path:     page.RelPath,
 				Severity: "error",

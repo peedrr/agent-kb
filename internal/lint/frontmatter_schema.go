@@ -60,6 +60,7 @@ func (c *FrontmatterSchemaChecker) Check(_ context.Context, kb *KB) ([]LintIssue
 			if field.Required && !exists {
 				issues = append(issues, LintIssue{
 					Type:     "frontmatter_schema",
+					RuleID:   "frontmatter_schema",
 					Message:  fmt.Sprintf("missing required field '%s' for type '%s'", fieldName, fm.Type),
 					Path:     page.RelPath,
 					Severity: "error",
@@ -73,23 +74,25 @@ func (c *FrontmatterSchemaChecker) Check(_ context.Context, kb *KB) ([]LintIssue
 
 			if len(field.Enum) > 0 {
 				strVal, ok := value.(string)
-				if !ok {
-					issues = append(issues, LintIssue{
-						Type:     "frontmatter_schema",
-						Message:  fmt.Sprintf("field '%s' must be a string for type '%s'", fieldName, fm.Type),
-						Path:     page.RelPath,
-						Severity: "error",
-					})
-					continue
-				}
-				if !isInEnum(strVal, field.Enum) {
-					issues = append(issues, LintIssue{
-						Type:     "frontmatter_schema",
-						Message:  fmt.Sprintf("field '%s' value '%s' is not valid; must be one of: %s", fieldName, strVal, strings.Join(field.Enum, ", ")),
-						Path:     page.RelPath,
-						Severity: "error",
-					})
-				}
+if !ok {
+				issues = append(issues, LintIssue{
+					Type:     "frontmatter_schema",
+					RuleID:   "frontmatter_schema",
+					Message:  fmt.Sprintf("field '%s' must be a string for type '%s'", fieldName, fm.Type),
+					Path:     page.RelPath,
+					Severity: "error",
+				})
+				continue
+			}
+if !isInEnum(strVal, field.Enum) {
+				issues = append(issues, LintIssue{
+					Type:     "frontmatter_schema",
+					RuleID:   "frontmatter_schema",
+					Message:  fmt.Sprintf("field '%s' value '%s' is not valid; must be one of: %s", fieldName, strVal, strings.Join(field.Enum, ", ")),
+					Path:     page.RelPath,
+					Severity: "error",
+				})
+			}
 			}
 		}
 	}
