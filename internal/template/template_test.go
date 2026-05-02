@@ -4,65 +4,40 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/goccy/go-yaml"
 )
 
-func TestFieldUnmarshalYAML(t *testing.T) {
-	t.Run("plain string field", func(t *testing.T) {
-		input := `"title"`
-		var f Field
-		if err := yaml.Unmarshal([]byte(input), &f); err != nil {
-			t.Fatalf("Unmarshal failed: %v", err)
-		}
-		if f.Name != "title" {
-			t.Errorf("Name = %q, want %q", f.Name, "title")
-		}
-		if len(f.Enum) != 0 {
-			t.Errorf("Enum = %v, want empty", f.Enum)
-		}
-	})
-
-	t.Run("map with enum", func(t *testing.T) {
-		input := `
-status:
-  enum:
-    - proposed
-    - accepted
-    - deprecated
-`
-		var f Field
-		if err := yaml.Unmarshal([]byte(input), &f); err != nil {
-			t.Fatalf("Unmarshal failed: %v", err)
-		}
-		if f.Name != "status" {
-			t.Errorf("Name = %q, want %q", f.Name, "status")
-		}
-		if len(f.Enum) != 3 {
-			t.Fatalf("Enum length = %d, want 3", len(f.Enum))
-		}
-		if f.Enum[0] != "proposed" || f.Enum[1] != "accepted" || f.Enum[2] != "deprecated" {
-			t.Errorf("Enum = %v, want [proposed accepted deprecated]", f.Enum)
-		}
-	})
-}
-
 func TestLoadTemplates(t *testing.T) {
-	t.Run("loads valid templates", func(t *testing.T) {
+	t.Run("loads valid new-format templates", func(t *testing.T) {
 		dir := t.TempDir()
 		noteYaml := `name: note
+description: General knowledge note
 dir: notes
-required:
-  - title
-  - type
-  - summary
-  - tags
-optional:
-  - created
-  - updated
-  - sources
-body: |
-  # {{.Title}}
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    type:
+      type: string
+      required: true
+    summary:
+      type: string
+      required: true
+    tags:
+      type: list
+      required: true
+    created:
+      type: string
+      required: false
+validations:
+  - id: v1
+    rule: "size(title) > 0"
+    expect: "title must not be empty"
+lint_rules:
+  - id: l1
+    rule: "summary.length > 10"
+    severity: warning
+    expect: "summary should be longer than 10 characters"
 `
 		err := os.WriteFile(filepath.Join(dir, "note.yaml"), []byte(noteYaml), 0600)
 		if err != nil {
@@ -83,14 +58,43 @@ body: |
 		if note.Name != "note" {
 			t.Errorf("Name = %q, want %q", note.Name, "note")
 		}
+		if note.Description != "General knowledge note" {
+			t.Errorf("Description = %q, want %q", note.Description, "General knowledge note")
+		}
 		if note.Dir != "notes" {
 			t.Errorf("Dir = %q, want %q", note.Dir, "notes")
 		}
-		if len(note.Required) != 4 || note.Required[0].Name != "title" || note.Required[1].Name != "type" || note.Required[2].Name != "summary" || note.Required[3].Name != "tags" {
-			t.Errorf("Required = %v, want [{Name:title},{Name:type},{Name:summary},{Name:tags}]", note.Required)
+		if len(note.Schema.Frontmatter) != 5 {
+			t.Errorf("Schema.Frontmatter len = %d, want 5", len(note.Schema.Frontmatter))
 		}
-		if len(note.Optional) != 3 || note.Optional[0].Name != "created" || note.Optional[1].Name != "updated" || note.Optional[2].Name != "sources" {
-			t.Errorf("Optional = %v, want [{Name:created},{Name:updated},{Name:sources}]", note.Optional)
+		titleSchema, ok := note.Schema.Frontmatter["title"]
+		if !ok {
+			t.Fatal("expected 'title' in schema")
+		}
+		if titleSchema.Type != "string" {
+			t.Errorf("title.Type = %q, want %q", titleSchema.Type, "string")
+		}
+		if !titleSchema.Required {
+			t.Error("title.Required = false, want true")
+		}
+		createdSchema, ok := note.Schema.Frontmatter["created"]
+		if !ok {
+			t.Fatal("expected 'created' in schema")
+		}
+		if createdSchema.Required {
+			t.Error("created.Required = true, want false")
+		}
+		if len(note.Validations) != 1 {
+			t.Errorf("Validations len = %d, want 1", len(note.Validations))
+		}
+		if note.Validations[0].ID != "v1" {
+			t.Errorf("Validation[0].ID = %q, want %q", note.Validations[0].ID, "v1")
+		}
+		if len(note.LintRules) != 1 {
+			t.Errorf("LintRules len = %d, want 1", len(note.LintRules))
+		}
+		if note.LintRules[0].Severity != "warning" {
+			t.Errorf("LintRule[0].Severity = %q, want %q", note.LintRules[0].Severity, "warning")
 		}
 	})
 
@@ -98,17 +102,18 @@ body: |
 		dir := t.TempDir()
 		adrYaml := `name: adr
 dir: decisions
-required:
-  - title
-  - status:
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    status:
+      type: string
+      required: true
       enum:
         - proposed
         - accepted
         - deprecated
-optional:
-  - context
-body: |
-  # {{.Title}}
 `
 		err := os.WriteFile(filepath.Join(dir, "adr.yaml"), []byte(adrYaml), 0600)
 		if err != nil {
@@ -123,18 +128,78 @@ body: |
 		if !ok {
 			t.Fatal("expected template with name 'adr'")
 		}
-		var statusField *Field
-		for i := range adr.Required {
-			if adr.Required[i].Name == "status" {
-				statusField = &adr.Required[i]
-				break
-			}
+		statusSchema, ok := adr.Schema.Frontmatter["status"]
+		if !ok {
+			t.Fatal("expected 'status' in schema")
 		}
-		if statusField == nil {
-			t.Fatal("expected required field 'status'")
+		if len(statusSchema.Enum) != 3 {
+			t.Fatalf("Enum length = %d, want 3", len(statusSchema.Enum))
 		}
-		if len(statusField.Enum) != 3 {
-			t.Errorf("Enum length = %d, want 3", len(statusField.Enum))
+		if statusSchema.Enum[0] != "proposed" || statusSchema.Enum[1] != "accepted" || statusSchema.Enum[2] != "deprecated" {
+			t.Errorf("Enum = %v, want [proposed accepted deprecated]", statusSchema.Enum)
+		}
+	})
+
+	t.Run("rejects old-format template with required", func(t *testing.T) {
+		dir := t.TempDir()
+		oldYaml := `name: note
+dir: notes
+required:
+  - title
+`
+		err := os.WriteFile(filepath.Join(dir, "old.yaml"), []byte(oldYaml), 0600)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = LoadTemplates(dir)
+		if err == nil {
+			t.Fatal("expected error for old-format template")
+		}
+		if !contains(err.Error(), "Template format has changed") {
+			t.Errorf("error should mention format change, got: %v", err)
+		}
+	})
+
+	t.Run("rejects old-format template with optional", func(t *testing.T) {
+		dir := t.TempDir()
+		oldYaml := `name: note
+dir: notes
+optional:
+  - created
+`
+		err := os.WriteFile(filepath.Join(dir, "old.yaml"), []byte(oldYaml), 0600)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = LoadTemplates(dir)
+		if err == nil {
+			t.Fatal("expected error for old-format template")
+		}
+		if !contains(err.Error(), "Template format has changed") {
+			t.Errorf("error should mention format change, got: %v", err)
+		}
+	})
+
+	t.Run("rejects old-format template with body", func(t *testing.T) {
+		dir := t.TempDir()
+		oldYaml := `name: note
+dir: notes
+body: |
+  # {{.Title}}
+`
+		err := os.WriteFile(filepath.Join(dir, "old.yaml"), []byte(oldYaml), 0600)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, err = LoadTemplates(dir)
+		if err == nil {
+			t.Fatal("expected error for old-format template")
+		}
+		if !contains(err.Error(), "Template format has changed") {
+			t.Errorf("error should mention format change, got: %v", err)
 		}
 	})
 
@@ -142,8 +207,11 @@ body: |
 		dir := t.TempDir()
 		content := `name: note
 dir: notes
-required:
-  - title
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
 `
 		err := os.WriteFile(filepath.Join(dir, "note.yaml"), []byte(content), 0600)
 		if err != nil {
@@ -166,8 +234,8 @@ required:
 	t.Run("rejects missing name", func(t *testing.T) {
 		dir := t.TempDir()
 		content := `dir: notes
-required:
-  - title
+schema:
+  frontmatter: {}
 `
 		err := os.WriteFile(filepath.Join(dir, "noname.yaml"), []byte(content), 0600)
 		if err != nil {
@@ -211,6 +279,57 @@ required:
 	})
 }
 
+func TestAllowedFields(t *testing.T) {
+	t.Run("returns schema keys plus is_draft", func(t *testing.T) {
+		tmpl := Template{
+			Name: "note",
+			Schema: Schema{
+				Frontmatter: map[string]FieldSchema{
+					"title":   {Type: "string", Required: true},
+					"summary": {Type: "string", Required: true},
+					"tags":    {Type: "list", Required: true},
+				},
+			},
+		}
+
+		fields := tmpl.AllowedFields()
+		if len(fields) != 4 {
+			t.Fatalf("AllowedFields len = %d, want 4", len(fields))
+		}
+
+		seen := make(map[string]bool)
+		for _, f := range fields {
+			seen[f] = true
+		}
+		if !seen["title"] || !seen["summary"] || !seen["tags"] || !seen["is_draft"] {
+			t.Errorf("AllowedFields = %v, want [title summary tags is_draft]", fields)
+		}
+	})
+
+	t.Run("does not duplicate is_draft if already in schema", func(t *testing.T) {
+		tmpl := Template{
+			Name: "note",
+			Schema: Schema{
+				Frontmatter: map[string]FieldSchema{
+					"is_draft": {Type: "bool", Required: false},
+					"title":    {Type: "string", Required: true},
+				},
+			},
+		}
+
+		fields := tmpl.AllowedFields()
+		count := 0
+		for _, f := range fields {
+			if f == "is_draft" {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Errorf("is_draft appears %d times, want 1", count)
+		}
+	})
+}
+
 func TestCopyDefaults(t *testing.T) {
 	t.Run("copies embedded templates to target", func(t *testing.T) {
 		dir := t.TempDir()
@@ -240,7 +359,7 @@ func TestCopyDefaults(t *testing.T) {
 
 	t.Run("skips existing files", func(t *testing.T) {
 		dir := t.TempDir()
-		existingContent := "name: my-custom-note\ndir: custom\n"
+		existingContent := "name: my-custom-note\nschema:\n  frontmatter: {}\n"
 		err := os.WriteFile(filepath.Join(dir, "note.yaml"), []byte(existingContent), 0600)
 		if err != nil {
 			t.Fatal(err)
@@ -276,10 +395,26 @@ func TestCopyDefaults(t *testing.T) {
 			t.Error("target directory should have been created")
 		}
 	})
+
+	t.Run("copies .md files alongside .yaml files", func(t *testing.T) {
+		dir := t.TempDir()
+		err := CopyDefaults(dir)
+		if err != nil {
+			t.Fatalf("CopyDefaults failed: %v", err)
+		}
+
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			t.Fatalf("ReadDir failed: %v", err)
+		}
+		if len(entries) == 0 {
+			t.Error("expected files to be copied")
+		}
+	})
 }
 
 func TestEmbeddedTemplates(t *testing.T) {
-	t.Run("embedded templates are valid", func(t *testing.T) {
+	t.Run("embedded templates are valid new-format", func(t *testing.T) {
 		templates, err := LoadTemplatesFromFS(DefaultTemplates)
 		if err != nil {
 			t.Fatalf("embedded templates invalid: %v", err)
@@ -295,6 +430,9 @@ func TestEmbeddedTemplates(t *testing.T) {
 		if note.Dir != "notes" {
 			t.Errorf("note.Dir = %q, want %q", note.Dir, "notes")
 		}
+		if len(note.Schema.Frontmatter) == 0 {
+			t.Error("note schema should have frontmatter fields")
+		}
 
 		adr, ok := templates["adr"]
 		if !ok {
@@ -304,18 +442,15 @@ func TestEmbeddedTemplates(t *testing.T) {
 			t.Errorf("adr.Dir = %q, want %q", adr.Dir, "decisions")
 		}
 
-		var statusField *Field
-		for i := range adr.Required {
-			if adr.Required[i].Name == "status" {
-				statusField = &adr.Required[i]
-				break
-			}
+		statusSchema, ok := adr.Schema.Frontmatter["status"]
+		if !ok {
+			t.Fatal("expected 'status' in adr schema")
 		}
-		if statusField == nil {
-			t.Fatal("expected 'status' required field in adr template")
-		}
-		if len(statusField.Enum) == 0 {
+		if len(statusSchema.Enum) == 0 {
 			t.Error("status field should have enum values")
+		}
+		if statusSchema.Enum[0] != "proposed" {
+			t.Errorf("status.Enum[0] = %q, want %q", statusSchema.Enum[0], "proposed")
 		}
 	})
 }

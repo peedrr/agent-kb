@@ -11,58 +11,48 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-// Field defines a single template field with optional enum values.
-type Field struct {
-	Name string
-	Enum []string
+// Schema defines the frontmatter schema for a template.
+type Schema struct {
+	Frontmatter map[string]FieldSchema `yaml:"frontmatter"`
 }
 
-// UnmarshalYAML parses a Field from YAML, supporting simple string or enum map.
-func (f *Field) UnmarshalYAML(unmarshal func(any) error) error {
-	var raw any
-	if err := unmarshal(&raw); err != nil {
-		return err
-	}
-
-	switch v := raw.(type) {
-	case string:
-		f.Name = v
-		return nil
-	case map[string]any:
-		for key, val := range v {
-			f.Name = key
-			if m, ok := val.(map[string]any); ok {
-				if enumRaw, ok := m["enum"]; ok {
-					if enumSlice, ok := enumRaw.([]any); ok {
-						for _, item := range enumSlice {
-							if s, ok := item.(string); ok {
-								f.Enum = append(f.Enum, s)
-							}
-						}
-					}
-				}
-			}
-			return nil
-		}
-		return fmt.Errorf("empty map for field")
-	default:
-		return fmt.Errorf("field must be a string or map, got %T", raw)
-	}
+// FieldSchema defines the type and constraints for a single frontmatter field.
+type FieldSchema struct {
+	Type     string   `yaml:"type"`
+	Required bool     `yaml:"required"`
+	Enum     []string `yaml:"enum,omitempty"`
 }
 
-// Template defines a typed page template with fields and required keys.
+// ValidationRule defines a CEL validation rule for a template.
+type ValidationRule struct {
+	ID          string `yaml:"id"`
+	Rule        string `yaml:"rule"`
+	Requirement string `yaml:"requirement,omitempty"`
+	Expect      string `yaml:"expect"`
+}
+
+// LintRule defines a lint rule for a template.
+type LintRule struct {
+	ID       string `yaml:"id"`
+	Rule     string `yaml:"rule"`
+	Severity string `yaml:"severity"` // "warning" | "error"
+	Expect   string `yaml:"expect"`
+}
+
+// Template defines a typed page template with schema, validations, and lint rules.
 type Template struct {
-	Name         string  `yaml:"name"`
-	Dir          string  `yaml:"dir"`
-	Required     []Field `yaml:"required"`
-	Optional     []Field `yaml:"optional"`
-	BodyTemplate string  `yaml:"body"`
-	filename     string
+	Name        string           `yaml:"name"`
+	Description string           `yaml:"description"`
+	Dir         string           `yaml:"dir"`
+	Schema      Schema           `yaml:"schema"`
+	Validations []ValidationRule `yaml:"validations"`
+	LintRules   []LintRule       `yaml:"lint_rules"`
+	filename    string
 }
 
 // DefaultFS holds the embedded default templates.
 //
-//go:embed embedded/*.yaml
+//go:embed embedded/*
 var DefaultFS embed.FS
 
 // DefaultTemplates is the FS used to load embedded default templates.
@@ -74,6 +64,15 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create sub FS: %v", err))
 	}
+}
+
+func detectOldFormat(raw map[string]any, filename string) error {
+	for _, key := range []string{"required", "optional", "body"} {
+		if _, ok := raw[key]; ok {
+			return fmt.Errorf("parse %s: Template format has changed. Please update to the new schema.", filename)
+		}
+	}
+	return nil
 }
 
 // LoadTemplates reads template YAML files from a directory.
@@ -96,6 +95,14 @@ func LoadTemplates(dir string) (map[string]Template, error) {
 		data, err := os.ReadFile(path) //nolint:gosec // path constructed from validated dir and fs.DirEntry
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", entry.Name(), err)
+		}
+
+		var raw map[string]any
+		if err := yaml.Unmarshal(data, &raw); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", entry.Name(), err)
+		}
+		if err := detectOldFormat(raw, entry.Name()); err != nil {
+			return nil, err
 		}
 
 		var tmpl Template
@@ -136,6 +143,14 @@ func LoadTemplatesFromFS(fsys fs.FS) (map[string]Template, error) {
 			return nil, fmt.Errorf("read %s: %w", entry.Name(), err)
 		}
 
+		var raw map[string]any
+		if err := yaml.Unmarshal(data, &raw); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", entry.Name(), err)
+		}
+		if err := detectOldFormat(raw, entry.Name()); err != nil {
+			return nil, err
+		}
+
 		var tmpl Template
 		if err := yaml.Unmarshal(data, &tmpl); err != nil {
 			return nil, fmt.Errorf("parse %s: %w", entry.Name(), err)
@@ -156,26 +171,19 @@ func LoadTemplatesFromFS(fsys fs.FS) (map[string]Template, error) {
 	return templates, nil
 }
 
-// AllowedFields returns all declared field names (required + optional) for this template,
+// AllowedFields returns all declared field names from Schema.Frontmatter for this template,
 // plus the built-in 'is_draft' field.
 func (t Template) AllowedFields() []string {
 	seen := make(map[string]struct{})
 	var fields []string
 
-	for _, f := range t.Required {
-		if _, ok := seen[f.Name]; !ok {
-			seen[f.Name] = struct{}{}
-			fields = append(fields, f.Name)
-		}
-	}
-	for _, f := range t.Optional {
-		if _, ok := seen[f.Name]; !ok {
-			seen[f.Name] = struct{}{}
-			fields = append(fields, f.Name)
+	for key := range t.Schema.Frontmatter {
+		if _, ok := seen[key]; !ok {
+			seen[key] = struct{}{}
+			fields = append(fields, key)
 		}
 	}
 
-	// is_draft is always allowed as a built-in system field
 	if _, ok := seen["is_draft"]; !ok {
 		fields = append(fields, "is_draft")
 	}

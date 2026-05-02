@@ -1,63 +1,60 @@
 name: adr
+description: Architecture Decision Record
 dir: decisions
-required:
-  - title
-  - type
-  - summary
-  - tags
-  - status:
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    type:
+      type: string
+      required: true
+    summary:
+      type: string
+      required: true
+    tags:
+      type: list
+      required: true
+    status:
+      type: string
+      required: true
       enum:
         - proposed
         - accepted
         - deprecated
         - superseded
-  - deciders
-  - created
-  - updated
-optional:
-  - sources
-  - context
-  - decision
-  - consequences
-body: |
-  # {{.Title}}
-
-  ## Status
-
-  {{.Status}}
-
-  ## Type
-
-  {{.Type}}
-
-  ## Summary
-
-  {{.Summary}}
-
-  ## Tags
-
-  {{.Tags}}
-
-  ## Deciders
-
-  {{.Deciders}}
-
-  ## Created
-
-  {{.Created}}
-
-  ## Updated
-
-  {{.Updated}}
-
-  ## Context
-
-  {{.Context}}
-
-  ## Decision
-
-  {{.Decision}}
-
-  ## Consequences
-
-  {{.Consequences}}
+    deciders:
+      type: string
+      required: true
+    created:
+      type: string
+      required: true
+    updated:
+      type: string
+      required: true
+    sources:
+      type: list
+      required: false
+    context:
+      type: string
+      required: false
+    decision:
+      type: string
+      required: false
+    consequences:
+      type: string
+      required: false
+validations:
+  - id: require_context
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Context")'
+    requirement: Must include H2 'Context' section
+    expect: page must have a '## Context' heading
+  - id: valid_status
+    rule: 'page.frontmatter.status in ["proposed", "accepted", "deprecated", "superseded"]'
+    requirement: Status must be a valid ADR status
+    expect: status must be one of proposed, accepted, deprecated, superseded
+lint_rules:
+  - id: adr_stale
+    rule: 'now - timestamp(page.frontmatter.updated) < duration("4320h")'
+    severity: warning
+    expect: ADR hasn't been updated in 180 days

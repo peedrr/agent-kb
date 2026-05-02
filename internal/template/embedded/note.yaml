@@ -1,13 +1,36 @@
 name: note
+description: General knowledge note
 dir: notes
-required:
-  - title
-  - type
-  - summary
-  - tags
-optional:
-  - created
-  - updated
-  - sources
-body: |
-  # {{.Title}}
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    type:
+      type: string
+      required: true
+    summary:
+      type: string
+      required: true
+    tags:
+      type: list
+      required: true
+    created:
+      type: string
+      required: false
+    updated:
+      type: string
+      required: false
+    sources:
+      type: list
+      required: false
+validations:
+  - id: require_title
+    rule: 'page.frontmatter.title != ""'
+    requirement: Title must not be empty
+    expect: frontmatter title must be non-empty
+lint_rules:
+  - id: note_stale
+    rule: 'now - timestamp(page.frontmatter.updated) < duration("2160h")'
+    severity: warning
+    expect: Note hasn't been updated in 90 days

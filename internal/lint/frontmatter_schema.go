@@ -43,10 +43,10 @@ func (c *FrontmatterSchemaChecker) Check(_ context.Context, kb *KB) ([]LintIssue
 			continue
 		}
 
-		for _, field := range tmpl.Required {
+		for fieldName, field := range tmpl.Schema.Frontmatter {
 			var value any
 			var exists bool
-			switch field.Name {
+			switch fieldName {
 			case "type":
 				value = fm.Type
 				exists = fm.Type != ""
@@ -54,16 +54,20 @@ func (c *FrontmatterSchemaChecker) Check(_ context.Context, kb *KB) ([]LintIssue
 				value = fm.Title
 				exists = fm.Title != ""
 			default:
-				value, exists = fm.Fields[field.Name]
+				value, exists = fm.Fields[fieldName]
 			}
 
-			if !exists {
+			if field.Required && !exists {
 				issues = append(issues, LintIssue{
 					Type:     "frontmatter_schema",
-					Message:  fmt.Sprintf("missing required field '%s' for type '%s'", field.Name, fm.Type),
+					Message:  fmt.Sprintf("missing required field '%s' for type '%s'", fieldName, fm.Type),
 					Path:     page.RelPath,
 					Severity: "error",
 				})
+				continue
+			}
+
+			if !exists {
 				continue
 			}
 
@@ -72,7 +76,7 @@ func (c *FrontmatterSchemaChecker) Check(_ context.Context, kb *KB) ([]LintIssue
 				if !ok {
 					issues = append(issues, LintIssue{
 						Type:     "frontmatter_schema",
-						Message:  fmt.Sprintf("field '%s' must be a string for type '%s'", field.Name, fm.Type),
+						Message:  fmt.Sprintf("field '%s' must be a string for type '%s'", fieldName, fm.Type),
 						Path:     page.RelPath,
 						Severity: "error",
 					})
@@ -81,7 +85,7 @@ func (c *FrontmatterSchemaChecker) Check(_ context.Context, kb *KB) ([]LintIssue
 				if !isInEnum(strVal, field.Enum) {
 					issues = append(issues, LintIssue{
 						Type:     "frontmatter_schema",
-						Message:  fmt.Sprintf("field '%s' value '%s' is not valid; must be one of: %s", field.Name, strVal, strings.Join(field.Enum, ", ")),
+						Message:  fmt.Sprintf("field '%s' value '%s' is not valid; must be one of: %s", fieldName, strVal, strings.Join(field.Enum, ", ")),
 						Path:     page.RelPath,
 						Severity: "error",
 					})
