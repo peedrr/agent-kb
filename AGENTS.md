@@ -1,13 +1,13 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-04-25
-**Commit:** f361e81
+**Generated:** 2026-05-02
+**Commit:** 64ab9a0
 **Branch:** master
 **Status:** WIP/prototype - APIs subject to change
 
 ## OVERVIEW
 
-Agent KB (akb): Go CLI for managing a git-tracked knowledge base with SQLite FTS5 search, SQLite link graph, YAML frontmatter, typed page templates, lint engine, and raw drift detection.
+Agent KB (akb): Go CLI for managing a git-tracked knowledge base with SQLite FTS5 search, SQLite link graph, YAML frontmatter, typed page templates, CEL-driven validation, lint engine, and raw drift detection.
 
 ## STRUCTURE
 
@@ -15,21 +15,22 @@ Agent KB (akb): Go CLI for managing a git-tracked knowledge base with SQLite FTS
 agent-kb/
 ├── cmd/akb/        # CLI commands (Cobra, 25+ commands)
 ├── internal/       # Core packages
+│   ├── cel/        # CEL expression engine (validation + lint)
 │   ├── config/     # .akb.yaml handling
 │   ├── db/         # SQLite schema + WAL mode
-│   ├── frontmatter/# YAML frontmatter parsing
+│   ├── frontmatter/# YAML frontmatter parsing (goldmark + goccy/go-yaml)
 │   ├── index/      # kb/index.md management
 │   ├── linkgraph/  # SQLite link tracking (wikilinks)
-│   ├── lint/       # 13 lint checkers + engine
+│   ├── lint/       # 8 lint checkers + engine
 │   ├── log/        # kb/log.md append-only log
 │   ├── manifest/   # raw/files.log SHA-256 manifest
-│   ├── markdown/   # Wikilink, annotation, provenance parsers
+│   ├── markdown/   # Wikilink, annotation, provenance, AST parsers
 │   ├── path/       # KB path resolution & guards
 │   ├── registry/   # ~/.config/agent-kb/registry.yaml
 │   ├── search/     # SQLite FTS5 full-text search
 │   ├── skill/      # Embedded skill management (//go:embed)
 │   ├── storage/    # GitProvider (auto-commit)
-│   └── template/   # Typed page templates
+│   └── template/   # Typed page templates (TemplateV2 with CEL rules)
 └── test/           # Integration tests (testscript)
 ```
 
@@ -39,19 +40,24 @@ agent-kb/
 |------|----------|-------|
 | Add command | `cmd/akb/` | New subcommand = new file |
 | KB path logic | `internal/path/path.go` | KBRoot(), ResolveKBPath() |
-| Page write flow | `cmd/akb/write.go` | stdin → frontmatter → git → search → links |
+| Page write flow | `cmd/akb/write.go` | stdin → frontmatter → CEL validation → git → search → links |
 | Index management | `internal/index/index.go` | kb/index.md parsing/rendering |
 | Search | `internal/search/sqlite.go` | SQLite FTS5 with BM25 ranking |
 | Link graph | `internal/linkgraph/sqlite.go` | 3-step wikilink resolution |
 | Wikilink parser | `internal/markdown/wikilink.go` | Excludes code blocks, inline code, HTML comments |
 | Annotation parser | `internal/markdown/annotation.go` | `<!-- olw-auto: ... -->` HTML comments |
 | Provenance markers | `internal/markdown/provenance.go` | `^[inferred]`, `^[ambiguous]`, `^[extracted]` |
+| Markdown AST | `internal/markdown/ast.go` | Goldmark AST flattener for CEL (headings, links, code blocks) |
+| CEL engine | `internal/cel/engine.go` | Environment builder, rule compiler, evaluator with panic recovery |
+| CEL page builder | `internal/cel/pagebuilder.go` | Builds `page`/`old_page` maps from frontmatter + AST |
+| Template loader | `internal/template/template.go` | TemplateV2 with schema, validations, lint_rules |
+| Template commands | `cmd/akb/template.go`, `templates_write.go` | `template get/list`, `templates write` |
 | Git integration | `internal/storage/git.go` | Auto-commit, merge conflict detection |
 | DB schema | `internal/db/db.go` | documents, pages, links tables + FTS5 |
-| Template validation | `internal/template/template.go` | Typed pages (note, adr, custom) |
 | Config format | `internal/config/config.go` | YAML .akb.yaml |
 | Lint engine | `internal/lint/engine.go` | LintEngine, LintChecker interface |
-| Lint checks | `internal/lint/*.go` | 13 checkers (broken_links, orphans, freshness, etc.) |
+| Lint checks | `internal/lint/*.go` | 8 checkers (broken_links, orphans, empty_pages, missing_frontmatter, index_consistency, citations, provenance, cel_lint) |
+| CEL lint checker | `internal/lint/cel.go` | Evaluates template `lint_rules` with `now` injection |
 | Manifest | `internal/manifest/manifest.go` | raw/files.log SHA-256 tracking |
 | Skill install | `internal/skill/skill.go` | `//go:embed embedded/*` |
 | Registry | `internal/registry/registry.go` | Multi-KB registry with default |
@@ -60,7 +66,6 @@ agent-kb/
 | Write frontmatter | `cmd/akb/write.go` | `--frontmatter key=val` for partial updates |
 | Batch approve | `cmd/akb/approve.go` | `--all-drafts` to approve all draft pages |
 | Dimensional search | `cmd/akb/search.go` | `--tag`, `--type`, `--after` filters |
-| Stale all KBs | `cmd/akb/stale.go` | `--all` checks all registered KBs |
 | List drafts | `cmd/akb/list.go` | `--json` includes `is_draft` field |
 
 ## CODE MAP
@@ -76,13 +81,22 @@ agent-kb/
 | LinkGraphUpdater | interface | internal/linkgraph/updater.go:7 | UpdatePageLinks/RemovePage |
 | SQLiteLinkGraph | struct | internal/linkgraph/sqlite.go:24 | SQLite implementation |
 | Link | struct | internal/linkgraph/sqlite.go:16 | Source, target, display, resolved |
-| LintChecker | interface | internal/lint/engine.go:26 | Name()/Check() interface |
-| LintEngine | struct | internal/lint/engine.go:49 | Orchestrates all checkers |
-| LintIssue | struct | internal/lint/engine.go:13 | Type/Message/Path/Severity |
-| LintReport | struct | internal/lint/engine.go:20 | Issues/PagesChecked/ByCheck |
-| KB | struct | internal/lint/engine.go:31 | Lint context: root, linkgraph, templates, pages |
-| PageData | struct | internal/lint/engine.go:39 | Parsed page with frontmatter + markers |
-| Template | struct | internal/template/template.go:50 | Page type definition |
+| LintChecker | interface | internal/lint/engine.go:37 | Name()/Check() interface |
+| LintEngine | struct | internal/lint/engine.go:69 | Orchestrates all checkers |
+| LintIssue | struct | internal/lint/engine.go:17 | Type/RuleID/Message/Path/Severity |
+| LintReport | struct | internal/lint/engine.go:28 | Issues/PagesChecked/ByCheck |
+| KB | struct | internal/lint/engine.go:45 | Lint context: root, linkgraph, templates, pages |
+| PageData | struct | internal/lint/engine.go:56 | Parsed page with frontmatter + markers |
+| Template | struct | internal/template/template.go:43 | TemplateV2: schema, validations, lint_rules |
+| Schema | struct | internal/template/template.go:15 | Frontmatter schema definition |
+| ValidationRule | struct | internal/template/template.go:27 | Write-time CEL validation rule |
+| LintRule | struct | internal/template/template.go:35 | Sweep-time CEL lint rule |
+| NewEnv | func | internal/cel/engine.go:19 | Creates CEL env with page/old_page/now variables |
+| CompileRule | func | internal/cel/engine.go:29 | Parses/compiles CEL expr, caches programs |
+| Evaluate | func | internal/cel/engine.go:51 | Evaluates CEL program with panic recovery |
+| ValidationError | struct | internal/cel/errors.go:5 | RuleID/Message/Line/Severity |
+| BuildPage | func | internal/cel/pagebuilder.go:48 | Assembles page map from frontmatter + AST |
+| BuildOldPage | func | internal/cel/pagebuilder.go:88 | Reads on-disk page, builds old_page map |
 | IndexEntry | struct | internal/index/index.go:12 | Page in index |
 | ParsedFrontmatter | struct | internal/frontmatter/frontmatter.go:11 | Type, Title, Fields, IsDraft |
 | Wikilink | struct | internal/markdown/wikilink.go:8 | Target, Display, Heading |
@@ -108,6 +122,9 @@ agent-kb/
 - **is_draft**: Auto-managed frontmatter field; new pages are implicit drafts; `akb approve` sets `is_draft: false`
 - **Type enforcement**: All pages MUST declare `type` in frontmatter matching a template in `.akb/templates/`
 - **Build output**: Always `-o bin/akb` (never project root)
+- **Template format**: TemplateV2 uses `schema.frontmatter`, `validations[]`, `lint_rules[]` (old `required[]`/`optional[]`/`body` rejected)
+- **CEL variables**: `page` (map), `old_page` (nullable map), `now` (timestamp) injected at evaluation time
+- **Date fields**: ISO-8601 strings (`created`, `updated`) auto-converted to `time.Time` for CEL `timestamp()`
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
@@ -118,6 +135,9 @@ agent-kb/
 - Do NOT add `--type` flag on `akb write` or `akb append` (type comes from frontmatter)
 - Do NOT build binary in project root (use `bin/`)
 - Do NOT add v2 features (MCP, Nix Flake, goreleaser, TUI, AI exports) in v1 code
+- Do NOT use `gopkg.in/yaml.v3` (replaced by `github.com/goccy/go-yaml`)
+- Do NOT construct `old_page` from in-memory modified state (must read on-disk)
+- Do NOT inject `old_page` for lint sweeps (lint is sweep-time, not write-time)
 
 ## COMMANDS
 
@@ -134,10 +154,16 @@ nix develop                     # Dev shell (Go, gopls, delve, golangci-lint)
 - WIP: APIs may change between commits
 - Wikilink resolution: exact → namespace prefix → basename match
 - FTS5 query escaping strips FTS5 operators (OR, AND, NOT) and special chars
-- Templates embedded in binary via `//go:embed embedded/*.yaml`
+- Templates embedded in binary via `//go:embed embedded/*` (includes `.yaml` + `_pass.md` + `_fail.md`)
 - Skills embedded in binary via `//go:embed embedded/*`
 - Integration tests use testscript framework (`.txt` files in testdata/)
-- 13 lint checks: 5 structural + 6 template-driven + 2 semantic (provenance, freshness)
-- Provenance drift threshold: 0.20; freshness half-life: 30 days; freshness score threshold: 50.0
+- 8 lint checks: 5 structural + 1 template-driven (cel_lint) + 2 semantic (provenance, citations)
+- Provenance drift threshold: 0.20 (still checked by provenance.go)
 - Lint thresholds are hardcoded constants (not configurable via `.akb.yaml` in v1)
-- Recent additions: `--append`, `--frontmatter`, `--all-drafts`, dimensional search (`--tag`/`--type`/`--after`), `--all` for stale
+- CEL engine: programs cached in sync.Map, cost limit 100000, panics recovered as "exceeded compute budget"
+- `akb template get <name>` returns Writer View (schema + requirements only)
+- `akb template get <name> --example` returns `_pass.md` content
+- `akb template get <name> --full` returns complete YAML with CEL rules
+- `akb templates write` validates CEL syntax and test-driven mockups
+- All-errors aggregation on write: ALL failed rules reported, file NOT written if any fail
+- Exit codes: 0=success, 1=validation failure, 2=internal error

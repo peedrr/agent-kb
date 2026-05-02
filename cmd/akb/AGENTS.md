@@ -11,7 +11,7 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 | Command | File | Description |
 |---------|------|-------------|
 | init | `init.go` | Initialize new KB |
-| write | `write.go` | Write page (stdin → frontmatter → git → search → links) |
+| write | `write.go` | Write page (stdin → frontmatter → CEL validation → git → search → links) |
 | read | `read.go` | Read page content |
 | append | `append.go` | Append content to existing page |
 | delete | `delete.go` | Delete page from KB, SQLite, index.md, log.md |
@@ -27,8 +27,9 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 | registry | `registry.go` | List registered KBs |
 | use | `use.go` | Set default KB in registry |
 | approve | `approve.go` | Strip annotations, set `is_draft: false`, commit |
-| stale | `stale.go` | Cross-KB freshness report |
 | skill | `skill.go` | `skill install` — extract embedded skill |
+| template | `template.go` | `template get <name>` (Writer/Mockup/Maintainer views), `template list` |
+| templates write | `templates_write.go` | Write template with CEL syntax + mockup validation |
 | raw | `raw.go` | Parent command for raw namespace |
 | raw write | `raw_write.go` | Write raw file with SHA-256 manifest |
 | raw read | `raw_read.go` | Read raw file content |
@@ -44,11 +45,15 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 - KB root resolved via `path.KBRoot()` at start of each command
 - DB opened via `db.OpenKB(kbRoot)` for search/linkgraph/lint operations
 - `approve` strips provenance markers via `markdown.StripProvenanceMarkers()`; `--all-drafts` for batch approval
-- `stale` iterates ALL KBs in registry; `--json` and `--all` flags supported
 - `raw delete` scans KB pages for frontmatter `sources` referencing the deleted file
 - `write` supports `--append` (append to body) and `--frontmatter key=val` (partial updates)
+- `write` runs CEL validations before file write; exits 1 on validation failure, 2 on internal error
 - `search` supports `--tag`, `--type`, `--after` dimensional filters
 - `list` `--json` includes `is_draft` field
+- `template get <name>` returns Writer View (schema + requirements only)
+- `template get <name> --example` returns `_pass.md` content
+- `template get <name> --full` returns complete YAML with CEL rules
+- `templates write` validates CEL syntax, pass mockup passes all validations, fail mockup fails at least one
 
 ## KEY DEPENDENCIES
 

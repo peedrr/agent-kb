@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Lint engine with 13 checkers across 3 categories: structural, template-driven, semantic.
+Lint engine with 8 checkers across 3 categories: structural, template-driven, semantic.
 
 ## FILES
 
@@ -17,14 +17,9 @@ Lint engine with 13 checkers across 3 categories: structural, template-driven, s
 | `empty_pages.go` | empty_pages | structural |
 | `missing_frontmatter.go` | missing_frontmatter | structural |
 | `index_consistency.go` | index_consistency | structural |
-| `type_exists.go` | type_exists | template-driven |
-| `frontmatter_schema.go` | frontmatter_schema | template-driven |
-| `category_dirs.go` | category_dirs | template-driven |
-| `citations.go` | citations | template-driven |
-| `confidence.go` | confidence | template-driven |
-| `summary_length.go` | summary_length | template-driven |
+| `citations.go` | citations | semantic |
 | `provenance.go` | provenance | semantic |
-| `freshness.go` | freshness | semantic |
+| `cel.go` | cel_lint | template-driven |
 
 ## KEY TYPES
 
@@ -32,7 +27,7 @@ Lint engine with 13 checkers across 3 categories: structural, template-driven, s
 |------|---------|
 | `LintEngine` | Orchestrates checkers, produces `LintReport` |
 | `LintChecker` | Interface: `Name()` + `Check(ctx, *KB) ([]LintIssue, error)` |
-| `LintIssue` | `Type`, `Message`, `Path`, `Severity` |
+| `LintIssue` | `Type`, `RuleID`, `Message`, `Path`, `Severity` |
 | `LintReport` | `Issues`, `PagesChecked`, `ByCheck` |
 | `KB` | Lint context: root path, linkgraph, templates, manifest, parsed pages |
 | `PageData` | Parsed page with content, frontmatter, provenance markers, annotations |
@@ -41,16 +36,14 @@ Lint engine with 13 checkers across 3 categories: structural, template-driven, s
 
 ```go
 ProvenanceDriftThreshold = 0.20   // |frontmatter - inline| ratio
-FreshnessHalfLifeDays    = 30     // days for freshness decay
-FreshnessScoreThreshold  = 50.0   // flag pages below this
-SummaryMinLength         = 10     // chars
-SummaryMaxLength         = 200    // chars
 ```
 
 ## NOTES
 
-- All checkers query SQLite `links` table (not filesystem scan) for broken_links/orphans
-- Template-driven checks use dynamically loaded templates, NOT hardcoded enum
+- All structural checkers query SQLite `links` table (not filesystem scan) for broken_links/orphans
+- `cel_lint` evaluates CEL `lint_rules` from templates with `now` variable injection
+- `citations` validates frontmatter `sources` against raw manifest entries
 - Provenance drift: `|frontmatter_confidence - inline_marker_ratio|` > 0.20
-- Freshness: `score = 100 * 2^(-days/30) * confidence_weight`; flag if < 50
-- `akb lint --json` outputs `LintReport` JSON
+- `akb lint --json` outputs `LintReport` JSON with `rule_id` field
+- Retired checkers (replaced by CEL): `type_exists`, `frontmatter_schema`, `category_dirs`
+- Removed checkers: `freshness`, `confidence`, `summary_length`

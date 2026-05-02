@@ -1,0 +1,71 @@
+# internal/cel/
+
+**Parent:** `./AGENTS.md`
+
+## OVERVIEW
+
+CEL expression evaluation engine for template-based page validation and linting. Bridges frontmatter, markdown AST, and template rules.
+
+## FILES
+
+| File | Purpose |
+|------|---------|
+| `engine.go` | CEL environment builder, rule compiler with caching, evaluator with panic recovery |
+| `types.go` | AST structs (Heading, Link, CodeBlock) with CEL tags for native type registration |
+| `errors.go` | ValidationError struct with RuleID, Message, Line, Severity |
+| `pagebuilder.go` | BuildPage/BuildOldPage — assembles `page`/`old_page` maps from frontmatter + AST |
+
+## KEY TYPES
+
+| Type | Purpose |
+|------|---------|
+| `ValidationError` | Structured error: RuleID/Message/Line/Severity |
+| `Heading` | `level`, `text`, `line` — for CEL `page.ast.headings` |
+| `Link` | `target`, `text`, `is_wikilink`, `line` — for CEL `page.ast.links` |
+| `CodeBlock` | `language`, `line` — for CEL `page.ast.code_blocks` |
+
+## KEY FUNCTIONS
+
+| Function | Purpose |
+|----------|---------|
+| `NewEnv()` | Creates CEL env with `page`, `old_page`, `now` variables |
+| `CompileRule(env, expr)` | Parses/compiles CEL expression; caches result in `sync.Map` |
+| `Evaluate(ctx, prg, vars, costLimit)` | Runs compiled program; recovers from panics; converts cost-limit-exceeded to "exceeded compute budget" error |
+| `BuildPage(relPath, fm, body, astDoc, source)` | Assembles `page` map: `file`, `frontmatter`, `content`, `ast`, `akb` |
+| `BuildOldPage(relPath, store)` | Reads on-disk file, returns `page` map or `nil` for new files |
+
+## CEL VARIABLES
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `page` | `map[string]any` | Post-modification page state |
+| `old_page` | `map[string]any` | Pre-modification page state (nil for new files) |
+| `now` | `timestamp` | Current time (injected during lint sweeps) |
+
+## PAGE MAP STRUCTURE
+
+```
+page.file.path      — relative path
+page.file.name      — basename
+page.file.dir       — directory
+page.frontmatter.type
+page.frontmatter.title
+page.frontmatter.<field>
+page.content.raw
+page.content.word_count
+page.content.char_count
+page.ast.headings   — []{level, text, line}
+page.ast.links      — []{target, text, is_wikilink, line}
+page.ast.code_blocks — []{language, line}
+page.akb.provenance_markers
+page.akb.annotations
+```
+
+## NOTES
+
+- Programs cached in `sync.Map` keyed by expression string
+- Cost limit: 100000 (hardcoded)
+- Panic recovery catches `interpreter.EvalCancelledError` (cost exceeded) and unknown panics
+- `old_page` is nil for new files; `has(old_page)` returns `false` in CEL
+- Date fields (`created`, `updated`) auto-converted from ISO-8601 strings to `time.Time`
+- Inlined markdown parsing in `pagebuilder.go` to avoid import cycle (internal/markdown imports internal/cel for types)
