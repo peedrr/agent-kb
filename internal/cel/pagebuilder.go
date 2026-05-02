@@ -107,8 +107,8 @@ func extractText(n ast.Node, source []byte) string {
 	return string(text)
 }
 
-func flattenHeadings(doc ast.Node, source []byte) []Heading {
-	var headings []Heading
+func flattenHeadings(doc ast.Node, source []byte) []map[string]any {
+	var headings []map[string]any
 	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
@@ -117,18 +117,18 @@ func flattenHeadings(doc ast.Node, source []byte) []Heading {
 		if !ok {
 			return ast.WalkContinue, nil
 		}
-		headings = append(headings, Heading{
-			Level: h.Level,
-			Text:  extractText(h, source),
-			Line:  offsetToLine(source, h.Pos()),
+		headings = append(headings, map[string]any{
+			"level": h.Level,
+			"text":  extractText(h, source),
+			"line":  offsetToLine(source, h.Pos()),
 		})
 		return ast.WalkContinue, nil
 	})
 	return headings
 }
 
-func flattenLinks(doc ast.Node, source []byte) []Link {
-	var links []Link
+func flattenLinks(doc ast.Node, source []byte) []map[string]any {
+	var links []map[string]any
 	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
@@ -139,19 +139,19 @@ func flattenLinks(doc ast.Node, source []byte) []Link {
 		}
 		pos := l.Pos()
 		isWikilink := pos+1 < len(source) && source[pos] == '[' && source[pos+1] == '['
-		links = append(links, Link{
-			Target:     string(l.Destination),
-			Text:       extractText(l, source),
-			IsWikilink: isWikilink,
-			Line:       offsetToLine(source, pos),
+		links = append(links, map[string]any{
+			"target":      string(l.Destination),
+			"text":        extractText(l, source),
+			"is_wikilink": isWikilink,
+			"line":        offsetToLine(source, pos),
 		})
 		return ast.WalkContinue, nil
 	})
 	return links
 }
 
-func flattenCodeBlocks(doc ast.Node, source []byte) []CodeBlock {
-	var blocks []CodeBlock
+func flattenCodeBlocks(doc ast.Node, source []byte) []map[string]any {
+	var blocks []map[string]any
 	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
@@ -164,9 +164,9 @@ func flattenCodeBlocks(doc ast.Node, source []byte) []CodeBlock {
 		if cb.Info != nil {
 			lang = string(cb.Info.Value(source))
 		}
-		blocks = append(blocks, CodeBlock{
-			Language: lang,
-			Line:     offsetToLine(source, cb.Pos()),
+		blocks = append(blocks, map[string]any{
+			"language": lang,
+			"line":     offsetToLine(source, cb.Pos()),
 		})
 		return ast.WalkContinue, nil
 	})

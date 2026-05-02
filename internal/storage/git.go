@@ -66,6 +66,9 @@ func (g *GitProvider) Write(ctx context.Context, path string, data []byte) error
 }
 
 func (g *GitProvider) Read(_ context.Context, path string) ([]byte, error) {
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(g.kbRoot, path)
+	}
 	data, err := os.ReadFile(path) //nolint:gosec // path validated by provider
 	if err != nil {
 		return nil, fmt.Errorf("read file: %w", err)
@@ -106,6 +109,9 @@ func (g *GitProvider) Delete(_ context.Context, path string) error {
 
 // Exists checks whether a file exists.
 func (g *GitProvider) Exists(_ context.Context, path string) (bool, error) {
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(g.kbRoot, path)
+	}
 	_, err := os.Stat(path)
 	if err == nil {
 		return true, nil

@@ -105,40 +105,40 @@ Some body text with a [link](https://example.com).
 	if !ok {
 		t.Fatalf("ast map missing")
 	}
-	headings, ok := astMap["headings"].([]Heading)
+	headings, ok := astMap["headings"].([]map[string]any)
 	if !ok {
 		t.Fatalf("ast.headings type mismatch")
 	}
 	if len(headings) != 2 {
 		t.Errorf("ast.headings len = %d, want 2", len(headings))
 	}
-	if headings[0].Level != 1 || headings[0].Text != "Heading One" {
-		t.Errorf("ast.headings[0] = %+v, want Level=1 Text=Heading One", headings[0])
+	if headings[0]["level"] != 1 || headings[0]["text"] != "Heading One" {
+		t.Errorf("ast.headings[0] = %+v, want level=1 text=Heading One", headings[0])
 	}
-	if headings[1].Level != 2 || headings[1].Text != "Heading Two" {
-		t.Errorf("ast.headings[1] = %+v, want Level=2 Text=Heading Two", headings[1])
+	if headings[1]["level"] != 2 || headings[1]["text"] != "Heading Two" {
+		t.Errorf("ast.headings[1] = %+v, want level=2 text=Heading Two", headings[1])
 	}
 
-	links, ok := astMap["links"].([]Link)
+	links, ok := astMap["links"].([]map[string]any)
 	if !ok {
 		t.Fatalf("ast.links type mismatch")
 	}
 	if len(links) != 1 {
 		t.Errorf("ast.links len = %d, want 1", len(links))
 	}
-	if links[0].Target != "https://example.com" {
-		t.Errorf("ast.links[0].Target = %v, want %v", links[0].Target, "https://example.com")
+	if links[0]["target"] != "https://example.com" {
+		t.Errorf("ast.links[0].target = %v, want %v", links[0]["target"], "https://example.com")
 	}
 
-	codeBlocks, ok := astMap["code_blocks"].([]CodeBlock)
+	codeBlocks, ok := astMap["code_blocks"].([]map[string]any)
 	if !ok {
 		t.Fatalf("ast.code_blocks type mismatch")
 	}
 	if len(codeBlocks) != 1 {
 		t.Errorf("ast.code_blocks len = %d, want 1", len(codeBlocks))
 	}
-	if codeBlocks[0].Language != "go" {
-		t.Errorf("ast.code_blocks[0].Language = %v, want %v", codeBlocks[0].Language, "go")
+	if codeBlocks[0]["language"] != "go" {
+		t.Errorf("ast.code_blocks[0].language = %v, want %v", codeBlocks[0]["language"], "go")
 	}
 
 	akbMap, ok := page["akb"].(map[string]any)
@@ -248,8 +248,8 @@ Body text.
 	}
 
 	astMap := page["ast"].(map[string]any)
-	headings := astMap["headings"].([]Heading)
-	if len(headings) != 1 || headings[0].Text != "Old Heading" {
+	headings := astMap["headings"].([]map[string]any)
+	if len(headings) != 1 || headings[0]["text"] != "Old Heading" {
 		t.Errorf("headings = %+v, want 1 heading with text Old Heading", headings)
 	}
 }

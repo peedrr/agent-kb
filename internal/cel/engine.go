@@ -7,23 +7,17 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types/ref"
-	"github.com/google/cel-go/ext"
 	"github.com/google/cel-go/interpreter"
-	"reflect"
 	"sync"
 )
 
 var programCache = sync.Map{}
 
-// NewEnv creates a CEL environment pre-configured with native types for
-// AST elements and variables for page context evaluation.
+// NewEnv creates a CEL environment pre-configured with variables for page
+// context evaluation. AST elements are passed as plain maps so that CEL
+// field access works at runtime without native type adapter overhead.
 func NewEnv() (*cel.Env, error) {
 	return cel.NewEnv(
-		ext.NativeTypes(
-			reflect.TypeOf(Heading{}),
-			reflect.TypeOf(Link{}),
-			reflect.TypeOf(CodeBlock{}),
-		),
 		cel.Variable("page", cel.MapType(cel.StringType, cel.DynType)),
 		cel.Variable("old_page", cel.NullableType(cel.MapType(cel.StringType, cel.DynType))),
 		cel.Variable("now", cel.TimestampType),

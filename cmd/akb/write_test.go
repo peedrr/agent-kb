@@ -237,20 +237,19 @@ func TestWriteMissingTitle(t *testing.T) {
 	}
 }
 
-func TestWriteUnknownFieldRejected(t *testing.T) {
+func TestWriteUnknownFieldAllowed(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)
 
 	content := "---\ntype: note\ntitle: Bad Field\nsummary: test\ntags: test\nconfidence: high\n---\nContent."
 	out, err := writeRun(kbRoot, "bad-field.md", content)
-	if err == nil {
-		t.Fatal("expected error for unknown field, got nil")
+	if err != nil {
+		t.Fatalf("expected success for unknown field with CEL validation, got: %s: %v", out, err)
 	}
-	if !strings.Contains(out, "unknown field 'confidence'") {
-		t.Errorf("expected error to contain \"unknown field 'confidence'\", got: %s", out)
-	}
-	if !strings.Contains(out, "Allowed fields:") {
-		t.Errorf("expected error to contain 'Allowed fields:', got: %s", out)
+
+	writtenPath := filepath.Join(kbRoot, "kb", "notes", "bad-field.md")
+	if _, err := os.Stat(writtenPath); os.IsNotExist(err) {
+		t.Errorf("expected file at %s, not found", writtenPath)
 	}
 }
 

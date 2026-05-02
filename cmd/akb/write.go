@@ -11,7 +11,12 @@ import (
 
 	"github.com/spf13/cobra"
 	yaml "github.com/goccy/go-yaml"
+	"github.com/google/cel-go/common/types"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/text"
 
+	"github.com/peedrr/agent-kb/internal/cel"
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
@@ -89,11 +94,22 @@ func runWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("load templates: %w", err)
 	}
 
+	// Create storage provider (needed for old_page and write)
+	store := storage.NewGitProvider(kbRoot, noCommit)
+
+	// Create CEL environment
+	celEnv, err := cel.NewEnv()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "CEL engine error: %v\n", err)
+		os.Exit(2)
+	}
+
 	var fm *frontmatter.ParsedFrontmatter
 	var body []byte
 	var writeContent []byte
 	var fullPath string
 	var relPath string
+	var oldPage map[string]any
 
 	if len(writeFrontmatter) > 0 {
 		if writeAppend {
@@ -162,6 +178,16 @@ func runWrite(_ *cobra.Command, args []string) error {
 			return fmt.Errorf("validate title: %w", err)
 		}
 
+		// Compute relative path for output and indexing
+		relPath = filepath.ToSlash(strings.TrimPrefix(fullPath, kbRoot+string(filepath.Separator)))
+
+		// Build old_page from pre-modification state
+		oldPage, err = cel.BuildOldPage(relPath, store)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "CEL engine error: %v\n", err)
+			os.Exit(2)
+		}
+
 		for _, arg := range writeFrontmatter {
 			parts := strings.SplitN(arg, "=", 2)
 			if len(parts) != 2 {
@@ -183,21 +209,9 @@ func runWrite(_ *cobra.Command, args []string) error {
 			return fmt.Errorf("validate type: %w", err)
 		}
 
-		tmpl, ok := templates[fm.Type]
+		_, ok := templates[fm.Type]
 		if !ok {
 			return fmt.Errorf("unknown type %q", fm.Type)
-		}
-
-		// Validate strict field compliance against template
-		allowed := tmpl.AllowedFields()
-		allowedSet := make(map[string]struct{}, len(allowed))
-		for _, f := range allowed {
-			allowedSet[f] = struct{}{}
-		}
-		for key := range fm.Fields {
-			if _, ok := allowedSet[key]; !ok {
-				return fmt.Errorf("unknown field '%s' in frontmatter for type '%s'. Allowed fields: [%s]", key, fm.Type, strings.Join(allowed, ", "))
-			}
 		}
 
 		allFields := map[string]any{
@@ -212,9 +226,6 @@ func runWrite(_ *cobra.Command, args []string) error {
 			return fmt.Errorf("re-serialize frontmatter: %w", err)
 		}
 		writeContent = []byte("---\n" + string(yamlBytes) + "---\n" + string(body))
-
-		// Compute relative path for output and indexing
-		relPath = filepath.ToSlash(strings.TrimPrefix(fullPath, kbRoot+string(filepath.Separator)))
 	} else {
 		// Read from stdin — error if stdin is a TTY
 		stat, err := os.Stdin.Stat()
@@ -284,6 +295,16 @@ func runWrite(_ *cobra.Command, args []string) error {
 				return fmt.Errorf("validate title: %w", err)
 			}
 
+			// Compute relative path
+			relPath = filepath.ToSlash(filepath.Join("kb", cleanPath))
+
+			// Build old_page from pre-modification state
+			oldPage, err = cel.BuildOldPage(relPath, store)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "CEL engine error: %v\n", err)
+				os.Exit(2)
+			}
+
 			newBody := string(body) + "\n" + string(stdinContent)
 
 			allFields := map[string]any{
@@ -299,8 +320,6 @@ func runWrite(_ *cobra.Command, args []string) error {
 			}
 			writeContent = []byte("---\n" + string(yamlBytes) + "---\n" + newBody)
 			body = []byte(newBody)
-
-			relPath = filepath.ToSlash(filepath.Join("kb", cleanPath))
 		} else {
 			// Parse frontmatter from stdin
 			fm, body, err = frontmatter.Parse(stdinContent)
@@ -316,23 +335,6 @@ func runWrite(_ *cobra.Command, args []string) error {
 			// Validate title
 			if err := frontmatter.ValidateTitle(fm); err != nil {
 				return fmt.Errorf("validate title: %w", err)
-			}
-
-			// Validate strict field compliance against template
-			tmpl, ok := templates[fm.Type]
-			if !ok {
-				// Should not happen after ValidateType, but be safe
-				return fmt.Errorf("unknown type %q", fm.Type)
-			}
-			allowed := tmpl.AllowedFields()
-			allowedSet := make(map[string]struct{}, len(allowed))
-			for _, f := range allowed {
-				allowedSet[f] = struct{}{}
-			}
-			for key := range fm.Fields {
-				if _, ok := allowedSet[key]; !ok {
-					return fmt.Errorf("unknown field '%s' in frontmatter for type '%s'. Allowed fields: [%s]", key, fm.Type, strings.Join(allowed, ", "))
-				}
 			}
 
 			writeContent = stdinContent
@@ -366,6 +368,11 @@ func runWrite(_ *cobra.Command, args []string) error {
 			}
 
 			// Resolve type-derived directory
+			tmpl, ok := templates[fm.Type]
+			if !ok {
+				// Should not happen after ValidateType, but be safe
+				return fmt.Errorf("unknown type %q", fm.Type)
+			}
 			dirFromType := tmpl.Dir
 
 			// Validate .md extension
@@ -416,15 +423,60 @@ func runWrite(_ *cobra.Command, args []string) error {
 				relPath = filepath.Join("kb", cleanPath)
 			}
 			relPath = filepath.ToSlash(relPath)
+
+			// old_page is nil for new stdin writes
+			oldPage = nil
 		}
+	}
+
+	// CEL validation
+	tmpl, ok := templates[fm.Type]
+	if !ok {
+		return fmt.Errorf("unknown type %q", fm.Type)
+	}
+
+	// Build page map from post-modification state
+	md := goldmark.New()
+	var astDoc ast.Node
+	astDoc = md.Parser().Parse(text.NewReader(body))
+	page := cel.BuildPage(relPath, fm, body, astDoc, body)
+
+	// Run CEL validations
+	var validationErrors []cel.ValidationError
+	for _, rule := range tmpl.Validations {
+		prg, err := cel.CompileRule(celEnv, rule.Rule)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "CEL engine error: compile rule %s: %v\n", rule.ID, err)
+			os.Exit(2)
+		}
+		result, err := cel.Evaluate(context.Background(), prg, map[string]any{
+			"page":     page,
+			"old_page": oldPage,
+		}, 100000)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "CEL engine error: evaluate rule %s: %v\n", rule.ID, err)
+			os.Exit(2)
+		}
+		if result != types.True {
+			validationErrors = append(validationErrors, cel.ValidationError{
+				RuleID:   rule.ID,
+				Message:  rule.Expect,
+				Line:     0,
+				Severity: "error",
+			})
+		}
+	}
+
+	if len(validationErrors) > 0 {
+		for _, ve := range validationErrors {
+			fmt.Fprintln(os.Stderr, ve.Error())
+		}
+		os.Exit(1)
 	}
 
 	// Extract tags and summary from frontmatter fields
 	tags := search.ExtractTags(fm.Fields)
 	summary := search.ExtractSummary(fm.Fields)
-
-	// Create storage provider
-	store := storage.NewGitProvider(kbRoot, noCommit)
 
 	// Write content
 	ctx := context.Background()
