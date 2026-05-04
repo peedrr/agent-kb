@@ -6,6 +6,25 @@
 
 Raw sources and KB pages are **separate**. Never write raw source text directly into `kb/` without distillation.
 
+## Discover Template Requirements
+
+Before writing ANY KB page, check what the template requires. Different `type` values have different mandatory fields, validations, and linking requirements.
+
+```bash
+akb template get <type-name>
+```
+
+This shows:
+- `schema`: Required frontmatter fields
+- `requirements`: What must be present in the page content
+
+**Why this matters:** Writing without checking requirements causes validation failures. `akb write` will reject the page if required fields are missing or content doesn't meet rules.
+
+Pattern:
+```
+akb template get <type>  →  read requirements  →  craft content  →  akb write <path>
+```
+
 ## Procedure
 
 1. Save the raw source (immutable):

@@ -69,6 +69,25 @@
    akb log append update "Updated <path>; <reason>"
    ```
 
+## Re-checking Template Requirements
+
+Before updating an existing page, always re-check the template requirements:
+
+```bash
+akb template get <type>
+```
+
+**Why this matters:** Updates can inadvertently violate validations that were satisfied in the original page. For example, if the template requires a "## References" section, removing that section during editing will cause validation to fail—even though the original page was valid.
+
+**Workflow pattern:**
+
+1. `akb read <path>` — read current content and note the `type` from frontmatter
+2. `akb template get <type>` — review schema fields and requirements
+3. Understand constraints — ensure your update won't remove required elements
+4. `akb write <path> --frontmatter key=val` or `akb write <path> --append` — make the update
+
+**Example:** A page has `type: reference` with a requirement that body must contain at least one wikilink. If you rewrite the page and forget to include the wikilink, validation will fail. Running `akb template get reference` beforehand reminds you to preserve that requirement.
+
 ## Deleting Pages (Restructuring)
 
 If restructuring requires removing a page:

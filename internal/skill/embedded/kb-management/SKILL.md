@@ -5,8 +5,8 @@ description: >
   Use whenever the user wants to create, maintain, query, or organize a
   markdown-based knowledge base. Triggers on: wiki, knowledge base, KB,
   akb, ingest, compile sources, query what we know, lint wiki, update pages,
-  delete pages, add raw files, approve drafts, or any request to read/write
-  structured project knowledge.
+  delete pages, add raw files, approve drafts, create template, define page type,
+  add schema, design template, or any request to read/write structured project knowledge.
   Do NOT use for generic chat, unrelated file operations, or off-wiki trivia.
 metadata:
   author: peedrr
@@ -43,6 +43,7 @@ Before performing ANY KB-related work, you MUST:
 | "Update", "fix", "correct", "merge", "revise" | Revise pages | `references/UPDATE.md` |
 | "Lint", "health check", "orphans", "broken links" | Audit / repair | `references/MAINTAIN.md` |
 | "Approve", "publish", "strip annotations" | Publish drafts | `references/APPROVE.md` |
+| "Create template", "define page type", "add schema", "design template", "template type" | Template authoring | `references/TEMPLATE.md` |
 
 If the request matches multiple triggers, prefer the one higher in the table.
 
