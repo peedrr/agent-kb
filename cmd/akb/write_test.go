@@ -176,7 +176,7 @@ func TestWriteADRToDecisionsDir(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)
 
-	content := "---\ntype: adr\ntitle: Use Go\nsummary: We chose Go\ntags: decision\nstatus: accepted\ndeciders: team\ncreated: 2025-01-01\nupdated: 2025-01-01\n---\n## Context\nWe needed a language."
+	content := "---\ntype: adr\ntitle: Use Go\nsummary: We chose Go\ntags: decision\nstatus: accepted\ndeciders: team\ncreated: 2025-01-01\nupdated: 2025-01-01\n---\n## Context\n\nWe needed a language.\n\n## Decision\n\nWe decided to use Go.\n\n## Consequences\n\nEverything works better."
 	out, err := writeRun(kbRoot, "my-adr.md", content)
 	if err != nil {
 		t.Fatalf("akb write failed: %s: %v", out, err)
@@ -503,7 +503,7 @@ func TestWriteGitCommitMessageADR(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)
 
-	content := "---\ntype: adr\ntitle: Use Go\nsummary: We chose Go\ntags: decision\nstatus: accepted\ndeciders: team\ncreated: 2025-01-01\nupdated: 2025-01-01\n---\n## Context"
+	content := "---\ntype: adr\ntitle: Use Go\nsummary: We chose Go\ntags: decision\nstatus: accepted\ndeciders: team\ncreated: 2025-01-01\nupdated: 2025-01-01\n---\n## Context\n\nWe needed a language.\n\n## Decision\n\nWe decided to use Go.\n\n## Consequences\n\nEverything works better."
 	out, err := writeRun(kbRoot, "my-adr.md", content)
 	if err != nil {
 		t.Fatalf("akb write failed: %s: %v", out, err)

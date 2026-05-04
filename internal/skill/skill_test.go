@@ -24,8 +24,8 @@ func TestGetSkill(t *testing.T) {
 	if skill.Name != "kb-management" {
 		t.Errorf("skill.Name = %q, want %q", skill.Name, "kb-management")
 	}
-	if len(skill.Files) != 7 {
-		t.Errorf("len(skill.Files) = %d, want 7", len(skill.Files))
+	if len(skill.Files) != 8 {
+		t.Errorf("len(skill.Files) = %d, want 8", len(skill.Files))
 	}
 	if _, ok := skill.Files["SKILL.md"]; !ok {
 		t.Error("skill.Files missing SKILL.md")
