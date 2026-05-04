@@ -11,10 +11,10 @@ schema:
       required: true
     summary:
       type: string
-      required: true
+      required: false
     tags:
       type: list
-      required: true
+      required: false
     created:
       type: string
       required: false

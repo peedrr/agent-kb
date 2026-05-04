@@ -449,9 +449,14 @@ func runWrite(_ *cobra.Command, args []string) error {
 			fmt.Fprintf(os.Stderr, "CEL engine error: compile rule %s: %v\n", rule.ID, err)
 			os.Exit(2)
 		}
+		var oldPageAny any
+		if oldPage != nil {
+			oldPageAny = oldPage
+		}
 		result, err := cel.Evaluate(context.Background(), prg, map[string]any{
 			"page":     page,
-			"old_page": oldPage,
+			"old_page": oldPageAny,
+			"now":      time.Now(),
 		}, 100000)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "CEL engine error: evaluate rule %s: %v\n", rule.ID, err)

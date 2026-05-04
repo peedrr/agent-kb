@@ -1,9 +1,10 @@
 ---
 type: note
 title: Test Note
-summary: Test summary
-tags: [test]
 ---
+
+<!-- PASSES: require_title - title "Test Note" is non-empty -->
+<!-- PASSES: note.yaml schema requires only title and type -->
 
 # Test Note
 

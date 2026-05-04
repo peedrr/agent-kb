@@ -35,26 +35,84 @@ schema:
     sources:
       type: list
       required: false
-    context:
-      type: string
-      required: false
-    decision:
-      type: string
-      required: false
-    consequences:
+    supersedes:
       type: string
       required: false
 validations:
-  - id: require_context
-    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Context")'
-    requirement: Must include H2 'Context' section
-    expect: page must have a '## Context' heading
+  # CEL Concept: Basic field presence and non-empty check
+  - id: require_title
+    rule: 'page.frontmatter.title != ""'
+    requirement: Title must not be empty
+    expect: frontmatter title must be non-empty
+
+  # CEL Concept: List membership / enum validation
   - id: valid_status
     rule: 'page.frontmatter.status in ["proposed", "accepted", "deprecated", "superseded"]'
     requirement: Status must be a valid ADR status
     expect: status must be one of proposed, accepted, deprecated, superseded
+
+  # CEL Concept: AST collection existence check
+  - id: require_context
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Context")'
+    requirement: Must include H2 'Context' section
+    expect: page must have a '## Context' heading
+
+  # CEL Concept: AST collection existence check
+  - id: require_decision
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Decision")'
+    requirement: Must include H2 'Decision' section
+    expect: page must have a '## Decision' heading
+
+  # CEL Concept: AST collection existence check
+  - id: require_consequences
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Consequences")'
+    requirement: Must include H2 'Consequences' section
+    expect: page must have a '## Consequences' heading
+
+  # CEL Concept: Negation + AST collection check
+  - id: disallow_options
+    rule: '!page.ast.headings.exists(h, h.level == 2 && h.text == "Options")'
+    requirement: Must not include H2 'Options' section
+    expect: page must not have a '## Options' heading
+
+  # CEL Concept: Negation + AST collection check
+  - id: disallow_pros_cons
+    rule: '!page.ast.headings.exists(h, h.level == 2 && h.text == "Pros and Cons")'
+    requirement: Must not include H2 'Pros and Cons' section
+    expect: page must not have a '## Pros and Cons' heading
+
+  # CEL Concept: State machine with old_page / has() guard
+  - id: valid_state_transition
+    rule: '!has(old_page.frontmatter) || old_page.frontmatter.status == page.frontmatter.status || (old_page.frontmatter.status == "proposed" && page.frontmatter.status == "accepted") || (old_page.frontmatter.status == "accepted" && page.frontmatter.status == "deprecated") || (old_page.frontmatter.status == "accepted" && page.frontmatter.status == "superseded")'
+    requirement: Status transitions must follow the ADR lifecycle
+    expect: only proposed->accepted, accepted->deprecated, accepted->superseded transitions are allowed
+
+  # CEL Concept: Conditional requirement / logical implication
+  - id: superseded_requires_field
+    rule: 'page.frontmatter.status != "superseded" || (has(page.frontmatter.supersedes) && page.frontmatter.supersedes != "")'
+    requirement: When status is superseded, supersedes field must be set
+    expect: superseded ADRs must specify what they supersede
+
+  # CEL Concept: Cross-reference validation between frontmatter and AST
+  - id: superseded_requires_link
+    rule: 'page.frontmatter.status != "superseded" || page.ast.links.exists(l, l.is_wikilink && l.target == page.frontmatter.supersedes)'
+    requirement: When status is superseded, body must contain wikilink to superseded ADR
+    expect: superseded ADRs must link to the ADR they supersede
+
+  # CEL Concept: Temporal comparison with timestamp() and now
+  - id: temporal_created
+    rule: '!has(page.frontmatter.created) || timestamp(page.frontmatter.created) <= now'
+    requirement: Created date must not be in the future
+    expect: created timestamp must be less than or equal to current time
 lint_rules:
+  # CEL Concept: Temporal drift detection (warning)
   - id: adr_stale
     rule: 'now - timestamp(page.frontmatter.updated) < duration("4320h")'
     severity: warning
     expect: ADR hasn't been updated in 180 days
+
+  # CEL Concept: Temporal conditional enforcement (error)
+  - id: deprecated_flagged
+    rule: 'page.frontmatter.status != "deprecated" || now - timestamp(page.frontmatter.updated) < duration("720h")'
+    severity: error
+    expect: Deprecated ADRs must be updated within 30 days
