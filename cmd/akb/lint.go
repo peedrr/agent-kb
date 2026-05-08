@@ -41,36 +41,38 @@ func init() {
 	lintCmd.Flags().BoolVar(&lintJSON, "json", false, "output results as JSON")
 }
 
-func runLint(_ *cobra.Command, _ []string) error {
-	ctx := context.Background()
-
+// RunLint runs all lint checks against the KB and returns the report.
+// It handles: resolve KB → open DB → load templates → read manifest →
+// rebuild link graph → walk pages → build KB struct → create engine →
+// add all 8 checkers → run → return report.
+func RunLint(ctx context.Context) (*lint.LintReport, error) {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
-		return fmt.Errorf("resolve knowledge base: %w", err)
+		return nil, fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	sqlDB, err := db.OpenKB(kbRoot)
 	if err != nil {
 		if isMissingDB(err) {
-			return fmt.Errorf("run `akb init` to initialize the knowledge base")
+			return nil, fmt.Errorf("run `akb init` to initialize the knowledge base")
 		}
-		return fmt.Errorf("open search database: %w", err)
+		return nil, fmt.Errorf("open search database: %w", err)
 	}
 	defer sqlDB.Close() //nolint:errcheck // DB close error non-critical on command exit
 
 	templates, err := template.LoadTemplates(filepath.Join(kbRoot, ".akb", "templates"))
 	if err != nil {
-		return fmt.Errorf("load templates: %w", err)
+		return nil, fmt.Errorf("load templates: %w", err)
 	}
 
 	entries, err := manifest.NewManager(kbRoot).ReadManifest()
 	if err != nil {
-		return fmt.Errorf("read manifest: %w", err)
+		return nil, fmt.Errorf("read manifest: %w", err)
 	}
 
 	lg := linkgraph.NewSQLiteLinkGraph(sqlDB)
 	if err := lg.RebuildLinks(ctx, kbRoot); err != nil {
-		return fmt.Errorf("rebuild link graph: %w", err)
+		return nil, fmt.Errorf("rebuild link graph: %w", err)
 	}
 
 	kbDir := filepath.Join(kbRoot, "kb")
@@ -128,7 +130,7 @@ func runLint(_ *cobra.Command, _ []string) error {
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("walk kb directory: %w", err)
+		return nil, fmt.Errorf("walk kb directory: %w", err)
 	}
 
 	kb := &lint.KB{
@@ -151,7 +153,18 @@ func runLint(_ *cobra.Command, _ []string) error {
 
 	report, err := engine.Run(ctx, kb)
 	if err != nil {
-		return fmt.Errorf("lint: %w", err)
+		return nil, fmt.Errorf("lint: %w", err)
+	}
+
+	return report, nil
+}
+
+func runLint(_ *cobra.Command, _ []string) error {
+	ctx := context.Background()
+
+	report, err := RunLint(ctx)
+	if err != nil {
+		return err
 	}
 
 	if lintJSON {
