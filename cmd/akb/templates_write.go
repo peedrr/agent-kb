@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/cel-go/common/types"
@@ -13,6 +15,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/text"
 	"github.com/peedrr/agent-kb/internal/cel"
+	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/template"
@@ -21,6 +24,7 @@ import (
 var twTemplate string
 var twPass string
 var twFail string
+var twForce bool
 
 var templateWriteCmd = &cobra.Command{
 	Use:   "write <name>",
@@ -33,9 +37,8 @@ func init() {
 	templateWriteCmd.Flags().StringVar(&twTemplate, "template", "", "path to template YAML")
 	templateWriteCmd.Flags().StringVar(&twPass, "pass", "", "path to pass mockup")
 	templateWriteCmd.Flags().StringVar(&twFail, "fail", "", "path to fail mockup")
+	templateWriteCmd.Flags().BoolVar(&twForce, "force", false, "overwrite existing template without confirmation")
 	_ = templateWriteCmd.MarkFlagRequired("template")
-	_ = templateWriteCmd.MarkFlagRequired("pass")
-	_ = templateWriteCmd.MarkFlagRequired("fail")
 	templateCmd.AddCommand(templateWriteCmd)
 }
 
@@ -45,6 +48,18 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
+	}
+
+	templateYAMLPath := filepath.Join(kbRoot, ".akb", "templates", name+".yaml")
+	templateExists := false
+	if _, err := os.Stat(templateYAMLPath); err == nil {
+		templateExists = true
+	}
+
+	if !templateExists {
+		if twPass == "" || twFail == "" {
+			return fmt.Errorf("--pass and --fail are required for new templates")
+		}
 	}
 
 	tmplData, err := os.ReadFile(twTemplate) //nolint:gosec // path provided by user flag
@@ -87,10 +102,22 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		}
 	}
 
-	passData, err := os.ReadFile(twPass) //nolint:gosec // path provided by user flag
-	if err != nil {
-		return fmt.Errorf("read pass mockup: %w", err)
+	var passData []byte
+	if twPass != "" {
+		passData, err = os.ReadFile(twPass) //nolint:gosec // path provided by user flag
+		if err != nil {
+			return fmt.Errorf("read pass mockup: %w", err)
+		}
+	} else if templateExists {
+		existingPass := filepath.Join(kbRoot, ".akb", "templates", name+"_pass.md")
+		passData, err = os.ReadFile(existingPass) //nolint:gosec // known path
+		if err != nil {
+			return fmt.Errorf("read existing pass mockup: %w", err)
+		}
+	} else {
+		return fmt.Errorf("--pass and --fail are required for new templates")
 	}
+
 	passFM, passBody, err := frontmatter.Parse(passData)
 	if err != nil {
 		return fmt.Errorf("parse pass mockup frontmatter: %w", err)
@@ -115,13 +142,25 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		}
 	}
 	if len(passFailed) > 0 {
-		return fmt.Errorf("pass mockup: validation(s) failed: %v", passFailed)
+		return fmt.Errorf("pass mockup no longer validates: %v\n\n--- pass mockup ---\n%s\n\nProvide updated mockup with --pass <path>", passFailed, string(passData))
 	}
 
-	failData, err := os.ReadFile(twFail) //nolint:gosec // path provided by user flag
-	if err != nil {
-		return fmt.Errorf("read fail mockup: %w", err)
+	var failData []byte
+	if twFail != "" {
+		failData, err = os.ReadFile(twFail) //nolint:gosec // path provided by user flag
+		if err != nil {
+			return fmt.Errorf("read fail mockup: %w", err)
+		}
+	} else if templateExists {
+		existingFail := filepath.Join(kbRoot, ".akb", "templates", name+"_fail.md")
+		failData, err = os.ReadFile(existingFail) //nolint:gosec // known path
+		if err != nil {
+			return fmt.Errorf("read existing fail mockup: %w", err)
+		}
+	} else {
+		return fmt.Errorf("--pass and --fail are required for new templates")
 	}
+
 	failFM, failBody, err := frontmatter.Parse(failData)
 	if err != nil {
 		return fmt.Errorf("parse fail mockup frontmatter: %w", err)
@@ -146,7 +185,39 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		}
 	}
 	if len(failFailed) == 0 {
-		return fmt.Errorf("fail mockup: expected at least one validation to fail, but all passed")
+		return fmt.Errorf("fail mockup no longer validates: expected at least one validation to fail, but all passed\n\n--- fail mockup ---\n%s\n\nProvide updated mockup with --fail <path>", string(failData))
+	}
+
+	if templateExists && !twForce {
+		oldYAMLData, err := os.ReadFile(templateYAMLPath) //nolint:gosec // known path
+		if err != nil {
+			return fmt.Errorf("read existing template: %w", err)
+		}
+
+		diff := diffStrings(string(oldYAMLData), string(tmplData))
+
+		pageCount := 0
+		dbConn, dbErr := db.OpenKB(kbRoot)
+		if dbErr == nil {
+			row := dbConn.QueryRow("SELECT COUNT(*) FROM documents WHERE type = ?", name)
+			if scanErr := row.Scan(&pageCount); scanErr != nil {
+				pageCount = 0
+			}
+			_ = dbConn.Close() //nolint:errcheck // best effort
+		}
+
+		cmdParts := []string{"akb", "template", "write", name, "--template", twTemplate}
+		if twPass != "" {
+			cmdParts = append(cmdParts, "--pass", twPass)
+		}
+		if twFail != "" {
+			cmdParts = append(cmdParts, "--fail", twFail)
+		}
+		cmdParts = append(cmdParts, "--force")
+
+		fmt.Printf("Template %q exists and is used by %d pages.\n\n--- diff ---\n%s\n\nRun `%s` to overwrite.\n",
+			name, pageCount, diff, strings.Join(cmdParts, " "))
+		return fmt.Errorf("template %q exists; use --force to overwrite", name)
 	}
 
 	targetDir := filepath.Join(kbRoot, ".akb", "templates")
@@ -191,7 +262,26 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("write fail mockup: %w", err)
 	}
 
-	fmt.Printf("Template %q written. Run `akb lint` to evaluate existing pages against new rules.\n", name)
+	if !noCommit {
+		gitAdd := exec.Command("git", "add", "-A", filepath.Join(".akb", "templates")) //nolint:gosec // controlled path
+		gitAdd.Dir = kbRoot
+		if out, err := gitAdd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git add: %s: %w", strings.TrimSpace(string(out)), err)
+		}
+
+		if err := ensureGitConfig(kbRoot); err != nil {
+			return fmt.Errorf("git config: %w", err)
+		}
+
+		commitMsg := fmt.Sprintf("akb: template write %s", name)
+		gitCommit := exec.Command("git", "commit", "-m", commitMsg) //nolint:gosec // launching trusted git binary with controlled args
+		gitCommit.Dir = kbRoot
+		if out, err := gitCommit.CombinedOutput(); err != nil {
+			return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)
+		}
+	}
+
+	fmt.Printf("Template %q written. Run `akb lint` to evaluate existing pages.\n", name)
 	return nil
 }
 
@@ -208,4 +298,26 @@ func detectOldFormat(raw map[string]any, filename string) error {
 		}
 	}
 	return nil
+}
+
+// diffStrings produces a simple aligned diff between two strings,
+// showing unchanged lines with "  ", removed lines with "- ", and
+// added lines with "+ ".
+func diffStrings(a, b string) string {
+	alines := strings.Split(a, "\n")
+	blines := strings.Split(b, "\n")
+	var out strings.Builder
+	for i := 0; i < len(alines) || i < len(blines); i++ {
+		if i < len(alines) && i < len(blines) && alines[i] == blines[i] {
+			out.WriteString("  " + alines[i] + "\n")
+		} else {
+			if i < len(alines) {
+				out.WriteString("- " + alines[i] + "\n")
+			}
+			if i < len(blines) {
+				out.WriteString("+ " + blines[i] + "\n")
+			}
+		}
+	}
+	return out.String()
 }
