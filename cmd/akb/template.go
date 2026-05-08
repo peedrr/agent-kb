@@ -1,12 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/google/cel-go/common/types"
 	"github.com/goccy/go-yaml"
 	"github.com/spf13/cobra"
+	"github.com/peedrr/agent-kb/internal/cel"
+	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/template"
 )
@@ -63,6 +68,42 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("pass mockup not found for template %q: %w", name, err)
 		}
+
+		passFM, passBody, fmErr := frontmatter.Parse(data)
+		if fmErr == nil {
+			passPage := buildTestPage(fmt.Sprintf("kb/%s_pass.md", name), passFM, passBody)
+			celEnv, celErr := cel.NewEnv()
+			if celErr == nil {
+				var failedRules []string
+				for _, rule := range tmpl.Validations {
+					prg, compErr := cel.CompileRule(celEnv, rule.Rule)
+					if compErr != nil {
+						fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: CEL compile error in rule '%s': %v\n", rule.ID, compErr)
+						continue
+					}
+					result, evalErr := cel.Evaluate(context.Background(), prg, map[string]any{
+						"page":     passPage,
+						"old_page": nil,
+						"now":      time.Now(),
+					}, 100000)
+					if evalErr != nil {
+						fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: CEL evaluate error in rule '%s': %v\n", rule.ID, evalErr)
+						continue
+					}
+					if result != types.True {
+						failedRules = append(failedRules, rule.ID)
+					}
+				}
+				if len(failedRules) > 0 {
+					fmt.Fprintf(os.Stderr, "WARNING: This mockup no longer passes validation against the current template rules.\n         Failed rule(s): %v\n         The template may have been changed without updating the mockup.\n", failedRules)
+				}
+			} else {
+				fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: %v\n", celErr)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: %v\n", fmErr)
+		}
+
 		fmt.Print(string(data))
 		return nil
 	}
