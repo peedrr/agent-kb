@@ -150,6 +150,7 @@ func RunLint(ctx context.Context) (*lint.LintReport, error) {
 	engine.AddChecker(lint.NewCitationsChecker())
 	engine.AddChecker(lint.NewProvenanceChecker())
 	engine.AddChecker(lint.NewCELLintChecker())
+	engine.AddChecker(lint.NewTypeOrphanChecker())
 
 	report, err := engine.Run(ctx, kb)
 	if err != nil {
