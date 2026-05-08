@@ -9,11 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/cel-go/common/types"
 	"github.com/goccy/go-yaml"
+	"github.com/google/cel-go/common/types"
 	"github.com/spf13/cobra"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/text"
+
 	"github.com/peedrr/agent-kb/internal/cel"
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
@@ -44,6 +45,9 @@ func init() {
 
 func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	name := args[0]
+	if !templateNameRe.MatchString(name) {
+		return fmt.Errorf("invalid template name %q: must contain only letters, numbers, hyphens, and underscores", name)
+	}
 
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
@@ -103,18 +107,19 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	}
 
 	var passData []byte
-	if twPass != "" {
+	switch {
+	case twPass != "":
 		passData, err = os.ReadFile(twPass) //nolint:gosec // path provided by user flag
 		if err != nil {
 			return fmt.Errorf("read pass mockup: %w", err)
 		}
-	} else if templateExists {
+	case templateExists:
 		existingPass := filepath.Join(kbRoot, ".akb", "templates", name+"_pass.md")
 		passData, err = os.ReadFile(existingPass) //nolint:gosec // known path
 		if err != nil {
 			return fmt.Errorf("read existing pass mockup: %w", err)
 		}
-	} else {
+	default:
 		return fmt.Errorf("--pass and --fail are required for new templates")
 	}
 
@@ -146,18 +151,19 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	}
 
 	var failData []byte
-	if twFail != "" {
+	switch {
+	case twFail != "":
 		failData, err = os.ReadFile(twFail) //nolint:gosec // path provided by user flag
 		if err != nil {
 			return fmt.Errorf("read fail mockup: %w", err)
 		}
-	} else if templateExists {
+	case templateExists:
 		existingFail := filepath.Join(kbRoot, ".akb", "templates", name+"_fail.md")
 		failData, err = os.ReadFile(existingFail) //nolint:gosec // known path
 		if err != nil {
 			return fmt.Errorf("read existing fail mockup: %w", err)
 		}
-	} else {
+	default:
 		return fmt.Errorf("--pass and --fail are required for new templates")
 	}
 
@@ -235,13 +241,13 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	tmpPass := filepath.Join(tmpDir, name+"_pass.md")
 	tmpFail := filepath.Join(tmpDir, name+"_fail.md")
 
-	if err := os.WriteFile(tmpYAML, tmplData, 0600); err != nil {
+	if err := os.WriteFile(tmpYAML, tmplData, 0600); err != nil { //nolint:gosec // name validated by templateNameRe, path inside temp dir
 		return fmt.Errorf("write temp template: %w", err)
 	}
-	if err := os.WriteFile(tmpPass, passData, 0600); err != nil {
+	if err := os.WriteFile(tmpPass, passData, 0600); err != nil { //nolint:gosec // name validated by templateNameRe, path inside temp dir
 		return fmt.Errorf("write temp pass mockup: %w", err)
 	}
-	if err := os.WriteFile(tmpFail, failData, 0600); err != nil {
+	if err := os.WriteFile(tmpFail, failData, 0600); err != nil { //nolint:gosec // name validated by templateNameRe, path inside temp dir
 		return fmt.Errorf("write temp fail mockup: %w", err)
 	}
 
@@ -294,7 +300,7 @@ func buildTestPage(relPath string, fm *frontmatter.ParsedFrontmatter, body []byt
 func detectOldFormat(raw map[string]any, filename string) error {
 	for _, key := range []string{"required", "optional", "body"} {
 		if _, ok := raw[key]; ok {
-			return fmt.Errorf("parse %s: Template format has changed. Please update to the new schema.", filename)
+			return fmt.Errorf("parse %s: template format has changed; please update to the new schema", filename)
 		}
 	}
 	return nil

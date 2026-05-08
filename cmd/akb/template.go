@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/google/cel-go/common/types"
 	"github.com/goccy/go-yaml"
+	"github.com/google/cel-go/common/types"
 	"github.com/spf13/cobra"
+
 	"github.com/peedrr/agent-kb/internal/cel"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/path"
@@ -57,6 +58,9 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 	}
 
 	name := args[0]
+	if !templateNameRe.MatchString(name) {
+		return fmt.Errorf("invalid template name %q: must contain only letters, numbers, hyphens, and underscores", name)
+	}
 	tmpl, ok := templates[name]
 	if !ok {
 		return fmt.Errorf("template %q not found. Run `akb template list` to see available templates", name)
@@ -64,7 +68,7 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 
 	if templateExample {
 		passPath := filepath.Join(kbRoot, ".akb", "templates", name+"_pass.md")
-		data, err := os.ReadFile(passPath)
+		data, err := os.ReadFile(passPath) //nolint:gosec // name validated by templateNameRe
 		if err != nil {
 			return fmt.Errorf("pass mockup not found for template %q: %w", name, err)
 		}
@@ -109,7 +113,7 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 	}
 
 	if templateFull {
-		data, err := os.ReadFile(filepath.Join(kbRoot, ".akb", "templates", name+".yaml"))
+		data, err := os.ReadFile(filepath.Join(kbRoot, ".akb", "templates", name+".yaml")) //nolint:gosec // name validated by templateNameRe
 		if err != nil {
 			return fmt.Errorf("template file not found: %w", err)
 		}
