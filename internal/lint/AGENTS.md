@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Lint engine with 8 checkers across 3 categories: structural, template-driven, semantic.
+Lint engine with 9 checkers across 3 categories: structural, template-driven, semantic.
 
 ## FILES
 
@@ -20,6 +20,7 @@ Lint engine with 8 checkers across 3 categories: structural, template-driven, se
 | `citations.go` | citations | semantic |
 | `provenance.go` | provenance | semantic |
 | `cel.go` | cel_lint | template-driven |
+| `type_orphan.go` | type_orphan | structural |
 
 ## KEY TYPES
 
@@ -47,3 +48,4 @@ ProvenanceDriftThreshold = 0.20   // |frontmatter - inline| ratio
 - `akb lint --json` outputs `LintReport` JSON with `rule_id` field
 - Retired checkers (replaced by CEL): `type_exists`, `frontmatter_schema`, `category_dirs`
 - Removed checkers: `freshness`, `confidence`, `summary_length`
+- `type_orphan` detects pages whose `type` frontmatter has no matching template in `.akb/templates/`; excludes pages without frontmatter or empty type; severity: error

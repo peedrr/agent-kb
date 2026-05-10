@@ -23,13 +23,14 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 | backlinks | `links.go` | Inbound links only |
 | orphans | `links.go` | Pages with zero inbound links |
 | status | `status.go` | KB name, path, page count, git status |
-| lint | `lint.go` | Run all lint checks |
+| lint | `lint.go` | Run all lint checks; `RunLint(ctx)` helper extracted |
 | registry | `registry.go` | List registered KBs |
 | use | `use.go` | Set default KB in registry |
 | approve | `approve.go` | Strip annotations, set `is_draft: false`, commit |
 | skill | `skill.go` | `skill install` — extract embedded skill |
-| template | `template.go` | `template get <name>` (Writer/Mockup/Maintainer views), `template list` |
-| templates write | `templates_write.go` | Write template with CEL syntax + mockup validation |
+| template | `template.go` | `template get <name>` (Writer/Mockup/Maintainer views, `--example` validates mockup), `template list` |
+| templates write | `templates_write.go` | Overwrite protection (diff + page count), mockup reuse, `--force`, stale mockup rejection |
+| template delete | `template_delete.go` | Delete template with impact analysis (page count), `--force`, auto-lint after |
 | raw | `raw.go` | Parent command for raw namespace |
 | raw write | `raw_write.go` | Write raw file with SHA-256 manifest |
 | raw read | `raw_read.go` | Read raw file content |
@@ -50,6 +51,9 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 - `write` runs CEL validations before file write; exits 1 on validation failure, 2 on internal error
 - `search` supports `--tag`, `--type`, `--after` dimensional filters
 - `list` `--json` includes `is_draft` field
+- Template name validation: names must match `^[a-zA-Z0-9_-]+$` (path traversal prevention)
+- `--force` on template write bypasses existence warning only, never mockup validation
+- Existing mockups reused on overwrite if `--pass`/`--fail` flags omitted
 - `template get <name>` returns Writer View (schema + requirements only)
 - `template get <name> --example` returns `_pass.md` content
 - `template get <name> --full` returns complete YAML with CEL rules

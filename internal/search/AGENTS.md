@@ -10,7 +10,7 @@ SQLite FTS5 full-text search with BM25 ranking. Replaces former NoOp stub.
 
 | File | Purpose |
 |------|---------|
-| `searcher.go` | Interface: `Searcher` with `IndexPage/RemovePage/Search/RebuildIndex` |
+| `searcher.go` | Interface: `Searcher` with `IndexPage/RemovePage/Search/RebuildIndex` (line 27) |
 | `sqlite.go` | `SQLiteFTS5Searcher` implementation (259 lines) |
 | `noop.go` | No-op stub for testing |
 | `sqlite_test.go` | Unit tests |

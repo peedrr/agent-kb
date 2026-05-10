@@ -1,9 +1,9 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-05-02
-**Commit:** 64ab9a0
+**Generated:** 2026-05-10
+**Commit:** 02e26d2
 **Branch:** master
-**Status:** WIP/prototype - APIs subject to change
+**Status:** v0.15.0 — template CRUD complete
 
 ## OVERVIEW
 
@@ -21,7 +21,7 @@ agent-kb/
 │   ├── frontmatter/# YAML frontmatter parsing (goldmark + goccy/go-yaml)
 │   ├── index/      # kb/index.md management
 │   ├── linkgraph/  # SQLite link tracking (wikilinks)
-│   ├── lint/       # 8 lint checkers + engine
+│   ├── lint/       # 9 lint checkers + engine
 │   ├── log/        # kb/log.md append-only log
 │   ├── manifest/   # raw/files.log SHA-256 manifest
 │   ├── markdown/   # Wikilink, annotation, provenance, AST parsers
@@ -31,7 +31,9 @@ agent-kb/
 │   ├── skill/      # Embedded skill management (//go:embed)
 │   ├── storage/    # GitProvider (auto-commit)
 │   └── template/   # Typed page templates (TemplateV2 with CEL rules)
-└── test/           # Integration tests (testscript)
+├── test/           # Integration tests (testscript)
+├── flake.nix       # Nix flake (dev shell + build package)
+└── Makefile        # Build, test, lint targets
 ```
 
 ## WHERE TO LOOK
@@ -51,17 +53,19 @@ agent-kb/
 | CEL engine | `internal/cel/engine.go` | Environment builder, rule compiler, evaluator with panic recovery |
 | CEL page builder | `internal/cel/pagebuilder.go` | Builds `page`/`old_page` maps from frontmatter + AST |
 | Template loader | `internal/template/template.go` | TemplateV2 with schema, validations, lint_rules |
-| Template commands | `cmd/akb/template.go`, `templates_write.go` | `template get/list`, `templates write` |
+| Template commands | `cmd/akb/template.go`, `templates_write.go`, `template_delete.go` | `template get/list`, `templates write`, `template delete` |
+| Template delete | `cmd/akb/template_delete.go` | Impact analysis (page count), `--force`, path traversal prevention |
 | Git integration | `internal/storage/git.go` | Auto-commit, merge conflict detection |
 | DB schema | `internal/db/db.go` | documents, pages, links tables + FTS5 |
 | Config format | `internal/config/config.go` | YAML .akb.yaml |
 | Lint engine | `internal/lint/engine.go` | LintEngine, LintChecker interface |
-| Lint checks | `internal/lint/*.go` | 8 checkers (broken_links, orphans, empty_pages, missing_frontmatter, index_consistency, citations, provenance, cel_lint) |
+| Lint checks | `internal/lint/*.go` | 9 checkers (broken_links, orphans, empty_pages, missing_frontmatter, index_consistency, citations, provenance, cel_lint, type_orphan) |
 | CEL lint checker | `internal/lint/cel.go` | Evaluates template `lint_rules` with `now` injection |
 | Manifest | `internal/manifest/manifest.go` | raw/files.log SHA-256 tracking |
 | Skill install | `internal/skill/skill.go` | `//go:embed embedded/*` |
 | Registry | `internal/registry/registry.go` | Multi-KB registry with default |
 | Raw drift | `cmd/akb/raw_status.go` | `akb raw status` exits 0/1/2 |
+| Nix flake | `flake.nix` | Dev shell (`nix develop`) + build package |
 | Write append | `cmd/akb/write.go` | `--append` to append to existing page body |
 | Write frontmatter | `cmd/akb/write.go` | `--frontmatter key=val` for partial updates |
 | Batch approve | `cmd/akb/approve.go` | `--all-drafts` to approve all draft pages |
@@ -72,13 +76,13 @@ agent-kb/
 
 | Symbol | Type | Location | Role |
 |--------|------|----------|------|
-| RootCmd | Cobra.Command | cmd/akb/root.go:9 | Base CLI command |
+| RootCmd | Cobra.Command | cmd/akb/root.go:11 | Base CLI command |
 | version | string | cmd/akb/main.go:8 | CLI version (injected at build via LDFLAGS) |
-| StorageProvider | interface | internal/storage/provider.go:6 | Write/Read/Delete/Exists/List |
-| GitProvider | struct | internal/storage/git.go:13 | Git-tracked file operations |
-| Searcher | interface | internal/search/searcher.go:20 | IndexPage/Search/RebuildIndex |
+| Provider | interface | internal/storage/provider.go:6 | Write/Read/Delete/Exists/List |
+| GitProvider | struct | internal/storage/git.go:15 | Git-tracked file operations |
+| Searcher | interface | internal/search/searcher.go:27 | IndexPage/RemovePage/Search/RebuildIndex |
 | SQLiteFTS5Searcher | struct | internal/search/sqlite.go:18 | FTS5 implementation |
-| LinkGraphUpdater | interface | internal/linkgraph/updater.go:7 | UpdatePageLinks/RemovePage |
+| Updater | interface | internal/linkgraph/updater.go:7 | UpdatePageLinks/RemovePage |
 | SQLiteLinkGraph | struct | internal/linkgraph/sqlite.go:24 | SQLite implementation |
 | Link | struct | internal/linkgraph/sqlite.go:16 | Source, target, display, resolved |
 | LintChecker | interface | internal/lint/engine.go:37 | Name()/Check() interface |
@@ -97,17 +101,17 @@ agent-kb/
 | ValidationError | struct | internal/cel/errors.go:5 | RuleID/Message/Line/Severity |
 | BuildPage | func | internal/cel/pagebuilder.go:48 | Assembles page map from frontmatter + AST |
 | BuildOldPage | func | internal/cel/pagebuilder.go:88 | Reads on-disk page, builds old_page map |
-| IndexEntry | struct | internal/index/index.go:12 | Page in index |
-| ParsedFrontmatter | struct | internal/frontmatter/frontmatter.go:11 | Type, Title, Fields, IsDraft |
-| Wikilink | struct | internal/markdown/wikilink.go:8 | Target, Display, Heading |
-| Annotation | struct | internal/markdown/annotation.go:8 | olw-auto HTML comment parser |
+| IndexEntry | struct | internal/index/index.go:16 | Page in index |
+| ParsedFrontmatter | struct | internal/frontmatter/frontmatter.go:18 | Type, Title, Fields, IsDraft |
+| Wikilink | struct | internal/markdown/wikilink.go:9 | Target, Display, Heading |
+| Annotation | struct | internal/markdown/annotation.go:10 | olw-auto HTML comment parser |
 | ProvenanceMarker | struct | internal/markdown/provenance.go:9 | ^[type] marker parser |
-| ManifestEntry | struct | internal/manifest/manifest.go:17 | Filename, SHA256, LastUpdated |
-| ManifestManager | struct | internal/manifest/manifest.go:24 | Read/Write/Add/Remove/Update entries |
-| Skill | struct | internal/skill/skill.go:15 | Name, Files map |
-| Entry | struct | internal/registry/registry.go:13 | Registry KB entry |
-| Config | struct | internal/config/config.go:12 | .akb.yaml |
-| DB | struct | internal/db/db.go:12 | Wrapper around sql.DB |
+| Entry | struct | internal/manifest/manifest.go:17 | Filename, SHA256, LastUpdated |
+| Manager | struct | internal/manifest/manifest.go:24 | Read/Write/Add/Remove/Update entries |
+| Skill | struct | internal/skill/skill.go:17 | Name, Files map |
+| Entry | struct | internal/registry/registry.go:14 | Registry KB entry |
+| Config | struct | internal/config/config.go:15 | .akb.yaml |
+| DB | struct | internal/db/db.go:14 | Wrapper around sql.DB |
 
 ## CONVENTIONS (THIS PROJECT)
 
@@ -125,6 +129,8 @@ agent-kb/
 - **Template format**: TemplateV2 uses `schema.frontmatter`, `validations[]`, `lint_rules[]` (old `required[]`/`optional[]`/`body` rejected)
 - **CEL variables**: `page` (map), `old_page` (nullable map), `now` (timestamp) injected at evaluation time
 - **Date fields**: ISO-8601 strings (`created`, `updated`) auto-converted to `time.Time` for CEL `timestamp()`
+- **Template name validation**: Names must match `^[a-zA-Z0-9_-]+$` (regex-enforced, prevents path traversal)
+- **`--force` semantics**: On template commands, bypasses existence warning only; never bypasses mockup validation
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
@@ -134,10 +140,11 @@ agent-kb/
 - Do NOT run concurrent DB operations (max 1 open connection)
 - Do NOT add `--type` flag on `akb write` or `akb append` (type comes from frontmatter)
 - Do NOT build binary in project root (use `bin/`)
-- Do NOT add v2 features (MCP, Nix Flake, goreleaser, TUI, AI exports) in v1 code
+- Do NOT add v2 features (MCP, goreleaser, TUI, AI exports) in v1 code
 - Do NOT use `gopkg.in/yaml.v3` (replaced by `github.com/goccy/go-yaml`)
 - Do NOT construct `old_page` from in-memory modified state (must read on-disk)
 - Do NOT inject `old_page` for lint sweeps (lint is sweep-time, not write-time)
+- Do NOT use `--force` to bypass mockup validation on `templates write` (stale mockups rejected regardless)
 
 ## COMMANDS
 
@@ -157,13 +164,14 @@ nix develop                     # Dev shell (Go, gopls, delve, golangci-lint)
 - Templates embedded in binary via `//go:embed embedded/*` (includes `.yaml` + `_pass.md` + `_fail.md`)
 - Skills embedded in binary via `//go:embed embedded/*`
 - Integration tests use testscript framework (`.txt` files in testdata/)
-- 8 lint checks: 5 structural + 1 template-driven (cel_lint) + 2 semantic (provenance, citations)
+- 9 lint checks: 6 structural + 1 template-driven (cel_lint) + 2 semantic (provenance, citations)
 - Provenance drift threshold: 0.20 (still checked by provenance.go)
 - Lint thresholds are hardcoded constants (not configurable via `.akb.yaml` in v1)
 - CEL engine: programs cached in sync.Map, cost limit 100000, panics recovered as "exceeded compute budget"
 - `akb template get <name>` returns Writer View (schema + requirements only)
-- `akb template get <name> --example` returns `_pass.md` content
+- `akb template get <name> --example` returns `_pass.md` content (validates against current CEL rules; warns on stderr if stale, still displays mockup)
 - `akb template get <name> --full` returns complete YAML with CEL rules
-- `akb templates write` validates CEL syntax and test-driven mockups
+- `akb templates write` validates CEL syntax and test-driven mockups; overwrite: shows diff + page count, reuses existing mockups, `--force` bypasses existence warning only
 - All-errors aggregation on write: ALL failed rules reported, file NOT written if any fail
 - Exit codes: 0=success, 1=validation failure, 2=internal error
+- `akb template delete <name>` impact analysis: counts pages using the type before deletion; auto-runs lint after

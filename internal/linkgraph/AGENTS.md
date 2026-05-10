@@ -10,7 +10,7 @@ SQLite-backed wikilink tracking. Tracks `[[wikilink]]` references between pages.
 
 | File | Purpose |
 |------|---------|
-| `updater.go` | Interface: `LinkGraphUpdater` with `UpdatePageLinks/RemovePage` |
+| `updater.go` | Interface: `Updater` with `UpdatePageLinks/RemovePage` |
 | `sqlite.go` | `SQLiteLinkGraph` implementation (313 lines) |
 | `noop.go` | No-op stub |
 | `sqlite_test.go` | Unit tests |

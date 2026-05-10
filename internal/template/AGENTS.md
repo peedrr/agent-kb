@@ -67,3 +67,6 @@ lint_rules:
 - `//go:embed embedded/*` includes `.yaml` and `.md` mockup files
 - `AllowedFields()` derives from `Schema.Frontmatter` keys + `is_draft`
 - Templates loaded from `.akb/templates/` per KB
+- `get --example` validates mockup against current CEL rules at read-time; warns on stderr if stale rules found (still displays mockup, exit 0)
+- `templates write --force` bypasses existence warning only; stale mockups rejected with full content in error
+- On overwrite, `templates write` reuses existing `_pass.md`/`_fail.md` if `--pass`/`--fail` flags omitted
