@@ -4,44 +4,29 @@
 
 ## Critical Rule
 
-Raw sources and KB pages are **separate**. Never write raw source text directly into `kb/` without distillation.
-
-## Discover Template Requirements
-
-Before writing ANY KB page, check what the template requires. Different `type` values have different mandatory fields, validations, and linking requirements.
-
-```bash
-akb template get <type-name>
-```
-
-This shows:
-- `schema`: Required frontmatter fields
-- `requirements`: What must be present in the page content
-
-**Why this matters:** Writing without checking requirements causes validation failures. `akb write` will reject the page if required fields are missing or content doesn't meet rules.
-
-Pattern:
-```
-akb template get <type>  →  read requirements  →  craft content  →  akb write <path>
-```
+Raw sources and KB pages are **separate**. Never store undistilled source text as a KB page.
 
 ## Procedure
 
-1. Save the raw source (immutable):
+1. **Save the raw source** (immutable once stored):
    ```bash
    akb raw write <filename> <<'EOF'
    <full content>
    EOF
    ```
-   Examples: `akb raw write paper.pdf`, `akb raw write notes.txt`.
 
-2. Sync the manifest:
+2. **Sync the manifest** so the KB can track the raw source:
    ```bash
    akb raw sync
-   akb raw status
    ```
 
-3. Distill into a KB page. Choose the appropriate `type` (check `.akb/templates/*.yaml` for available types). Include ALL required frontmatter fields for that type. `type` and `title` are mandatory for all pages.
+3. **Check the template requirements** before writing any KB page:
+   ```bash
+   akb template get <type-name>
+   ```
+   This shows required frontmatter fields and content requirements. `type` and `title` are mandatory for all pages.
+
+4. **Distill into a KB page.** Use `akb template list` to see available types. Include ALL required frontmatter fields for the chosen type:
    ```bash
    akb write <page-name>.md <<'EOF'
    ---
@@ -61,7 +46,7 @@ akb template get <type>  →  read requirements  →  craft content  →  akb wr
    EOF
    ```
 
-4. Update bookkeeping:
+5. **Update bookkeeping:**
    ```bash
    akb index add "<page-name>.md" "<one-line summary>"
    akb log append ingest "Ingested <source>; created <page-name>.md"
@@ -69,9 +54,8 @@ akb template get <type>  →  read requirements  →  craft content  →  akb wr
 
 ## Rules
 
+- Always check `akb template get <type>` before writing. Writing without understanding requirements causes validation failures.
 - Add 2–3 `[[wikilinks]]` to existing pages on every new page.
-- After creating pages, search for mentions of the new topic and add backlinks where missing.
-- Use `akb search "<topic>"` to find existing pages for linking.
-- `akb write` resolves the output path based on the page's `type` template. Just provide the filename.
-- If frontmatter validation fails, `akb write` prints the missing fields. Fix and retry.
+- After creating pages, search for mentions of the new topic and add backlinks where missing: `akb search "<topic>"`.
+- If validation fails, `akb write` prints the missing fields. Fix and retry.
 - New pages are drafts by default. Use `akb approve` to publish.

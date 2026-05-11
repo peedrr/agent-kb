@@ -1,6 +1,6 @@
 # MAINTAIN — Audit and Repair KB Health
 
-**When:** "lint", "health check", "find gaps", "what needs fixing", or after a batch of ingests.
+**When:** "lint", "health check", "find gaps", "what needs fixing", or after batch ingests and template changes.
 
 ## Procedure
 
@@ -9,12 +9,26 @@
    akb lint
    ```
 
+   What lint detects:
+
+   | Check | What it means |
+   |-------|---------------|
+   | `broken_links` | A wikilink points to a page that doesn't exist |
+   | `orphans` | A page has zero inbound links — nothing connects to it |
+   | `empty_pages` | A page has no body content |
+   | `missing_frontmatter` | A page has no YAML frontmatter |
+   | `index_consistency` | A page is listed in the index but doesn't exist, or vice versa |
+   | `type_orphan` | A page's `type` has no matching template — no enforced structure |
+   | `cel_lint` | A page violates its template's `lint_rules` (skipped for type-orphans) |
+   | `citations` | A page's `sources` field references a raw file that isn't tracked |
+   | `provenance` | A page's confidence markers have drifted too far from its frontmatter |
+
 2. Inspect specific issues:
    ```bash
    akb orphans                 # pages with zero inbound links
-   akb links <path>            # outbound, broken, and ambiguous links
+   akb links <path>            # outbound, broken, and ambiguous links for a page
    akb stale [--all]           # freshness report; --all checks all registered KBs
-   akb status                  # overview: name, path, page count, git status
+   akb status                  # overview: name, path, page count
    ```
 
 3. Fix issues:
@@ -22,44 +36,43 @@
    - **Orphans:** Add inbound links from related pages.
    - **Ambiguous links:** Use `[[path-form]]` instead of short names.
    - **Stale pages:** Update outdated content, or mark as deprecated.
+   - **Type-orphans:** Reassign the page's `type` to a valid template, create the missing template, or delete the page. See `references/TEMPLATE.md`.
 
-4. Batch orphan cleanup (if needed):
-
-   To remove all pages with zero inbound links:
-
+4. Batch orphan cleanup:
    ```bash
-   # Preview what would be deleted
-   akb delete --orphans
-
-   # Actually delete (requires --force)
-   akb delete --orphans --force
+   akb delete --orphans          # preview what would be deleted
+   akb delete --orphans --force  # actually delete
    ```
 
-   **Warning:** This deletes pages permanently. Preview first. Managed files (`index.md`, `log.md`) are never deleted.
+   **Warning:** This deletes pages permanently. Preview first.
 
 5. Log maintenance:
    ```bash
    akb log append lint "<description of fixes>"
    ```
 
-## Deleting Pages (Cleanup)
+## Deleting Pages
 
-If lint identifies pages that should be removed (e.g., empty pages, duplicates):
+If lint identifies pages that should be removed:
 
-1. Delete the page:
-   ```bash
-   akb delete <path>
-   ```
+```bash
+akb delete <path>
+akb lint  # verify no broken links remain
+```
 
-2. Run lint again to verify no broken links remain:
-   ```bash
-   akb lint
-   ```
+## Type-Orphan Recovery
+
+When lint reports `[type_orphan] error`:
+
+1. `akb template list` — see available templates
+2. Reassign: `akb write <path> --frontmatter type=<existing-type>`
+3. Or create the missing template (see `references/TEMPLATE.md`)
+4. Or delete the page if no longer needed
+5. `akb lint` — verify zero `type_orphan` errors remain
 
 ## Rules
 
 - `akb lint` exits 0 for warnings only, 1 if errors found.
 - Use `akb lint --json` for structured output.
-- Use `akb stale --json` for structured freshness data.
-- Run `akb lint` regularly, especially after batch ingests.
-- `akb stale` checks only the active KB by default. Use `--all` to check all registered KBs.
+- Run `akb lint` after batch ingests and template changes.
+- `type_orphan` errors indicate structural gaps — pages without templates will drift. Fix them promptly.

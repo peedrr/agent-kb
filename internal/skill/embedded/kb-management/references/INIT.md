@@ -34,17 +34,13 @@
    EOF
    ```
 
-4. Update the index:
+4. Update the index and log:
    ```bash
    akb index add "overview.md" "KB purpose and open questions"
-   ```
-
-5. Log the initialization:
-   ```bash
    akb log append ingest "Initialized KB <kb-name>"
    ```
 
 ## Notes
 
-- `akb init` creates `kb/`, `raw/`, `.akb/`, default templates, search index, and a git repo.
-- The KB root is the current working directory. Run `akb init` from where you want the KB.
+- `akb init` sets up everything — structure, default templates, search index, and version control.
+- Run `akb init` from the directory where you want the KB to live.

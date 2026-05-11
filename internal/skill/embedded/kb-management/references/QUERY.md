@@ -33,29 +33,18 @@ Never answer from general knowledge. The KB is the source of truth. Search and r
 
 ## Filtered Search
 
-Narrow results with dimensional filters:
-
 ```bash
-# Search by tag
-akb search "database" --tag go
-
-# Search by page type
-akb search "architecture" --type adr
-
-# Search by creation date
-akb search "API" --after 2025-01-01
-
-# Combined filters
-akb search "deployment" --tag kubernetes --type note --after 2025-01-01
+akb search "database" --tag go                       # by tag
+akb search "architecture" --type adr                 # by page type
+akb search "API" --after 2025-01-01                  # by creation date
+akb search "deployment" --tag k8s --type note        # combined
 ```
 
-Filters work with `--json` for structured output.
-
-Note: Search without filters continues to work as before, returning all matching results.
+All filters work with `--json` for structured output.
 
 ## Rules
 
 - Search first, read selectively. `akb search` ranks by relevance.
 - Use `akb backlinks <path>` to find pages that reference a topic.
 - Use `akb read` for full content; `akb links` for relationships.
-- Do NOT write to `kb/log.md` directly — use `akb log append`.
+- **DO NOT edit the log directly** — use `akb log append`.
