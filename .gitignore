@@ -11,6 +11,7 @@
 
 /akb
 bin/
+result*
 
 # --- Go Tooling ---
 # Test binaries and coverage reports
