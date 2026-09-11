@@ -52,3 +52,6 @@ go.work.sum
 Thumbs.db
 ehthumbs.db
 [Bb]humbs.db
+
+.pi/*
+!.pi/exec-profile.md
