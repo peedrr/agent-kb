@@ -9,6 +9,7 @@ require (
 
 require (
 	github.com/goccy/go-yaml v1.19.2
+	github.com/google/cel-go v0.28.0
 	github.com/rogpeppe/go-internal v1.14.1
 	github.com/yuin/goldmark v1.8.2
 	go.abhg.dev/goldmark/frontmatter v0.3.0
@@ -18,7 +19,6 @@ require (
 	cel.dev/expr v0.25.1 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	github.com/google/cel-go v0.28.0 // indirect
 	golang.org/x/exp v0.0.0-20251023183803-a4bb9ffd2546 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
