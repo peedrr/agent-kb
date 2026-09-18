@@ -3,6 +3,7 @@ package cel
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/cel-go/common/types"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
@@ -160,6 +161,154 @@ Some body text with a [link](https://example.com).
 	}
 	if len(annotations) != 1 {
 		t.Errorf("akb.annotations len = %d, want 1", len(annotations))
+	}
+}
+
+func TestBuildPageAnnotationExclusions(t *testing.T) {
+	mdSource := []byte(`---
+type: note
+title: Annotation Exclusions
+---
+
+` + "```\n<!-- olw-auto: in_fence=true -->\n```\n" + `
+Use ` + "`<!-- olw-auto: in_inline_code=true -->`" + ` in prose.
+
+<!-- olw-auto: real=true -->
+`)
+
+	fm, body, err := frontmatter.Parse(mdSource)
+	if err != nil {
+		t.Fatalf("parse frontmatter: %v", err)
+	}
+
+	md := goldmark.New()
+	doc := md.Parser().Parse(text.NewReader(mdSource))
+
+	page := BuildPage("kb/notes/annotations.md", fm, body, doc, mdSource)
+
+	akbMap, ok := page["akb"].(map[string]any)
+	if !ok {
+		t.Fatalf("akb map missing")
+	}
+	annotations, ok := akbMap["annotations"].([]any)
+	if !ok {
+		t.Fatalf("akb.annotations type mismatch, got %T", akbMap["annotations"])
+	}
+	if len(annotations) != 1 {
+		t.Fatalf("akb.annotations len = %d, want 1", len(annotations))
+	}
+
+	ann, ok := annotations[0].(map[string]any)
+	if !ok {
+		t.Fatalf("annotation type mismatch, got %T", annotations[0])
+	}
+	fields, ok := ann["fields"].(map[string]string)
+	if !ok {
+		t.Fatalf("fields type mismatch, got %T", ann["fields"])
+	}
+	if fields["real"] != "true" {
+		t.Errorf("fields = %v, want real=true", fields)
+	}
+}
+
+func TestConvertDateFieldNonDateStringsUnchanged(t *testing.T) {
+	for _, value := range []string{"note", "draft", "not a date", "2026-13-40", "10-05-2026", "2026-05-10T08:30", ""} {
+		if got := convertDateField(value); got != value {
+			t.Errorf("convertDateField(%q) = %v (%T), want unchanged", value, got, got)
+		}
+	}
+
+	if got := convertDateField(42); got != 42 {
+		t.Errorf("convertDateField(42) = %v (%T), want 42 unchanged", got, got)
+	}
+	if got := convertDateField(nil); got != nil {
+		t.Errorf("convertDateField(nil) = %v, want nil", got)
+	}
+}
+
+func TestBuildPageCustomDateFieldsInTimestampRule(t *testing.T) {
+	mdSource := []byte(`---
+type: note
+title: Custom Date Fields
+valid_from: 2026-05-10
+starts_at: 2026-05-10T08:30:00Z
+status: draft
+summary: not a date at all
+---
+
+Body text.
+`)
+
+	fm, body, err := frontmatter.Parse(mdSource)
+	if err != nil {
+		t.Fatalf("parse frontmatter: %v", err)
+	}
+
+	md := goldmark.New()
+	doc := md.Parser().Parse(text.NewReader(mdSource))
+
+	page := BuildPage("kb/notes/dates.md", fm, body, doc, mdSource)
+
+	fmMap, ok := page["frontmatter"].(map[string]any)
+	if !ok {
+		t.Fatalf("frontmatter map missing")
+	}
+
+	validFrom, ok := fmMap["valid_from"].(time.Time)
+	if !ok {
+		t.Fatalf("frontmatter.valid_from = %T, want time.Time", fmMap["valid_from"])
+	}
+	if want := time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC); !validFrom.Equal(want) {
+		t.Errorf("frontmatter.valid_from = %v, want %v", validFrom, want)
+	}
+
+	startsAt, ok := fmMap["starts_at"].(time.Time)
+	if !ok {
+		t.Fatalf("frontmatter.starts_at = %T, want time.Time", fmMap["starts_at"])
+	}
+	if want := time.Date(2026, 5, 10, 8, 30, 0, 0, time.UTC); !startsAt.Equal(want) {
+		t.Errorf("frontmatter.starts_at = %v, want %v", startsAt, want)
+	}
+
+	if fmMap["status"] != "draft" {
+		t.Errorf("frontmatter.status = %v, want draft", fmMap["status"])
+	}
+	if fmMap["summary"] != "not a date at all" {
+		t.Errorf("frontmatter.summary = %v, want unchanged", fmMap["summary"])
+	}
+
+	env, err := NewEnv()
+	if err != nil {
+		t.Fatalf("NewEnv: %v", err)
+	}
+
+	vars := map[string]any{
+		"page": page,
+		"now":  time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC),
+	}
+
+	rules := []struct {
+		expr string
+		want bool
+	}{
+		{`timestamp(page.frontmatter.valid_from) <= now`, true},
+		{`timestamp(page.frontmatter.starts_at) > timestamp(page.frontmatter.valid_from)`, true},
+		{`timestamp(page.frontmatter.valid_from) > now`, false},
+	}
+	for _, rule := range rules {
+		prg, err := CompileRule(env, rule.expr)
+		if err != nil {
+			t.Errorf("CompileRule(%s): %v", rule.expr, err)
+			continue
+		}
+		result, err := Evaluate(context.Background(), prg, vars, 1000)
+		if err != nil {
+			t.Errorf("Evaluate(%s): %v", rule.expr, err)
+			continue
+		}
+		if result != types.Bool(rule.want) {
+			t.Errorf("%s = %v, want %v", rule.expr, result, rule.want)
+		}
 	}
 }
 

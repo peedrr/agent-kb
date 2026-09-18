@@ -97,3 +97,29 @@ func TestParseAnnotations_MixedComments(t *testing.T) {
 		t.Errorf("expected confidence=low, got %q", annotations[0].Fields["confidence"])
 	}
 }
+
+func TestParseAnnotations_FencedCodeBlock(t *testing.T) {
+	content := "Some text\n```\n<!-- olw-auto: confidence=low -->\n```\nBut <!-- olw-auto: verified=true --> here."
+	annotations := ParseAnnotations(content)
+
+	if len(annotations) != 1 {
+		t.Fatalf("expected 1 annotation, got %d", len(annotations))
+	}
+
+	if annotations[0].Fields["verified"] != "true" {
+		t.Errorf("expected verified=true, got %v", annotations[0].Fields)
+	}
+}
+
+func TestParseAnnotations_InlineCode(t *testing.T) {
+	content := "Use `<!-- olw-auto: confidence=low -->` in a doc, but <!-- olw-auto: verified=true --> is real."
+	annotations := ParseAnnotations(content)
+
+	if len(annotations) != 1 {
+		t.Fatalf("expected 1 annotation, got %d", len(annotations))
+	}
+
+	if annotations[0].Fields["verified"] != "true" {
+		t.Errorf("expected verified=true, got %v", annotations[0].Fields)
+	}
+}

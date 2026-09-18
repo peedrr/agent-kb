@@ -17,15 +17,10 @@ import (
 
 // convertDateField converts ISO-8601 date strings to time.Time for CEL compatibility.
 // It handles both RFC3339 ("2024-01-01T00:00:00Z") and date-only ("2024-01-01") formats.
-// Returns the original value if parsing fails or the field is not a date field.
-func convertDateField(key string, value any) any {
+// Any string that is not one of those formats is returned unchanged.
+func convertDateField(value any) any {
 	str, ok := value.(string)
 	if !ok {
-		return value
-	}
-
-	// Only convert fields that are commonly date fields
-	if key != "created" && key != "updated" {
 		return value
 	}
 
@@ -56,7 +51,7 @@ func BuildPage(relPath string, fm *frontmatter.ParsedFrontmatter, body []byte, a
 
 	fmMap := make(map[string]any, len(fm.Fields)+2)
 	for k, v := range fm.Fields {
-		fmMap[k] = convertDateField(k, v)
+		fmMap[k] = convertDateField(v)
 	}
 	fmMap["type"] = fm.Type
 	fmMap["title"] = fm.Title
@@ -232,9 +227,18 @@ func parseAnnotations(content string) []any {
 	if content == "" {
 		return nil
 	}
+	// Only code ranges are excluded: an annotation is itself an HTML comment,
+	// so including comment ranges here would exclude every real annotation.
+	var excluded exclusionSet
+	excluded.ranges = append(excluded.ranges, fencedCodeBlockRanges(content)...)
+	excluded.ranges = append(excluded.ranges, inlineCodeRanges(content)...)
+
 	matches := annotationRe.FindAllStringSubmatchIndex(content, -1)
 	var annotations []any
 	for _, m := range matches {
+		if excluded.isExcluded(m[0], m[1]) {
+			continue
+		}
 		fieldsStr := content[m[2]:m[3]]
 		fields := parseAnnotationFields(fieldsStr)
 		annotations = append(annotations, map[string]any{

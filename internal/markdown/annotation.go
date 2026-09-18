@@ -16,14 +16,25 @@ type Annotation struct {
 var annotationRe = regexp.MustCompile(`<!--\s*olw-auto:\s*(.+?)\s*-->`)
 
 // ParseAnnotations extracts olw-auto annotations from content.
+// Annotations inside fenced code blocks or inline code are ignored.
 func ParseAnnotations(content string) []Annotation {
 	if content == "" {
 		return nil
 	}
 
+	// Only code ranges are excluded: an annotation is itself an HTML comment,
+	// so including comment ranges here would exclude every real annotation.
+	var excluded exclusionSet
+	excluded.ranges = append(excluded.ranges, fencedCodeBlockRanges(content)...)
+	excluded.ranges = append(excluded.ranges, inlineCodeRanges(content)...)
+
 	matches := annotationRe.FindAllStringSubmatchIndex(content, -1)
 	var annotations []Annotation
 	for _, m := range matches {
+		if excluded.isExcluded(m[0], m[1]) {
+			continue
+		}
+
 		fieldsStr := content[m[2]:m[3]]
 		fields := parseAnnotationFields(fieldsStr)
 		annotations = append(annotations, Annotation{
