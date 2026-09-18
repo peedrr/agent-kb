@@ -3,7 +3,7 @@
 **Generated:** 2026-05-10
 **Commit:** 02e26d2
 **Branch:** master
-**Status:** v0.15.0 — template CRUD complete
+**Status:** v0.16.0 — template CRUD complete
 
 ## OVERVIEW
 
@@ -115,7 +115,7 @@ agent-kb/
 
 ## CONVENTIONS (THIS PROJECT)
 
-- **KB root**: Located by walking up for `.akb/` directory marker
+- **KB root**: Resolved from the registry default (`~/.config/agent-kb/registry.yaml`, written by `akb init` / `akb use`) — commands do NOT walk up looking for a `.akb/` marker (`internal/path.KBRoot()` is currently unused). The path-addressing docs are being rewritten separately.
 - **Paths**: Always relative to KB root; `kb/` prefix stripped
 - **Managed files**: `index.md`, `log.md` cannot be written directly
 - **Raw access**: `raw/` prefix → separate storage; use `akb raw` commands

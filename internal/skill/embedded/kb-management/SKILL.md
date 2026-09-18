@@ -81,7 +81,6 @@ These rules apply to ALL KB operations. The reference files assume you know thes
 | Show backlinks | `akb backlinks <path> [--json]` |
 | Show orphans | `akb orphans` |
 | Lint | `akb lint [--json]` |
-| Stale report | `akb stale [--all] [--json]` |
 | Status | `akb status` |
 | Approve draft | `akb approve <path> [--all-drafts]` |
 | Index | `akb index show\|add\|remove\|rebuild` |

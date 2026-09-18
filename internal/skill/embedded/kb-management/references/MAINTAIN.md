@@ -27,15 +27,16 @@
    ```bash
    akb orphans                 # pages with zero inbound links
    akb links <path>            # outbound, broken, and ambiguous links for a page
-   akb stale [--all]           # freshness report; --all checks all registered KBs
    akb status                  # overview: name, path, page count
    ```
+
+   **Freshness:** there is no standalone freshness command. Freshness policy is template-owned: express staleness as CEL `lint_rules` on the page type's template, and it is reported by the `cel_lint` check above (see `references/TEMPLATE.md`).
 
 3. Fix issues:
    - **Broken links:** Create stub pages for missing targets, or fix the source page's wikilink.
    - **Orphans:** Add inbound links from related pages.
    - **Ambiguous links:** Use `[[path-form]]` instead of short names.
-   - **Stale pages:** Update outdated content, or mark as deprecated.
+   - **Stale pages:** Update outdated content, or mark as deprecated. Staleness is template-owned CEL lint policy, not a separate command.
    - **Type-orphans:** Reassign the page's `type` to a valid template, create the missing template, or delete the page. See `references/TEMPLATE.md`.
 
 4. Batch orphan cleanup:
