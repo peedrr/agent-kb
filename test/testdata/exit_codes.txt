@@ -1,0 +1,153 @@
+# Exit-code contract: 0 = success, 1 = the command ran but its result is a
+# failure the caller can act on (failed page validation, drift detected),
+# 2 = the command could not run (usage mistake or internal fault). Result
+# signals must not add error noise, and usage/internal faults must be labelled
+# on stderr.
+#
+# The script comes first and input files are declared last: testscript treats
+# the txtar comment (text before the first "-- file --" marker) as the script.
+
+# === SUCCESS: write and raw status exit 0 ===
+
+exec akb init exit-kb
+cd exit-kb
+
+stdin ../ok-note.md
+exec akb write notes/ok.md
+stdout 'Written to kb/notes/ok.md'
+
+stdin ../raw-data.csv
+exec akb raw write data.csv
+exec akb raw status
+stdout 'no drift'
+
+# === VALIDATION FAILURE: exit 1, every failed rule on stderr, no page written ===
+
+exec bash -c 'akb write decisions/missing-sections.md <../missing-sections-adr.md; echo "akb-exit=$?"'
+stdout 'akb-exit=1$'
+stderr 'require_context'
+stderr 'require_decision'
+stderr 'require_consequences'
+stderr 'disallow_options'
+stderr -count=4 '^\['
+! exists kb/decisions/missing-sections.md
+
+# === UNKNOWN TYPE: content failure the caller can fix, exit 1 ===
+
+exec bash -c 'akb write notes/unknown.md <../unknown-type.md; echo "akb-exit=$?"'
+stdout 'akb-exit=1$'
+stderr 'unknown type'
+
+# === DRIFT RESULT: drift report, exit 1, no error noise ===
+
+cp ../raw-modified.csv raw/data.csv
+
+exec bash -c 'akb raw status; echo "akb-exit=$?"'
+stdout 'MODIFIED data.csv'
+stdout 'akb-exit=1$'
+! stderr 'Error'
+! stderr 'usage:'
+! stderr 'internal:'
+
+exec bash -c 'akb raw status --json; echo "akb-exit=$?"'
+stdout '"modified": 1'
+stdout 'akb-exit=1$'
+! stderr 'Error'
+! stderr 'usage:'
+! stderr 'internal:'
+
+# === INTERNAL FAULT: exit 2 with internal: prefix ===
+
+cp ../broken-template.yaml .akb/templates/broken.yaml
+
+exec bash -c 'akb write broken/page.md <../broken-page.md; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'internal: CEL engine error: compile rule broken_rule'
+! exists kb/broken/page.md
+
+cp ../corrupt-manifest.txt raw/files.log
+
+exec bash -c 'akb raw status; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'internal:'
+stderr 'files.log is corrupted'
+
+# === USAGE ERROR: exit 2 with usage: prefix ===
+
+rm -rf raw
+
+exec bash -c 'akb raw status; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: raw/ directory not found'
+
+-- ok-note.md --
+---
+type: note
+title: Ok note
+created: "2020-01-01T00:00:00Z"
+---
+
+# Ok note
+
+A note that passes every validation rule.
+
+-- missing-sections-adr.md --
+---
+type: adr
+title: Missing sections
+summary: ADR without the required sections
+tags: [test]
+status: proposed
+deciders: team
+created: "2020-01-01T00:00:00Z"
+updated: "2020-01-01T00:00:00Z"
+---
+
+# Missing sections
+
+## Options
+
+An ADR that violates four validation rules at once.
+
+-- unknown-type.md --
+---
+type: nonexistent
+title: Unknown type
+---
+
+A page whose type has no template.
+
+-- raw-data.csv --
+hello
+
+-- raw-modified.csv --
+modified
+
+-- broken-template.yaml --
+name: broken
+description: Template with an invalid CEL rule
+dir: broken
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    type:
+      type: string
+      required: true
+validations:
+  - id: broken_rule
+    rule: 'this is not valid CEL (('
+    requirement: never satisfiable
+    expect: never reported
+
+-- broken-page.md --
+---
+type: broken
+title: Page for a template whose rule does not compile
+---
+
+Content that never reaches validation.
+
+-- corrupt-manifest.txt --
+invalid line without pipes

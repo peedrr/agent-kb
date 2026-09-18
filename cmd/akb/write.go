@@ -100,8 +100,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 	// Create CEL environment
 	celEnv, err := cel.NewEnv()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "CEL engine error: %v\n", err)
-		os.Exit(2)
+		return &internalError{err: fmt.Errorf("CEL engine error: %w", err)}
 	}
 
 	var fm *frontmatter.ParsedFrontmatter
@@ -184,8 +183,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 		// Build old_page from pre-modification state
 		oldPage, err = cel.BuildOldPage(relPath, store)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "CEL engine error: %v\n", err)
-			os.Exit(2)
+			return &internalError{err: fmt.Errorf("CEL engine error: %w", err)}
 		}
 
 		for _, arg := range writeFrontmatter {
@@ -301,8 +299,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 			// Build old_page from pre-modification state
 			oldPage, err = cel.BuildOldPage(relPath, store)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "CEL engine error: %v\n", err)
-				os.Exit(2)
+				return &internalError{err: fmt.Errorf("CEL engine error: %w", err)}
 			}
 
 			newBody := string(body) + "\n" + string(stdinContent)
@@ -446,8 +443,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 	for _, rule := range tmpl.Validations {
 		prg, err := cel.CompileRule(celEnv, rule.Rule)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "CEL engine error: compile rule %s: %v\n", rule.ID, err)
-			os.Exit(2)
+			return &internalError{err: fmt.Errorf("CEL engine error: compile rule %s: %w", rule.ID, err)}
 		}
 		var oldPageAny any
 		if oldPage != nil {
@@ -459,8 +455,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 			"now":      time.Now(),
 		}, 100000)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "CEL engine error: evaluate rule %s: %v\n", rule.ID, err)
-			os.Exit(2)
+			return &internalError{err: fmt.Errorf("CEL engine error: evaluate rule %s: %w", rule.ID, err)}
 		}
 		if result != types.True {
 			validationErrors = append(validationErrors, cel.ValidationError{
@@ -476,7 +471,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 		for _, ve := range validationErrors {
 			fmt.Fprintln(os.Stderr, ve.Error())
 		}
-		os.Exit(1)
+		return validationFailure{}
 	}
 
 	// Extract tags and summary from frontmatter fields

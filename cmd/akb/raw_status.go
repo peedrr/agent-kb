@@ -59,20 +59,17 @@ func runRawStatus(_ *cobra.Command, args []string) error {
 	rawDir := filepath.Join(kbRoot, "raw")
 	if info, err := os.Stat(rawDir); err != nil {
 		if os.IsNotExist(err) {
-			fmt.Fprintln(os.Stderr, "raw/ directory not found. Run 'akb init' to create a knowledge base.")
-			os.Exit(2)
+			return &usageError{msg: "raw/ directory not found. Run 'akb init' to create a knowledge base."}
 		}
 		return fmt.Errorf("stat raw directory: %w", err)
 	} else if !info.IsDir() {
-		fmt.Fprintln(os.Stderr, "raw/ is not a directory. Run 'akb init' to create a knowledge base.")
-		os.Exit(2)
+		return &usageError{msg: "raw/ is not a directory. Run 'akb init' to create a knowledge base."}
 	}
 
 	mgr := manifest.NewManager(kbRoot)
 	entries, err := mgr.ReadManifest()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err.Error())
-		os.Exit(2)
+		return &internalError{err: err}
 	}
 
 	// Build a map of manifest entries for lookup
@@ -178,7 +175,7 @@ func runRawStatus(_ *cobra.Command, args []string) error {
 	}
 
 	if len(drifted) > 0 {
-		os.Exit(1)
+		return driftDetected{}
 	}
 
 	return nil
