@@ -1,7 +1,6 @@
 package db
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -199,23 +198,6 @@ func TestVerifySchema(t *testing.T) {
 		err = VerifySchema(db)
 		if err == nil {
 			t.Fatal("expected error for missing indexes")
-		}
-	})
-}
-
-func TestOpen(t *testing.T) {
-	t.Run("opens database and pings", func(t *testing.T) {
-		dir := t.TempDir()
-		dbPath := filepath.Join(dir, "test.db")
-
-		db, err := Open(dbPath)
-		if err != nil {
-			t.Fatalf("Open failed: %v", err)
-		}
-		defer db.Close() //nolint:errcheck // test cleanup — failure is non-fatal
-
-		if err := db.Ping(context.Background()); err != nil {
-			t.Fatalf("Ping failed: %v", err)
 		}
 	})
 }

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	yaml "github.com/goccy/go-yaml"
 )
@@ -50,26 +49,5 @@ func Save(path string, cfg *Config) error {
 	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
-	return nil
-}
-
-// Validate checks that a Config has required fields.
-func Validate(cfg *Config) error {
-	if cfg.Name == "" {
-		return errors.New("name is required")
-	}
-
-	if cfg.Created == "" {
-		return errors.New("created is required")
-	}
-
-	_, err := time.Parse(time.RFC3339, cfg.Created)
-	if err != nil {
-		_, err = time.Parse("2006-01-02", cfg.Created)
-		if err != nil {
-			return errors.New("created must be valid ISO-8601")
-		}
-	}
-
 	return nil
 }

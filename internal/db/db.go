@@ -2,7 +2,6 @@
 package db
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -13,31 +12,6 @@ import (
 // DB wraps sql.DB with custom operations.
 type DB struct {
 	*sql.DB
-}
-
-// Open opens a SQLite database at the given path.
-func Open(path string) (*DB, error) {
-	db, err := sql.Open("sqlite", path)
-	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
-	}
-	return &DB{db}, nil
-}
-
-// Close closes the database connection.
-func (db *DB) Close() error {
-	if err := db.DB.Close(); err != nil {
-		return fmt.Errorf("close database: %w", err)
-	}
-	return nil
-}
-
-// Ping verifies the database connection.
-func (db *DB) Ping(ctx context.Context) error {
-	if err := db.PingContext(ctx); err != nil {
-		return fmt.Errorf("ping database: %w", err)
-	}
-	return nil
 }
 
 // InitDB opens a new SQLite database, creating it if necessary.

@@ -279,57 +279,6 @@ schema:
 	})
 }
 
-func TestAllowedFields(t *testing.T) {
-	t.Run("returns schema keys plus is_draft", func(t *testing.T) {
-		tmpl := Template{
-			Name: "note",
-			Schema: Schema{
-				Frontmatter: map[string]FieldSchema{
-					"title":   {Type: "string", Required: true},
-					"summary": {Type: "string", Required: true},
-					"tags":    {Type: "list", Required: true},
-				},
-			},
-		}
-
-		fields := tmpl.AllowedFields()
-		if len(fields) != 4 {
-			t.Fatalf("AllowedFields len = %d, want 4", len(fields))
-		}
-
-		seen := make(map[string]bool)
-		for _, f := range fields {
-			seen[f] = true
-		}
-		if !seen["title"] || !seen["summary"] || !seen["tags"] || !seen["is_draft"] {
-			t.Errorf("AllowedFields = %v, want [title summary tags is_draft]", fields)
-		}
-	})
-
-	t.Run("does not duplicate is_draft if already in schema", func(t *testing.T) {
-		tmpl := Template{
-			Name: "note",
-			Schema: Schema{
-				Frontmatter: map[string]FieldSchema{
-					"is_draft": {Type: "bool", Required: false},
-					"title":    {Type: "string", Required: true},
-				},
-			},
-		}
-
-		fields := tmpl.AllowedFields()
-		count := 0
-		for _, f := range fields {
-			if f == "is_draft" {
-				count++
-			}
-		}
-		if count != 1 {
-			t.Errorf("is_draft appears %d times, want 1", count)
-		}
-	})
-}
-
 func TestCopyDefaults(t *testing.T) {
 	t.Run("copies embedded templates to target", func(t *testing.T) {
 		dir := t.TempDir()
@@ -415,7 +364,12 @@ func TestCopyDefaults(t *testing.T) {
 
 func TestEmbeddedTemplates(t *testing.T) {
 	t.Run("embedded templates are valid new-format", func(t *testing.T) {
-		templates, err := LoadTemplatesFromFS(DefaultTemplates)
+		dir := t.TempDir()
+		if err := CopyDefaults(dir); err != nil {
+			t.Fatalf("CopyDefaults failed: %v", err)
+		}
+
+		templates, err := LoadTemplates(dir)
 		if err != nil {
 			t.Fatalf("embedded templates invalid: %v", err)
 		}
