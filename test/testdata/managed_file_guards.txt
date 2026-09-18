@@ -1,0 +1,58 @@
+# Managed-file guards — index.md and log.md are refused by delete and index remove
+
+exec akb init guard-kb
+cd guard-kb
+
+# === MANAGED FILES REFUSED VIA DOT-SEGMENT PATHS ===
+
+! exec akb delete ./index.md
+stderr 'cannot delete index.md'
+
+! exec akb delete kb/./log.md
+stderr 'cannot delete log.md'
+
+! exec akb index remove index.md
+stderr 'cannot remove index.md from index'
+
+! exec akb index remove kb/./log.md
+stderr 'cannot remove log.md from index'
+
+# === MANAGED FILES SURVIVE THE REFUSALS ===
+
+exists kb/index.md
+
+# === NORMAL DELETE STILL WORKS ===
+
+stdin ../note-input.md
+exec akb write smoke-note.md
+stdout 'Written to kb/notes/smoke-note.md'
+
+exec akb delete notes/smoke-note.md
+stdout 'Deleted kb/notes/smoke-note.md'
+! exists kb/notes/smoke-note.md
+
+# === NORMAL INDEX REMOVE STILL WORKS ===
+
+stdin ../note-input.md
+exec akb write smoke-two.md
+stdout 'Written to kb/notes/smoke-two.md'
+
+exec akb index add kb/notes/smoke-two.md 'smoke summary'
+stdout 'Added kb/notes/smoke-two.md to index'
+
+exec akb index show
+stdout 'smoke-two.md'
+
+exec akb index remove kb/notes/smoke-two.md
+stdout 'Removed kb/notes/smoke-two.md from index'
+
+exec akb index show
+! stdout 'smoke-two.md'
+
+-- note-input.md --
+---
+type: note
+title: Guard Smoke Note
+summary: A note for managed-file guard tests
+---
+Body content.

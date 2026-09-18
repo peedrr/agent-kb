@@ -52,6 +52,10 @@ func ResolveKBPath(kbRoot, inputPath string) (string, error) {
 		cleanPath = "."
 	}
 
+	// Normalize the resolved input path so "./" prefixes and redundant
+	// separators cannot mask the target from callers.
+	cleanPath = filepath.Clean(cleanPath)
+
 	return filepath.Join(kbRoot, cleanPath), nil
 }
 
@@ -86,6 +90,10 @@ func ResolveRawPath(kbRoot, inputPath string) (string, error) {
 	} else if cleanPath == "raw" && inputPath == "raw" {
 		cleanPath = "."
 	}
+
+	// Normalize the resolved input path so "./" prefixes and redundant
+	// separators cannot mask the target from callers.
+	cleanPath = filepath.Clean(cleanPath)
 
 	return filepath.Join(kbRoot, "raw", cleanPath), nil
 }

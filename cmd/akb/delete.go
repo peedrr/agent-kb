@@ -146,10 +146,11 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
 
 	// Guard: block delete on managed files
-	if cleanPath == "index.md" {
+	base := filepath.Base(cleanPath)
+	if base == "index.md" {
 		return fmt.Errorf("cannot delete index.md; use 'akb index rebuild' to reset")
 	}
-	if cleanPath == "log.md" {
+	if base == "log.md" {
 		return fmt.Errorf("cannot delete log.md; it is a managed file")
 	}
 

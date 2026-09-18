@@ -205,6 +205,34 @@ func TestIndexAdd_RejectsAbsolutePath(t *testing.T) {
 	}
 }
 
+func TestIndexRemove_RejectsIndexMd(t *testing.T) {
+	kbRoot := setupIndexTestKB(t)
+
+	err := runIndexRemove(nil, []string{"index.md"})
+	if err == nil {
+		t.Fatal("expected error for index.md, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot remove index.md from index") {
+		t.Errorf("expected 'cannot remove index.md from index' in error, got: %v", err)
+	}
+
+	if _, statErr := os.Stat(filepath.Join(kbRoot, "kb", "index.md")); statErr != nil {
+		t.Errorf("index.md should still exist: %v", statErr)
+	}
+}
+
+func TestIndexRemove_RejectsLogMd(t *testing.T) {
+	setupIndexTestKB(t)
+
+	err := runIndexRemove(nil, []string{"kb/./log.md"})
+	if err == nil {
+		t.Fatal("expected error for log.md, got nil")
+	}
+	if !strings.Contains(err.Error(), "cannot remove log.md from index") {
+		t.Errorf("expected 'cannot remove log.md from index' in error, got: %v", err)
+	}
+}
+
 func TestIndexRemove_RemovesEntry(t *testing.T) {
 	kbRoot := setupIndexTestKB(t)
 

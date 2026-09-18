@@ -192,6 +192,38 @@ func TestDelete(t *testing.T) {
 		}
 	})
 
+	t.Run("error on delete of managed file via dot-segment paths", func(t *testing.T) {
+		indexPath := filepath.Join(kbRoot, "kb", "index.md")
+		if err := os.WriteFile(indexPath, []byte("# Index\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+
+		origNoCommit := noCommit
+		noCommit = true
+		t.Cleanup(func() { noCommit = origNoCommit })
+
+		cases := []struct {
+			input   string
+			wantErr string
+		}{
+			{"./index.md", "cannot delete index.md"},
+			{"kb/./log.md", "cannot delete log.md"},
+		}
+		for _, tc := range cases {
+			err := runDeleteCmd(&cobra.Command{}, []string{tc.input})
+			if err == nil {
+				t.Fatalf("expected error for %q, got nil", tc.input)
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("delete %q: expected %q in error, got: %v", tc.input, tc.wantErr, err)
+			}
+		}
+
+		if _, err := os.Stat(indexPath); err != nil {
+			t.Errorf("index.md should not be deleted: %v", err)
+		}
+	})
+
 	t.Run("error on parent dir traversal", func(t *testing.T) {
 		origNoCommit := noCommit
 		noCommit = false
