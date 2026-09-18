@@ -84,7 +84,15 @@ func runRawWrite(_ *cobra.Command, args []string) error {
 	}
 
 	mgr := manifest.NewManager(kbRoot)
-	if err := mgr.AddEntry(relPath, sha256hash); err != nil {
+	_, found, err := mgr.FindByFilename(relPath)
+	if err != nil {
+		return fmt.Errorf("look up manifest entry: %w", err)
+	}
+	if found {
+		if err := mgr.UpdateEntry(relPath, sha256hash); err != nil {
+			return fmt.Errorf("update manifest: %w", err)
+		}
+	} else if err := mgr.AddEntry(relPath, sha256hash); err != nil {
 		return fmt.Errorf("update manifest: %w", err)
 	}
 
