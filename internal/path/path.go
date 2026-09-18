@@ -20,27 +20,40 @@ var (
 	ErrUseAKBRawWrite = errors.New("use `akb raw write` or `akb raw read`")
 )
 
+// GuardError reports an input path that violates the path rules: an absolute
+// path, a '..' escape, or a path that belongs to the other command family.
+// The path resolvers return it so callers can tell a rejected input apart from
+// a fault, and the CLI maps it to the usage exit code. It wraps the rule's
+// sentinel error, so errors.Is keeps matching the specific rule.
+type GuardError struct {
+	rule error
+}
+
+func (e *GuardError) Error() string { return e.rule.Error() }
+
+func (e *GuardError) Unwrap() error { return e.rule }
+
 // ResolveKBPath resolves a KB-relative path with guard rails.
 // It strips redundant "kb/" prefix and validates the path.
 func ResolveKBPath(kbRoot, inputPath string) (string, error) {
 	// Reject empty path
 	if strings.TrimSpace(inputPath) == "" {
-		return "", ErrEmptyPath
+		return "", &GuardError{rule: ErrEmptyPath}
 	}
 
 	// Reject absolute paths
 	if filepath.IsAbs(inputPath) || (len(inputPath) > 1 && inputPath[1] == ':') {
-		return "", ErrAbsolutePath
+		return "", &GuardError{rule: ErrAbsolutePath}
 	}
 
 	// Reject parent directory traversal
 	if strings.Contains(inputPath, "..") {
-		return "", ErrParentDir
+		return "", &GuardError{rule: ErrParentDir}
 	}
 
 	// Reject raw/ prefix - user should use akb raw commands
 	if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
-		return "", ErrUseAKBRawWrite
+		return "", &GuardError{rule: ErrUseAKBRawWrite}
 	}
 
 	// Strip redundant kb/ prefix
@@ -64,22 +77,22 @@ func ResolveKBPath(kbRoot, inputPath string) (string, error) {
 func ResolveRawPath(kbRoot, inputPath string) (string, error) {
 	// Reject empty path
 	if strings.TrimSpace(inputPath) == "" {
-		return "", ErrEmptyPath
+		return "", &GuardError{rule: ErrEmptyPath}
 	}
 
 	// Reject absolute paths
 	if filepath.IsAbs(inputPath) || (len(inputPath) > 1 && inputPath[1] == ':') {
-		return "", ErrAbsolutePath
+		return "", &GuardError{rule: ErrAbsolutePath}
 	}
 
 	// Reject parent directory traversal
 	if strings.Contains(inputPath, "..") {
-		return "", ErrParentDir
+		return "", &GuardError{rule: ErrParentDir}
 	}
 
 	// Reject kb/ prefix - user should use akb write/read commands
 	if strings.HasPrefix(inputPath, "kb/") || inputPath == "kb" {
-		return "", ErrUseAKBWrite
+		return "", &GuardError{rule: ErrUseAKBWrite}
 	}
 
 	// Strip redundant raw/ prefix

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func appendSetupTestKB(t *testing.T) string {
@@ -300,5 +302,90 @@ func TestAppendAbsolutePathRejected(t *testing.T) {
 	}
 	if !strings.Contains(out, "absolute") && !strings.Contains(out, "relative") {
 		t.Errorf("expected error about absolute/relative path, got: %s", out)
+	}
+}
+
+// TestConcurrentAppendsSerializeWithoutLostUpdates runs several akb append
+// processes against the same page: their read-modify-write cycles serialize on
+// the repository lock, so every append survives in the page and in its own
+// commit.
+func TestConcurrentAppendsSerializeWithoutLostUpdates(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	seed := "---\ntype: note\ntitle: Shared Note\nsummary: test\ntags: test\n---\nOriginal body."
+	if out, err := writeRun(kbRoot, "shared.md", seed); err != nil {
+		t.Fatalf("seed write failed: %s: %v", out, err)
+	}
+
+	const writers = 4
+	cmds := make([]*exec.Cmd, 0, writers)
+	outputs := make([]*strings.Builder, 0, writers)
+	for i := range writers {
+		cmd := exec.Command(akbBinPath, "append", "notes/shared.md") //nolint:gosec // test helper launching akb binary
+		cmd.Dir = kbRoot
+		cmd.Stdin = strings.NewReader(fmt.Sprintf("Appended by writer %d.", i))
+		output := &strings.Builder{}
+		cmd.Stdout = output
+		cmd.Stderr = output
+		if err := cmd.Start(); err != nil {
+			t.Fatalf("start append %d: %v", i, err)
+		}
+		cmds = append(cmds, cmd)
+		outputs = append(outputs, output)
+	}
+
+	waitErr := make(chan error, writers)
+	for i, cmd := range cmds {
+		go func(index int, cmd *exec.Cmd) {
+			if err := cmd.Wait(); err != nil {
+				waitErr <- fmt.Errorf("append process %d failed: %w\n%s", index, err, outputs[index].String())
+				return
+			}
+			waitErr <- nil
+		}(i, cmd)
+	}
+	deadline := time.After(90 * time.Second)
+	for range writers {
+		select {
+		case err := <-waitErr:
+			if err != nil {
+				for _, cmd := range cmds {
+					_ = cmd.Process.Kill() //nolint:errcheck // test cleanup
+				}
+				t.Fatal(err)
+			}
+		case <-deadline:
+			for _, cmd := range cmds {
+				_ = cmd.Process.Kill() //nolint:errcheck // test cleanup
+			}
+			t.Fatal("concurrent append processes did not finish in time")
+		}
+	}
+
+	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "shared.md")) //nolint:gosec // test reading known temp file
+	if err != nil {
+		t.Fatalf("read shared page: %v", err)
+	}
+	body := string(data)
+	for i := range writers {
+		if !strings.Contains(body, fmt.Sprintf("Appended by writer %d.", i)) {
+			t.Errorf("append of writer %d is missing from the page:\n%s", i, body)
+		}
+	}
+
+	appends := 0
+	for _, subject := range strings.Split(mustGitInDir(t, kbRoot, "log", "--format=%s"), "\n") {
+		if strings.TrimSpace(subject) == "akb: append kb/notes/shared.md" {
+			appends++
+		}
+	}
+	if appends != writers {
+		t.Errorf("append commits = %d, want %d — an append was lost", appends, writers)
+	}
+	for _, line := range strings.Split(mustGitInDir(t, kbRoot, "status", "--porcelain"), "\n") {
+		if len(line) > 3 && strings.HasPrefix(line[3:], "kb/") {
+			t.Errorf("page left dirty after the concurrent appends: %q", line)
+		}
 	}
 }

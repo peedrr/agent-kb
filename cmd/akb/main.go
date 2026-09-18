@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
+	"github.com/peedrr/agent-kb/internal/path"
 )
 
 var version = "dev"
@@ -50,6 +52,15 @@ type driftDetected struct{}
 
 func (driftDetected) Error() string { return "raw drift detected" }
 
+// commandFailure wraps the error of the command Execute ran. Its message is
+// what the default report prints, and reports that rephrase a failure as a
+// usage mistake recover the command's own message from it.
+type commandFailure struct{ err error }
+
+func (e commandFailure) Error() string { return "execute command: " + e.err.Error() }
+
+func (e commandFailure) Unwrap() error { return e.err }
+
 // classifyExit maps a command error to its process exit code and the text to
 // report on stderr. An empty report means the command already reported the
 // reason itself.
@@ -57,6 +68,7 @@ func classifyExit(err error) (code int, report string) {
 	var validationErr validationFailure
 	var driftErr driftDetected
 	var usageErr *usageError
+	var pathGuardErr *path.GuardError
 	var internalErr *internalError
 
 	switch {
@@ -64,13 +76,23 @@ func classifyExit(err error) (code int, report string) {
 		return exitSuccess, ""
 	case errors.As(err, &validationErr), errors.As(err, &driftErr):
 		return exitFailure, ""
-	case errors.As(err, &usageErr):
-		return exitFault, "usage: " + usageErr.Error()
+	case errors.As(err, &usageErr), errors.As(err, &pathGuardErr):
+		return exitFault, "usage: " + commandMessage(err)
 	case errors.As(err, &internalErr):
 		return exitFault, "internal: " + internalErr.Error()
 	default:
 		return exitFailure, "Error: " + err.Error()
 	}
+}
+
+// commandMessage returns the message of the failed command without the
+// context Execute adds to it.
+func commandMessage(err error) string {
+	var failedCommand commandFailure
+	if errors.As(err, &failedCommand) {
+		return failedCommand.err.Error()
+	}
+	return err.Error()
 }
 
 func main() {

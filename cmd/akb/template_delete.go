@@ -4,15 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/storage"
 )
 
 var tdForce bool
@@ -39,6 +38,16 @@ func init() {
 }
 
 var templateNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// templateCommitPaths returns the KB-relative paths of the files a template
+// operation on name records: the template and its pass and fail mockups.
+func templateCommitPaths(name string) []string {
+	return []string{
+		filepath.Join(".akb", "templates", name+".yaml"),
+		filepath.Join(".akb", "templates", name+"_pass.md"),
+		filepath.Join(".akb", "templates", name+"_fail.md"),
+	}
+}
 
 func runTemplateDelete(_ *cobra.Command, args []string) error {
 	name := args[0]
@@ -80,34 +89,32 @@ func runTemplateDelete(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("deletion refused without --force")
 	}
 
-	files := []string{
-		filepath.Join(kbRoot, ".akb", "templates", name+".yaml"),
-		filepath.Join(kbRoot, ".akb", "templates", name+"_pass.md"),
-		filepath.Join(kbRoot, ".akb", "templates", name+"_fail.md"),
-	}
-	for _, f := range files {
-		if err := os.Remove(f); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("delete file %s: %w", filepath.Base(f), err)
+	// Hold the repository lock across the removal of the template files and the
+	// commit that records them; the lint sweep that follows only reads the KB.
+	removeErr := func() error {
+		repoLock, lockErr := storage.LockRepo(kbRoot)
+		if lockErr != nil {
+			return fmt.Errorf("lock repository: %w", lockErr)
 		}
-	}
+		defer repoLock.Release()
 
-	if !noCommit {
-		gitAdd := exec.Command("git", "add", "-A", ".akb/templates/") //nolint:gosec // launching trusted git binary with controlled args
-		gitAdd.Dir = kbRoot
-		if out, err := gitAdd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git add: %s: %w", strings.TrimSpace(string(out)), err)
+		for _, relPath := range templateCommitPaths(name) {
+			if err := os.Remove(filepath.Join(kbRoot, relPath)); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("delete file %s: %w", filepath.Base(relPath), err)
+			}
 		}
 
-		if err := ensureGitConfig(kbRoot); err != nil {
-			return fmt.Errorf("git config: %w", err)
+		if noCommit {
+			return nil
 		}
-
 		commitMsg := fmt.Sprintf("akb: template delete %s", name)
-		gitCommit := exec.Command("git", "commit", "-m", commitMsg) //nolint:gosec // launching trusted git binary with controlled args
-		gitCommit.Dir = kbRoot
-		if out, err := gitCommit.CombinedOutput(); err != nil {
-			return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)
+		if err := storage.CommitFiles(kbRoot, commitMsg, templateCommitPaths(name)...); err != nil {
+			return fmt.Errorf("commit template delete: %w", err)
 		}
+		return nil
+	}()
+	if removeErr != nil {
+		return removeErr
 	}
 
 	ctx := context.Background()

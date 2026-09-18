@@ -102,7 +102,9 @@ func runRawStatus(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("walk raw directory: %w", err)
 	}
 
-	var drifted []driftFile
+	// The drifted list stays non-nil so the JSON envelope always renders files
+	// as an array, never as null.
+	drifted := make([]driftFile, 0)
 
 	// Check for modified and untracked files (on disk)
 	for relPath := range diskFiles {
@@ -139,7 +141,7 @@ func runRawStatus(_ *cobra.Command, args []string) error {
 		}
 		targetRel = filepath.ToSlash(targetRel)
 
-		var filtered []driftFile
+		filtered := make([]driftFile, 0, len(drifted))
 		for _, f := range drifted {
 			if f.Path == targetRel {
 				filtered = append(filtered, f)

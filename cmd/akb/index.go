@@ -204,7 +204,7 @@ func runIndexRemove(_ *cobra.Command, args []string) error {
 	// Reject index.md and log.md
 	base := filepath.Base(entryPath)
 	if base == "index.md" || base == "log.md" {
-		return fmt.Errorf("cannot remove %s from index", base)
+		return &usageError{msg: fmt.Sprintf("cannot remove %s from index", base)}
 	}
 
 	kbRoot, err := path.ResolveKB()

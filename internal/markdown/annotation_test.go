@@ -2,6 +2,7 @@ package markdown
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -121,5 +122,52 @@ func TestParseAnnotations_InlineCode(t *testing.T) {
 
 	if annotations[0].Fields["verified"] != "true" {
 		t.Errorf("expected verified=true, got %v", annotations[0].Fields)
+	}
+}
+
+func TestStripAnnotations_ProseAnnotation(t *testing.T) {
+	content := "Some text.\n<!-- olw-auto: confidence=low -->\nMore text."
+	stripped := StripAnnotations(content)
+
+	if strings.Contains(stripped, "olw-auto") {
+		t.Errorf("prose annotation should be removed, got: %q", stripped)
+	}
+	if !strings.Contains(stripped, "Some text.") || !strings.Contains(stripped, "More text.") {
+		t.Errorf("surrounding text should be preserved, got: %q", stripped)
+	}
+}
+
+func TestStripAnnotations_FencedCodeBlock(t *testing.T) {
+	content := "Some text\n```\n<!-- olw-auto: confidence=low -->\n```\nBut <!-- olw-auto: verified=true --> here."
+	stripped := StripAnnotations(content)
+
+	if !strings.Contains(stripped, "```\n<!-- olw-auto: confidence=low -->\n```") {
+		t.Errorf("annotation inside a fenced block should be preserved, got: %q", stripped)
+	}
+	if strings.Contains(stripped, "verified=true") {
+		t.Errorf("prose annotation should be removed, got: %q", stripped)
+	}
+}
+
+func TestStripAnnotations_InlineCode(t *testing.T) {
+	content := "Use `<!-- olw-auto: confidence=low -->` in a doc, but <!-- olw-auto: verified=true --> is real."
+	stripped := StripAnnotations(content)
+
+	if !strings.Contains(stripped, "`<!-- olw-auto: confidence=low -->`") {
+		t.Errorf("annotation inside inline code should be preserved, got: %q", stripped)
+	}
+	if strings.Contains(stripped, "verified=true") {
+		t.Errorf("prose annotation should be removed, got: %q", stripped)
+	}
+}
+
+func TestStripAnnotations_WithoutAnnotations(t *testing.T) {
+	if stripped := StripAnnotations(""); stripped != "" {
+		t.Errorf("empty content = %q, want %q", stripped, "")
+	}
+
+	content := "Just prose, no annotations.\n\n```\nsome code\n```\n"
+	if stripped := StripAnnotations(content); stripped != content {
+		t.Errorf("content without annotations changed to %q, want %q", stripped, content)
 	}
 }

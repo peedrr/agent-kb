@@ -80,6 +80,22 @@ exec bash -c 'akb raw status; echo "akb-exit=$?"'
 stdout 'akb-exit=2$'
 stderr 'usage: raw/ directory not found'
 
+# === USAGE ERROR: managed-file refusals and path guards ===
+
+exec bash -c 'akb delete ./index.md; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: cannot delete index.md'
+! stderr 'execute command:'
+
+exec bash -c 'akb index remove kb/./log.md; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: cannot remove log.md from index'
+
+exec bash -c 'akb write ../escape.md <../ok-note.md; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: resolve path: .*must not contain'
+exists kb/index.md
+
 -- ok-note.md --
 ---
 type: note

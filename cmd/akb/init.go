@@ -231,6 +231,10 @@ func gitInitAndCommit(name string) error {
 	return nil
 }
 
+// ensureGitConfig gives a repository without a git identity the akb identity to
+// commit under. Only `akb init` runs it: every other command commits under the
+// repository's configured identity or the per-invocation akb fallback, and none
+// of them write repository config.
 func ensureGitConfig(repoPath string) error {
 	gitConfig := func(args ...string) (string, error) {
 		cmd := exec.Command("git", args...) //nolint:gosec // launching trusted git binary with controlled args

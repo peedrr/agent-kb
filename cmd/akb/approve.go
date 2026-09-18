@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	yaml "github.com/goccy/go-yaml"
@@ -49,8 +48,6 @@ func init() {
 	approveCmd.Flags().BoolVar(&approveAllDrafts, "all-drafts", false, "approve all draft pages")
 }
 
-var annotationRe = regexp.MustCompile(`(?s)<!--\s*olw-auto:.*?-->`)
-
 func runApprove(_ *cobra.Command, args []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
@@ -89,6 +86,15 @@ func runApprove(_ *cobra.Command, args []string) error {
 }
 
 func approvePage(ctx context.Context, dbConn *sql.DB, kbRoot, fullPath, inputPath string) (bool, error) {
+	// Hold the repository lock from the read of the page through its commit and
+	// the search and link-graph updates, so the approved body is the body that
+	// gets committed.
+	repoLock, err := storage.LockRepo(kbRoot)
+	if err != nil {
+		return false, fmt.Errorf("lock repository: %w", err)
+	}
+	defer repoLock.Release()
+
 	store := storage.NewGitProvider(kbRoot, noCommit)
 
 	content, err := store.Read(ctx, fullPath)
@@ -108,8 +114,7 @@ func approvePage(ctx context.Context, dbConn *sql.DB, kbRoot, fullPath, inputPat
 		return false, nil
 	}
 
-	bodyStr := string(body)
-	bodyStr = annotationRe.ReplaceAllString(bodyStr, "")
+	bodyStr := markdown.StripAnnotations(string(body))
 	bodyStr = markdown.StripProvenanceMarkers(bodyStr)
 
 	fm.Fields["is_draft"] = false

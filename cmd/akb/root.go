@@ -8,6 +8,10 @@ import (
 
 var noCommit bool
 
+// usageClassificationInstalled reports whether the cobra error conversions
+// were installed, so Execute installs them once per process.
+var usageClassificationInstalled bool
+
 var RootCmd = &cobra.Command{
 	Use:     "akb",
 	Short:   "Agent Knowledge Base CLI",
@@ -42,10 +46,83 @@ func init() {
 	RootCmd.AddCommand(templateCmd)
 }
 
+// Execute runs the CLI and returns the failure of the command it ran, wrapped
+// with the step that failed. Cobra reports invocation mistakes — unknown
+// flags, wrong argument counts, unknown commands — as plain errors, so Execute
+// converts them into the typed usage error first; main reports that with a
+// usage: prefix and the fault exit code.
 func Execute() error {
+	installUsageErrorClassification()
 	RootCmd.SetVersionTemplate("akb {{.Version}}\n")
 	if err := RootCmd.Execute(); err != nil {
-		return fmt.Errorf("execute command: %w", err)
+		return commandFailure{err: err}
 	}
 	return nil
+}
+
+// installUsageErrorClassification converts the errors cobra raises on its own —
+// flag parse failures, positional argument validation, and unknown commands —
+// into the typed usage error.
+func installUsageErrorClassification() {
+	if usageClassificationInstalled {
+		return
+	}
+	usageClassificationInstalled = true
+
+	RootCmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return &usageError{msg: err.Error()}
+	})
+	wrapArgsErrors(RootCmd)
+	// Cobra validates the arguments of a root command that has no validator of
+	// its own and reports the first argument as an unknown command. Installing
+	// an equivalent check keeps that report identical while typing the mistake.
+	RootCmd.Args = rootArgs
+}
+
+// wrapArgsErrors types the positional-argument errors of cmd and its
+// subcommands as usage errors.
+func wrapArgsErrors(cmd *cobra.Command) {
+	if cmd.Args != nil {
+		validate := cmd.Args
+		cmd.Args = func(c *cobra.Command, args []string) error {
+			if err := validate(c, args); err != nil {
+				return &usageError{msg: err.Error()}
+			}
+			return nil
+		}
+	}
+	for _, child := range cmd.Commands() {
+		wrapArgsErrors(child)
+	}
+}
+
+// rootArgs reports a positional argument of the root command that names no
+// subcommand.
+func rootArgs(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	return &usageError{msg: unknownCommandMessage(cmd, args[0])}
+}
+
+// unknownCommandMessage builds the report cobra makes for an unknown command,
+// including the suggestions it offers for a mistyped subcommand.
+func unknownCommandMessage(cmd *cobra.Command, arg string) string {
+	msg := fmt.Sprintf("unknown command %q for %q", arg, cmd.CommandPath())
+	if cmd.DisableSuggestions {
+		return msg
+	}
+	if cmd.SuggestionsMinimumDistance <= 0 {
+		cmd.SuggestionsMinimumDistance = 2
+	}
+	suggestions := cmd.SuggestionsFor(arg)
+	if len(suggestions) == 0 {
+		return msg
+	}
+
+	msg += "\n\nDid you mean this?\n"
+	for _, suggestion := range suggestions {
+		msg += fmt.Sprintf("\t%v\n", suggestion)
+	}
+	return msg
 }

@@ -8,6 +8,38 @@ import (
 	"testing"
 )
 
+func TestApproveStripsOnlyRealAnnotations(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	content := "---\ntype: note\ntitle: Draft Note\nsummary: test\ntags: test\n---\n<!-- olw-auto: action=review -->\n```\n<!-- olw-auto: action=keep -->\n```"
+	_, err := writeRun(kbRoot, "draft.md", content)
+	if err != nil {
+		t.Fatalf("setup write failed: %v", err)
+	}
+
+	out, err := approveRun(kbRoot, "notes/draft.md")
+	if err != nil {
+		t.Fatalf("approve failed: %s: %v", out, err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "draft.md")) //nolint:gosec // test reading known temp file
+	if err != nil {
+		t.Fatalf("read approved file: %v", err)
+	}
+
+	body := string(data)
+	if strings.Count(body, "olw-auto") != 1 {
+		t.Errorf("expected only the annotation inside the fenced block, got: %s", body)
+	}
+	if !strings.Contains(body, "<!-- olw-auto: action=keep -->") {
+		t.Errorf("annotation inside the fenced block should survive approval, got: %s", body)
+	}
+	if !strings.Contains(body, "is_draft: false") {
+		t.Errorf("expected is_draft: false in frontmatter, got: %s", body)
+	}
+}
+
 func approveRun(kbRoot, inputPath string, extraArgs ...string) (string, error) {
 	args := append([]string{"approve"}, extraArgs...)
 	args = append(args, inputPath)

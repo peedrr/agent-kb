@@ -148,10 +148,10 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 	// Guard: block delete on managed files
 	base := filepath.Base(cleanPath)
 	if base == "index.md" {
-		return fmt.Errorf("cannot delete index.md; use 'akb index rebuild' to reset")
+		return &usageError{msg: "cannot delete index.md; use 'akb index rebuild' to reset"}
 	}
 	if base == "log.md" {
-		return fmt.Errorf("cannot delete log.md; it is a managed file")
+		return &usageError{msg: "cannot delete log.md; it is a managed file"}
 	}
 
 	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
@@ -185,6 +185,14 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 }
 
 func deletePage(ctx context.Context, kbRoot string, dbConn *sql.DB, relPath, fullPath, cleanPath, title string) error {
+	// Hold the repository lock across the whole deletion: the index and log
+	// updates, the commit, and the search and link-graph removals.
+	repoLock, err := storage.LockRepo(kbRoot)
+	if err != nil {
+		return fmt.Errorf("lock repository: %w", err)
+	}
+	defer repoLock.Release()
+
 	searcher := search.NewSQLiteFTS5Searcher(dbConn)
 	if err := searcher.RemovePage(ctx, relPath); err != nil {
 		return fmt.Errorf("remove from search index: %w", err)

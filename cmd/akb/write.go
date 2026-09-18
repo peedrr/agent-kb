@@ -478,6 +478,14 @@ func runWrite(_ *cobra.Command, args []string) error {
 	tags := search.ExtractTags(fm.Fields)
 	summary := search.ExtractSummary(fm.Fields)
 
+	// Hold the repository lock from the page write through its commit and the
+	// search and link-graph updates that follow it.
+	repoLock, err := storage.LockRepo(kbRoot)
+	if err != nil {
+		return fmt.Errorf("lock repository: %w", err)
+	}
+	defer repoLock.Release()
+
 	// Write content
 	ctx := context.Background()
 	if err := store.Write(ctx, fullPath, writeContent); err != nil {

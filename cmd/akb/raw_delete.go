@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/manifest"
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/storage"
 )
 
 var rawDeleteCmd = &cobra.Command{
@@ -64,6 +64,14 @@ func runRawDelete(_ *cobra.Command, args []string) error {
 	// Sources scan: find KB pages referencing this file (before deletion)
 	referencing := scanSources(kbRoot, relPath)
 
+	// Hold the repository lock across the file and manifest removals and the
+	// commit that records them.
+	repoLock, err := storage.LockRepo(kbRoot)
+	if err != nil {
+		return fmt.Errorf("lock repository: %w", err)
+	}
+	defer repoLock.Release()
+
 	// Delete file from disk
 	if err := os.Remove(fullPath); err != nil {
 		return fmt.Errorf("delete file: %w", err)
@@ -77,27 +85,9 @@ func runRawDelete(_ *cobra.Command, args []string) error {
 
 	// Git commit
 	if !noCommit {
-		gitAdd := exec.Command("git", "add", "-A", "raw/")
-		gitAdd.Dir = kbRoot
-		if out, err := gitAdd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git add: %s: %w", strings.TrimSpace(string(out)), err)
-		}
-
-		gitAddManifest := exec.Command("git", "add", "raw/files.log")
-		gitAddManifest.Dir = kbRoot
-		if out, err := gitAddManifest.CombinedOutput(); err != nil {
-			return fmt.Errorf("git add manifest: %s: %w", strings.TrimSpace(string(out)), err)
-		}
-
-		if err := ensureGitConfig(kbRoot); err != nil {
-			return fmt.Errorf("git config: %w", err)
-		}
-
 		commitMsg := fmt.Sprintf("akb: raw delete %s", relPath)
-		gitCommit := exec.Command("git", "commit", "-m", commitMsg) //nolint:gosec // launching trusted git binary with controlled args
-		gitCommit.Dir = kbRoot
-		if out, err := gitCommit.CombinedOutput(); err != nil {
-			return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)
+		if err := storage.CommitFiles(kbRoot, commitMsg, filepath.Join("raw", relPath), filepath.Join("raw", "files.log")); err != nil {
+			return fmt.Errorf("commit raw delete: %w", err)
 		}
 	}
 

@@ -108,6 +108,15 @@ func runAppend(_ *cobra.Command, args []string) error {
 	store := storage.NewGitProvider(kbRoot, noCommit)
 	ctx := context.Background()
 
+	// Hold the repository lock across the read-modify-write of the page body and
+	// the search and link-graph updates that follow it, so concurrent appends
+	// cannot overwrite each other's content.
+	repoLock, err := storage.LockRepo(kbRoot)
+	if err != nil {
+		return fmt.Errorf("lock repository: %w", err)
+	}
+	defer repoLock.Release()
+
 	existingContent, err := store.Read(ctx, fullPath)
 	if err != nil {
 		return fmt.Errorf("read page: %w", err)

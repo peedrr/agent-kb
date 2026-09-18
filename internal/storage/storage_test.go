@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -689,92 +691,218 @@ func TestGitProvider_MergeConflictDetection(t *testing.T) {
 	})
 }
 
-func TestGitProvider_CommitWithoutRepoIdentity(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "git-config-test")
+// isolateGitConfig keeps the developer machine's global and system git config
+// out of the test, so an ambient user.name cannot pick the identity branch
+// under test.
+func isolateGitConfig(t *testing.T) {
+	t.Helper()
+
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	t.Setenv("HOME", t.TempDir())
+}
+
+// forceUnsetUser forces git's merged config to carry no user.name. Some git
+// builds (nix) ignore GIT_CONFIG_GLOBAL and read a compiled-in global config,
+// so the identity resolution is given an empty user.name instead, which it
+// treats as unset.
+func forceUnsetUser(t *testing.T) {
+	t.Helper()
+
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "user.name")
+	t.Setenv("GIT_CONFIG_VALUE_0", "")
+}
+
+// gitIn runs one git command in repo and returns its combined output.
+func gitIn(t *testing.T, repo string, args ...string) (string, error) {
+	t.Helper()
+
+	cmd := exec.Command("git", args...) //nolint:gosec // test helper launching the git binary
+	cmd.Dir = repo
+	out, err := cmd.CombinedOutput()
+	return strings.TrimSpace(string(out)), err
+}
+
+// mustGitIn runs one git command in repo and fails the test when it fails.
+func mustGitIn(t *testing.T, repo string, args ...string) string {
+	t.Helper()
+
+	out, err := gitIn(t, repo, args...)
 	if err != nil {
+		t.Fatalf("git %s in %s: %s: %v", strings.Join(args, " "), repo, out, err)
+	}
+	return out
+}
+
+// initRepoWithoutIdentity creates a temporary git repository with one commit
+// and no configured user identity; the initial commit is authored through
+// one-off overrides, so the repository config stays empty.
+func initRepoWithoutIdentity(t *testing.T) string {
+	t.Helper()
+
+	repo := t.TempDir()
+	mustGitIn(t, repo, "init")
+	readme := filepath.Join(repo, "README.md")
+	if err := os.WriteFile(readme, []byte("# repo\n"), 0600); err != nil { //nolint:gosec // test writing into its temp repository
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
+	mustGitIn(t, repo, "add", "--", "README.md")
+	mustGitIn(t, repo, "-c", "user.name=seed", "-c", "user.email=seed@test", "commit", "-m", "initial")
+	return repo
+}
 
-	gitInit := exec.Command( //nolint:gosec // test helper launching akb binary
-		"git", "init")
-	gitInit.Dir = tmpDir
-	if out, err := gitInit.CombinedOutput(); err != nil {
-		t.Fatalf("git init: %s: %v", strings.TrimSpace(string(out)), err)
-	}
+// commitAuthor returns the author of HEAD.
+func commitAuthor(t *testing.T, repo string) string {
+	t.Helper()
 
-	gitConfig := func(args ...string) {
-		cmd := exec.Command( //nolint:gosec // test helper launching akb binary
-			"git", args...)
-		cmd.Dir = tmpDir
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %s: %v", args, strings.TrimSpace(string(out)), err)
+	return mustGitIn(t, repo, "log", "-1", "--format=%an <%ae>")
+}
+
+// assertRepoIdentityUnset fails the test when the repository config carries a
+// user identity.
+func assertRepoIdentityUnset(t *testing.T, repo string) {
+	t.Helper()
+
+	for _, key := range []string{"user.name", "user.email"} {
+		if out, err := gitIn(t, repo, "config", "--local", key); err == nil {
+			t.Errorf("repository config %s = %q, want it unset", key, out)
 		}
 	}
-	gitConfig("config", "user.name", "test")
-	gitConfig("config", "user.email", "test@test.com")
+}
 
-	readmePath := filepath.Join(tmpDir, "README.md")
-	if err := os.WriteFile(readmePath, []byte("# Test\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	gitAdd := exec.Command( //nolint:gosec // test helper launching akb binary
-		"git", "add", "README.md")
-	gitAdd.Dir = tmpDir
-	gitAdd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@test.com", "GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@test.com")
-	_, _ = gitAdd.CombinedOutput() //nolint:errcheck // test setup — failure caught by subsequent test assertions
-	gitCommit := exec.Command(     //nolint:gosec // test helper launching akb binary
-		"git", "commit", "-m", "initial")
-	gitCommit.Dir = tmpDir
-	gitCommit.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@test.com", "GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@test.com")
-	_, _ = gitCommit.CombinedOutput() //nolint:errcheck // test setup — failure caught by subsequent test assertions
+func TestCommitIdentityArgs(t *testing.T) {
+	isolateGitConfig(t)
 
-	gitConfig("config", "--unset", "user.name")
-	gitConfig("config", "--unset", "user.email")
+	t.Run("falls back to the akb identity without a configured user", func(t *testing.T) {
+		forceUnsetUser(t)
+		repo := initRepoWithoutIdentity(t)
 
-	p := NewGitProvider(tmpDir, false)
+		identity, err := CommitIdentityArgs(repo)
+		if err != nil {
+			t.Fatalf("CommitIdentityArgs: %v", err)
+		}
+		if want := []string{"-c", "user.name=akb", "-c", "user.email=akb@local"}; !reflect.DeepEqual(identity, want) {
+			t.Errorf("identity = %v, want %v", identity, want)
+		}
+	})
+
+	t.Run("keeps the configured identity", func(t *testing.T) {
+		repo := initRepoWithoutIdentity(t)
+		mustGitIn(t, repo, "config", "user.name", "ada")
+		mustGitIn(t, repo, "config", "user.email", "ada@example.com")
+
+		identity, err := CommitIdentityArgs(repo)
+		if err != nil {
+			t.Fatalf("CommitIdentityArgs: %v", err)
+		}
+		if len(identity) != 0 {
+			t.Errorf("identity = %v, want no overrides", identity)
+		}
+	})
+}
+
+func TestGitProvider_CommitWithoutRepoIdentity(t *testing.T) {
+	isolateGitConfig(t)
+	forceUnsetUser(t)
+	repo := initRepoWithoutIdentity(t)
+
+	provider := NewGitProvider(repo, false)
 	ctx := context.Background()
 
-	t.Run("commits without writing repository identity", func(t *testing.T) {
-		path := filepath.Join(tmpDir, "kb", "auto-config.md")
-		err := p.Write(ctx, path, []byte("auto config test"))
-		if err != nil {
-			t.Fatalf("Write without repository identity failed: %v", err)
+	t.Run("commits as the fallback identity", func(t *testing.T) {
+		path := filepath.Join(repo, "kb", "auto-config.md")
+		if err := provider.Write(ctx, path, []byte("auto config test")); err != nil {
+			t.Fatalf("write without repository identity: %v", err)
 		}
 
-		data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
+		data, err := os.ReadFile(path) //nolint:gosec // test reading a file in its temp repository
 		if err != nil {
-			t.Fatalf("ReadFile failed: %v", err)
+			t.Fatalf("ReadFile: %v", err)
 		}
 		if string(data) != "auto config test" {
 			t.Errorf("content = %q, want %q", string(data), "auto config test")
 		}
 
-		author := exec.Command( //nolint:gosec // test helper launching akb binary
-			"git", "log", "-1", "--format=%an <%ae>")
-		author.Dir = tmpDir
-		out, err := author.Output()
-		if err != nil {
-			t.Fatalf("git log: %v", err)
+		if author := commitAuthor(t, repo); author != "akb <akb@local>" {
+			t.Errorf("author = %q, want %q", author, "akb <akb@local>")
 		}
-		if strings.TrimSpace(string(out)) != "akb <akb@local>" {
-			t.Errorf("author = %q, want %q", strings.TrimSpace(string(out)), "akb <akb@local>")
-		}
-
-		for _, key := range []string{"user.name", "user.email"} {
-			cmd := exec.Command( //nolint:gosec // test helper launching akb binary
-				"git", "config", "--local", key)
-			cmd.Dir = tmpDir
-			cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
-			if out, err := cmd.Output(); err == nil {
-				t.Errorf("repository config %s = %q, want it unset", key, strings.TrimSpace(string(out)))
-			}
-		}
+		assertRepoIdentityUnset(t, repo)
 	})
 }
 
-// --- Interface Compliance Tests ---
+func TestGitProvider_CommitWithConfiguredIdentity(t *testing.T) {
+	isolateGitConfig(t)
+	repo := initRepoWithoutIdentity(t)
+	mustGitIn(t, repo, "config", "user.name", "ada")
+	mustGitIn(t, repo, "config", "user.email", "ada@example.com")
+
+	provider := NewGitProvider(repo, false)
+	path := filepath.Join(repo, "kb", "configured.md")
+	if err := provider.Write(context.Background(), path, []byte("configured identity test")); err != nil {
+		t.Fatalf("write with configured repository identity: %v", err)
+	}
+
+	if author := commitAuthor(t, repo); author != "ada <ada@example.com>" {
+		t.Errorf("author = %q, want %q", author, "ada <ada@example.com>")
+	}
+	if name := mustGitIn(t, repo, "config", "--local", "user.name"); name != "ada" {
+		t.Errorf("repository user.name = %q, want %q", name, "ada")
+	}
+	if email := mustGitIn(t, repo, "config", "--local", "user.email"); email != "ada@example.com" {
+		t.Errorf("repository user.email = %q, want %q", email, "ada@example.com")
+	}
+}
+
+func TestCommitFilesRecordsDeletionInNestedKB(t *testing.T) {
+	isolateGitConfig(t)
+
+	repo := t.TempDir()
+	mustGitIn(t, repo, "init")
+	mustGitIn(t, repo, "config", "user.name", "ada")
+	mustGitIn(t, repo, "config", "user.email", "ada@example.com")
+
+	// The KB lives in a subdirectory of the repository, so every path the
+	// commit machinery resolves is relative to the KB root.
+	kbRoot := filepath.Join(repo, "product")
+	rawDir := filepath.Join(kbRoot, "raw")
+	if err := os.MkdirAll(rawDir, 0750); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"data.csv", "files.log"} {
+		if err := os.WriteFile(filepath.Join(rawDir, name), []byte(name+"\n"), 0600); err != nil { //nolint:gosec // test writing into its temp repository
+			t.Fatal(err)
+		}
+	}
+	mustGitIn(t, repo, "add", "--", "product")
+	mustGitIn(t, repo, "commit", "-m", "add raw files")
+
+	if err := os.Remove(filepath.Join(rawDir, "data.csv")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(rawDir, "files.log"), []byte("# empty\n"), 0600); err != nil { //nolint:gosec // test writing into its temp repository
+		t.Fatal(err)
+	}
+
+	if err := CommitFiles(kbRoot, "akb: raw delete data.csv", "raw/data.csv", "raw/files.log"); err != nil {
+		t.Fatalf("CommitFiles: %v", err)
+	}
+
+	var recorded []string
+	for _, line := range strings.Split(mustGitIn(t, repo, "show", "--name-only", "--format=", "HEAD"), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			recorded = append(recorded, line)
+		}
+	}
+	sort.Strings(recorded)
+	want := []string{"product/raw/data.csv", "product/raw/files.log"}
+	if !reflect.DeepEqual(recorded, want) {
+		t.Errorf("commit recorded %v, want %v", recorded, want)
+	}
+	if status := mustGitIn(t, repo, "status", "--porcelain"); status != "" {
+		t.Errorf("repository is not clean after the commit:\n%s", status)
+	}
+}
 
 func TestFilesystemProvider_ImplementsStorageProvider(_ *testing.T) {
 	// Compile-time interface check

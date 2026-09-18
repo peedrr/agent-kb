@@ -65,3 +65,35 @@ func parseAnnotationFields(s string) map[string]string {
 
 	return fields
 }
+
+// StripAnnotations removes olw-auto annotation comments from content, leaving
+// the annotations inside fenced code blocks and inline code untouched — the
+// same exclusion ParseAnnotations applies when it reads them.
+func StripAnnotations(content string) string {
+	if content == "" {
+		return content
+	}
+
+	// Only code ranges are excluded: an annotation is itself an HTML comment,
+	// so including comment ranges here would exclude every real annotation.
+	var excluded exclusionSet
+	excluded.ranges = append(excluded.ranges, fencedCodeBlockRanges(content)...)
+	excluded.ranges = append(excluded.ranges, inlineCodeRanges(content)...)
+
+	matches := annotationRe.FindAllStringIndex(content, -1)
+
+	var stripped strings.Builder
+	lastEnd := 0
+	for _, m := range matches {
+		start := m[0]
+		end := m[1]
+		stripped.WriteString(content[lastEnd:start])
+		if excluded.isExcluded(start, end) {
+			stripped.WriteString(content[start:end])
+		}
+		lastEnd = end
+	}
+	stripped.WriteString(content[lastEnd:])
+
+	return stripped.String()
+}

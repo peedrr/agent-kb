@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -21,9 +22,10 @@ import (
 // join a commit's pathspec when the current operation staged them.
 var managedCommitPaths = []string{"kb/index.md", "kb/log.md"}
 
-// gitCommitIdentity is applied to every commit invocation so akb commits carry a
-// stable identity without writing user.name/user.email into repository config.
-var gitCommitIdentity = []string{"-c", "user.name=akb", "-c", "user.email=akb@local"}
+// akbCommitIdentity is the fallback identity of an akb commit: it keeps the
+// commit attributable to akb without writing user.name/user.email into
+// repository config. Repositories that configure their own identity keep it.
+var akbCommitIdentity = []string{"-c", "user.name=akb", "-c", "user.email=akb@local"}
 
 const (
 	// indexLockRetryAttempts bounds the retries used when another process holds
@@ -170,7 +172,7 @@ func (g *GitProvider) List(_ context.Context, dir string, ext string) ([]string,
 }
 
 func (g *GitProvider) checkMergeConflicts() error {
-	out, err := g.runGit("check git status", "status", "--porcelain")
+	out, err := runGit(g.kbRoot, "check git status", "status", "--porcelain")
 	if err != nil {
 		return err
 	}
@@ -192,31 +194,102 @@ func (g *GitProvider) checkMergeConflicts() error {
 // file write, staging and commit steps against other processes running akb on
 // the same repository.
 func (g *GitProvider) withRepoLock(fn func() error) error {
-	lockPath, err := g.repoLockPath()
+	lock, err := LockRepo(g.kbRoot)
 	if err != nil {
 		return err
+	}
+	defer lock.Release()
+
+	return fn()
+}
+
+// RepoLock is a handle on the repository lock the process holds. Releasing the
+// handle drops one acquisition; the process keeps the flock until the
+// outermost acquisition is released.
+type RepoLock struct {
+	path string
+}
+
+// repoLockEntry is the lock the process holds on one repository: the open file
+// carrying the flock and the number of acquisitions sharing it.
+type repoLockEntry struct {
+	file *os.File
+	refs int
+}
+
+// heldRepoLocks tracks the repository locks the process holds. A flock is keyed
+// by the open file description, so a second flock on a fresh handle of the same
+// file would block against the process's own lock; nested acquisitions reuse the
+// held lock instead.
+var (
+	heldRepoLocksMu sync.Mutex
+	heldRepoLocks   = make(map[string]*repoLockEntry)
+)
+
+// LockRepo acquires the exclusive lock on the git repository that hosts the KB
+// and returns its handle. A command holds that lock across its whole mutation
+// sequence — the page or raw file write, the index and log updates, the commit,
+// and the search and link-graph updates that follow them — so concurrent akb
+// processes serialize instead of losing each other's updates. An acquisition
+// nested inside an already held lock of the same repository shares it, which
+// lets a command hold the lock while the provider commits its write.
+func LockRepo(kbRoot string) (*RepoLock, error) {
+	lockPath, err := repoLockPath(kbRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	heldRepoLocksMu.Lock()
+	defer heldRepoLocksMu.Unlock()
+
+	if entry, held := heldRepoLocks[lockPath]; held {
+		entry.refs++
+		return &RepoLock{path: lockPath}, nil
 	}
 
 	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600) //nolint:gosec // fixed lock file name inside the git dir
 	if err != nil {
-		return fmt.Errorf("open repo lock %s: %w", lockPath, err)
+		return nil, fmt.Errorf("open repo lock %s: %w", lockPath, err)
 	}
-	defer f.Close() //nolint:errcheck // closing the handle also releases the lock
-
 	if err := unix.Flock(int(f.Fd()), unix.LOCK_EX); err != nil { //nolint:gosec // file descriptors fit in an int
-		return fmt.Errorf("lock repo %s: %w", lockPath, err)
+		_ = f.Close() //nolint:errcheck // a failed lock leaves nothing to release
+		return nil, fmt.Errorf("lock repo %s: %w", lockPath, err)
 	}
-	defer unix.Flock(int(f.Fd()), unix.LOCK_UN) //nolint:errcheck,gosec // released with the handle as well; file descriptors fit in an int
 
-	return fn()
+	heldRepoLocks[lockPath] = &repoLockEntry{file: f, refs: 1}
+	return &RepoLock{path: lockPath}, nil
+}
+
+// Release drops one acquisition of the repository lock. The flock is released
+// with the outermost acquisition; flock also releases it when the process exits.
+func (l *RepoLock) Release() {
+	if l == nil {
+		return
+	}
+
+	heldRepoLocksMu.Lock()
+	defer heldRepoLocksMu.Unlock()
+
+	entry, held := heldRepoLocks[l.path]
+	if !held {
+		return
+	}
+	entry.refs--
+	if entry.refs > 0 {
+		return
+	}
+
+	delete(heldRepoLocks, l.path)
+	_ = unix.Flock(int(entry.file.Fd()), unix.LOCK_UN) //nolint:errcheck,gosec // released with the handle as well; file descriptors fit in an int
+	_ = entry.file.Close()                             //nolint:errcheck // releasing the handle drops the lock too
 }
 
 // repoLockPath returns the lock file shared by all KBs of the git repository the
 // KB belongs to. It resolves --git-common-dir rather than --git-dir so linked
 // worktrees lock the repository they share with the main checkout.
-func (g *GitProvider) repoLockPath() (string, error) {
+func repoLockPath(kbRoot string) (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--git-common-dir") //nolint:gosec // launching trusted git binary with controlled args
-	cmd.Dir = g.kbRoot
+	cmd.Dir = kbRoot
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("resolve git common dir: %s: %w", strings.TrimSpace(string(out)), err)
@@ -224,9 +297,73 @@ func (g *GitProvider) repoLockPath() (string, error) {
 
 	commonDir := strings.TrimSpace(string(out))
 	if !filepath.IsAbs(commonDir) {
-		commonDir = filepath.Join(g.kbRoot, commonDir)
+		commonDir = filepath.Join(kbRoot, commonDir)
 	}
 	return filepath.Join(commonDir, "akb.lock"), nil
+}
+
+// CommitFiles stages and commits exactly the given KB-relative paths with
+// commitMsg while holding the repository lock. The pathspec keeps the commit
+// scoped to the operation's own files, so changes another tool staged stay
+// staged, and the commit carries the repository's configured identity or the
+// akb fallback identity. Paths git cannot record — absent from both the
+// worktree and the committed tree — are skipped.
+func CommitFiles(kbRoot, commitMsg string, paths ...string) error {
+	lock, err := LockRepo(kbRoot)
+	if err != nil {
+		return err
+	}
+	defer lock.Release()
+
+	recorded, err := recordablePaths(kbRoot, paths)
+	if err != nil {
+		return err
+	}
+	if len(recorded) == 0 {
+		return fmt.Errorf("git commit: nothing to commit")
+	}
+
+	if err := stagePaths(kbRoot, recorded); err != nil {
+		return err
+	}
+
+	args, err := commitArgs(kbRoot, commitMsg, recorded)
+	if err != nil {
+		return err
+	}
+	_, err = runGit(kbRoot, "git commit", args...)
+	return err
+}
+
+// recordablePaths keeps the paths git can record: the ones present in the
+// worktree, plus the ones recorded in the committed tree, which an operation
+// may have deleted.
+func recordablePaths(kbRoot string, paths []string) ([]string, error) {
+	recorded := make([]string, 0, len(paths))
+	for _, path := range paths {
+		relPath := filepath.ToSlash(path)
+		if _, err := os.Stat(filepath.Join(kbRoot, filepath.FromSlash(relPath))); err == nil {
+			recorded = append(recorded, relPath)
+			continue
+		}
+
+		inHEAD, err := isInHEAD(kbRoot, relPath)
+		if err != nil {
+			return nil, err
+		}
+		if inHEAD {
+			recorded = append(recorded, relPath)
+		}
+	}
+	return recorded, nil
+}
+
+// stagePaths stages the given KB-relative paths, including the deletions of
+// paths that are gone from the worktree.
+func stagePaths(kbRoot string, paths []string) error {
+	args := append([]string{"add", "-A", "--"}, paths...)
+	_, err := runGit(kbRoot, "git add", args...)
+	return err
 }
 
 // commitPaths returns the pathspec of the commit for the operation that wrote or
@@ -241,12 +378,12 @@ func (g *GitProvider) commitPaths(relPath string) ([]string, error) {
 	// Include the target when the operation staged it, or when it exists in the
 	// committed tree. A page git has never recorded — staged, then deleted
 	// before its first commit — has nothing to contribute and is rejected by git.
-	includeTarget, err := g.isStaged(target)
+	includeTarget, err := isStaged(g.kbRoot, target)
 	if err != nil {
 		return nil, err
 	}
 	if !includeTarget {
-		includeTarget, err = g.isInHEAD(target)
+		includeTarget, err = isInHEAD(g.kbRoot, target)
 		if err != nil {
 			return nil, err
 		}
@@ -259,7 +396,7 @@ func (g *GitProvider) commitPaths(relPath string) ([]string, error) {
 		if managed == target {
 			continue
 		}
-		staged, err := g.isStaged(managed)
+		staged, err := isStaged(g.kbRoot, managed)
 		if err != nil {
 			return nil, err
 		}
@@ -272,9 +409,9 @@ func (g *GitProvider) commitPaths(relPath string) ([]string, error) {
 }
 
 // isStaged reports whether relPath has staged changes in the git index.
-func (g *GitProvider) isStaged(relPath string) (bool, error) {
+func isStaged(kbRoot, relPath string) (bool, error) {
 	cmd := exec.Command("git", "diff", "--cached", "--quiet", "--", relPath) //nolint:gosec // launching trusted git binary with controlled args
-	cmd.Dir = g.kbRoot
+	cmd.Dir = kbRoot
 	err := cmd.Run()
 	if err == nil {
 		return false, nil
@@ -286,10 +423,12 @@ func (g *GitProvider) isStaged(relPath string) (bool, error) {
 	return false, fmt.Errorf("inspect staged state of %s: %w", relPath, err)
 }
 
-// isInHEAD reports whether relPath exists in the committed tree.
-func (g *GitProvider) isInHEAD(relPath string) (bool, error) {
-	cmd := exec.Command("git", "rev-parse", "--quiet", "--verify", "HEAD:"+relPath) //nolint:gosec // launching trusted git binary with controlled args
-	cmd.Dir = g.kbRoot
+// isInHEAD reports whether relPath exists in the committed tree. The path is
+// resolved relative to the KB root, which may be a subdirectory of the
+// repository.
+func isInHEAD(kbRoot, relPath string) (bool, error) {
+	cmd := exec.Command("git", "rev-parse", "--quiet", "--verify", "HEAD:./"+relPath) //nolint:gosec // launching trusted git binary with controlled args
+	cmd.Dir = kbRoot
 	err := cmd.Run()
 	if err == nil {
 		return true, nil
@@ -302,7 +441,7 @@ func (g *GitProvider) isInHEAD(relPath string) (bool, error) {
 }
 
 func (g *GitProvider) gitAdd(relPath string) error {
-	_, err := g.runGit("git add "+relPath, "add", relPath)
+	_, err := runGit(g.kbRoot, "git add "+relPath, "add", relPath)
 	return err
 }
 
@@ -317,23 +456,50 @@ func (g *GitProvider) gitCommit(msg string, relPath string) error {
 		return fmt.Errorf("git commit: nothing to commit for %s", filepath.ToSlash(relPath))
 	}
 
-	args := append([]string{}, gitCommitIdentity...)
-	args = append(args, "commit", "-m", msg, "--only", "--")
-	args = append(args, paths...)
+	args, err := commitArgs(g.kbRoot, msg, paths)
+	if err != nil {
+		return err
+	}
 
-	_, err = g.runGit("git commit", args...)
+	_, err = runGit(g.kbRoot, "git commit", args...)
 	return err
 }
 
-// runGit runs a git subcommand in the KB root and returns its combined output.
-// A command that writes or refreshes the repository index fails while another
+// CommitIdentityArgs returns the git arguments that give an akb commit its
+// author. A repository whose merged config carries a user.name commits under
+// that configured identity, so no override is passed; a repository without one
+// falls back to the akb identity. The identity is never written to repository
+// config.
+func CommitIdentityArgs(kbRoot string) ([]string, error) {
+	out, err := runGit(kbRoot, "git config user.name", "config", "user.name")
+	if err != nil || strings.TrimSpace(out) == "" {
+		return akbCommitIdentity, nil
+	}
+	return nil, nil
+}
+
+// commitArgs builds the arguments of a commit that records exactly paths with
+// msg under the identity resolved for the repository.
+func commitArgs(kbRoot, msg string, paths []string) ([]string, error) {
+	identity, err := CommitIdentityArgs(kbRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	args := append([]string{}, identity...)
+	args = append(args, "commit", "-m", msg, "--only", "--")
+	return append(args, paths...), nil
+}
+
+// runGit runs a git subcommand in kbRoot and returns its combined output. A
+// command that writes or refreshes the repository index fails while another
 // process holds the index lock, so contention is retried with backoff; the
 // holder — akb working on another KB, or any other tool — usually releases the
 // lock within milliseconds.
-func (g *GitProvider) runGit(op string, args ...string) (string, error) {
+func runGit(kbRoot, op string, args ...string) (string, error) {
 	for attempt := 0; ; attempt++ {
 		cmd := exec.Command("git", args...) //nolint:gosec // launching trusted git binary with controlled args
-		cmd.Dir = g.kbRoot
+		cmd.Dir = kbRoot
 		out, err := cmd.CombinedOutput()
 		if err == nil {
 			return string(out), nil

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -12,6 +11,7 @@ import (
 
 	"github.com/peedrr/agent-kb/internal/manifest"
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/storage"
 )
 
 var rawWriteCmd = &cobra.Command{
@@ -70,6 +70,14 @@ func runRawWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("validate filename: %w", err)
 	}
 
+	// Hold the repository lock across the file and manifest writes and the
+	// commit that records them.
+	repoLock, err := storage.LockRepo(kbRoot)
+	if err != nil {
+		return fmt.Errorf("lock repository: %w", err)
+	}
+	defer repoLock.Release()
+
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0750); err != nil {
 		return fmt.Errorf("create parent directories: %w", err)
 	}
@@ -97,21 +105,9 @@ func runRawWrite(_ *cobra.Command, args []string) error {
 	}
 
 	if !noCommit {
-		gitAdd := exec.Command("git", "add", filepath.Join("raw", relPath), filepath.Join("raw", "files.log")) //nolint:gosec // launching trusted git binary with controlled args
-		gitAdd.Dir = kbRoot
-		if out, err := gitAdd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git add: %s: %w", strings.TrimSpace(string(out)), err)
-		}
-
-		if err := ensureGitConfig(kbRoot); err != nil {
-			return fmt.Errorf("git config: %w", err)
-		}
-
 		commitMsg := fmt.Sprintf("akb: raw write %s", relPath)
-		gitCommit := exec.Command("git", "commit", "-m", commitMsg) //nolint:gosec // launching trusted git binary with controlled args
-		gitCommit.Dir = kbRoot
-		if out, err := gitCommit.CombinedOutput(); err != nil {
-			return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)
+		if err := storage.CommitFiles(kbRoot, commitMsg, filepath.Join("raw", relPath), filepath.Join("raw", "files.log")); err != nil {
+			return fmt.Errorf("commit raw write: %w", err)
 		}
 	}
 

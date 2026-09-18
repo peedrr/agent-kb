@@ -1,6 +1,7 @@
 package path
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -154,7 +155,7 @@ func TestResolveKBPath(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error but got nil")
 				}
-				if tt.errType != nil && err != tt.errType {
+				if tt.errType != nil && !errors.Is(err, tt.errType) {
 					t.Fatalf("expected error type %v but got %v", tt.errType, err)
 				}
 				return
@@ -299,7 +300,7 @@ func TestResolveRawPath(t *testing.T) {
 				if err == nil {
 					t.Fatalf("expected error but got nil")
 				}
-				if tt.errType != nil && err != tt.errType {
+				if tt.errType != nil && !errors.Is(err, tt.errType) {
 					t.Fatalf("expected error type %v but got %v", tt.errType, err)
 				}
 				return

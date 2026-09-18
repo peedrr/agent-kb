@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -19,6 +18,7 @@ import (
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/storage"
 	"github.com/peedrr/agent-kb/internal/template"
 )
 
@@ -231,6 +231,14 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("create templates directory: %w", err)
 	}
 
+	// Hold the repository lock across the swap of the template files and the
+	// commit that records it.
+	repoLock, err := storage.LockRepo(kbRoot)
+	if err != nil {
+		return fmt.Errorf("lock repository: %w", err)
+	}
+	defer repoLock.Release()
+
 	tmpDir, err := os.MkdirTemp(targetDir, ".tmp-write-")
 	if err != nil {
 		return fmt.Errorf("create temp directory: %w", err)
@@ -269,21 +277,9 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	}
 
 	if !noCommit {
-		gitAdd := exec.Command("git", "add", "-A", filepath.Join(".akb", "templates")) //nolint:gosec // controlled path
-		gitAdd.Dir = kbRoot
-		if out, err := gitAdd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git add: %s: %w", strings.TrimSpace(string(out)), err)
-		}
-
-		if err := ensureGitConfig(kbRoot); err != nil {
-			return fmt.Errorf("git config: %w", err)
-		}
-
 		commitMsg := fmt.Sprintf("akb: template write %s", name)
-		gitCommit := exec.Command("git", "commit", "-m", commitMsg) //nolint:gosec // launching trusted git binary with controlled args
-		gitCommit.Dir = kbRoot
-		if out, err := gitCommit.CombinedOutput(); err != nil {
-			return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)
+		if err := storage.CommitFiles(kbRoot, commitMsg, templateCommitPaths(name)...); err != nil {
+			return fmt.Errorf("commit template write: %w", err)
 		}
 	}
 

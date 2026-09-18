@@ -3,15 +3,14 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/peedrr/agent-kb/internal/manifest"
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/storage"
 )
 
 var rawSyncCmd = &cobra.Command{
@@ -35,6 +34,14 @@ func runRawSync(_ *cobra.Command, _ []string) error {
 	if _, err := os.Stat(rawDir); os.IsNotExist(err) {
 		return fmt.Errorf("raw/ directory does not exist; run `akb init` first")
 	}
+
+	// Hold the repository lock across the manifest reconciliation and the commit
+	// that records it.
+	repoLock, err := storage.LockRepo(kbRoot)
+	if err != nil {
+		return fmt.Errorf("lock repository: %w", err)
+	}
+	defer repoLock.Release()
 
 	// Read existing manifest
 	mgr := manifest.NewManager(kbRoot)
@@ -127,31 +134,10 @@ func runRawSync(_ *cobra.Command, _ []string) error {
 	// Git add and commit if there are changes
 	totalChanges := newCount + modifiedCount + deletedCount
 	if totalChanges > 0 && !noCommit {
-		// Ensure git config is set
-		if err := ensureGitConfig(kbRoot); err != nil {
-			return fmt.Errorf("git config: %w", err)
-		}
-
-		// Stage raw/ directory and manifest
-		gitAdd1 := exec.Command("git", "add", "-A", "raw/")
-		gitAdd1.Dir = kbRoot
-		if out, err := gitAdd1.CombinedOutput(); err != nil {
-			return fmt.Errorf("git add raw/: %s: %w", strings.TrimSpace(string(out)), err)
-		}
-
-		gitAdd2 := exec.Command("git", "add", "raw/files.log")
-		gitAdd2.Dir = kbRoot
-		if out, err := gitAdd2.CombinedOutput(); err != nil {
-			return fmt.Errorf("git add raw/files.log: %s: %w", strings.TrimSpace(string(out)), err)
-		}
-
-		// Commit with summary
 		commitMsg := fmt.Sprintf("akb: raw sync (%d new, %d modified, %d deleted, %d unchanged)",
 			newCount, modifiedCount, deletedCount, unchangedCount)
-		gitCommit := exec.Command("git", "commit", "-m", commitMsg) //nolint:gosec // launching trusted git binary with controlled args
-		gitCommit.Dir = kbRoot
-		if out, err := gitCommit.CombinedOutput(); err != nil {
-			return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)
+		if err := storage.CommitFiles(kbRoot, commitMsg, "raw/"); err != nil {
+			return fmt.Errorf("commit raw sync: %w", err)
 		}
 	}
 

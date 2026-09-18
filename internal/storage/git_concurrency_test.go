@@ -589,6 +589,77 @@ func TestGitProviderWorktreeWriteWaitsForRepoLock(t *testing.T) {
 	}
 }
 
+// TestLockRepoIsReentrantWithinProcess asserts that a process holding the
+// command-level repository lock can run a provider write: the nested
+// acquisition shares the held lock instead of blocking on the process's own
+// flock.
+func TestLockRepoIsReentrantWithinProcess(t *testing.T) {
+	repo := initRepo(t)
+	commitKBTree(t, repo, repo)
+
+	outer, err := storage.LockRepo(repo)
+	if err != nil {
+		t.Fatalf("LockRepo: %v", err)
+	}
+	defer outer.Release()
+
+	inner, err := storage.LockRepo(repo)
+	if err != nil {
+		t.Fatalf("nested LockRepo: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		provider := storage.NewGitProvider(repo, false)
+		done <- provider.Write(context.Background(), filepath.Join(repo, "kb", "notes", "reentrant.md"), []byte("reentrant content\n"))
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("provider write under the command-level lock: %v", err)
+		}
+	case <-time.After(15 * time.Second):
+		t.Fatal("provider write blocked while the process held the command-level lock")
+	}
+	inner.Release()
+
+	const rel = "kb/notes/reentrant.md"
+	data, err := os.ReadFile(filepath.Join(repo, rel)) //nolint:gosec // test reading a path inside its temp repository
+	if err != nil {
+		t.Fatalf("read page: %v", err)
+	}
+	if string(data) != "reentrant content\n" {
+		t.Errorf("page content = %q, want %q", string(data), "reentrant content\n")
+	}
+	if head := mustGit(t, repo, "log", "-1", "--format=%s"); head != "akb: write "+rel {
+		t.Errorf("HEAD subject = %q, want %q", head, "akb: write "+rel)
+	}
+	assertCleanWorktree(t, repo)
+}
+
+// TestLockRepoGatesOtherProcesses asserts the command-level lock is the same
+// repository flock other processes wait on.
+func TestLockRepoGatesOtherProcesses(t *testing.T) {
+	repo := initRepo(t)
+	commitKBTree(t, repo, repo)
+
+	lock, err := storage.LockRepo(repo)
+	if err != nil {
+		t.Fatalf("LockRepo: %v", err)
+	}
+
+	const rel = "kb/notes/blocked-by-command-lock.md"
+	helper := blockedWriter(t, repo, rel, "blocked content\n", "akb: write "+rel)
+
+	lock.Release()
+	helper.wait(t)
+
+	if head := mustGit(t, repo, "log", "-1", "--format=%s"); head != "akb: write "+rel {
+		t.Errorf("HEAD subject = %q, want %q", head, "akb: write "+rel)
+	}
+}
+
 // TestGitProviderRetriesWhileIndexLockHeld asserts that a write survives the git
 // index lock held by another tool: it waits for the lock instead of failing.
 func TestGitProviderRetriesWhileIndexLockHeld(t *testing.T) {
