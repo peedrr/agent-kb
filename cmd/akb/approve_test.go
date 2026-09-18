@@ -173,6 +173,127 @@ func TestApproveErrorWhenPageNotFound(t *testing.T) {
 	}
 }
 
+func approveAllDraftsRun(kbRoot string) (string, error) {
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		akbBinPath, "approve", "--all-drafts")
+	cmd.Dir = kbRoot
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+func approveSearchRun(t *testing.T, kbRoot, query string) (string, error) {
+	t.Helper()
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		akbBinPath, "search", query)
+	cmd.Dir = kbRoot
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+func approveBacklinksRun(t *testing.T, kbRoot, inputPath string) (string, error) {
+	t.Helper()
+	cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+		akbBinPath, "backlinks", inputPath)
+	cmd.Dir = kbRoot
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+// approveReindexFixture writes a draft whose body carries an annotation and
+// provenance markers plus a wikilink, then creates the link target afterwards.
+// The draft is therefore indexed verbatim (marker text searchable) and its link
+// entry stays unresolved until the page is approved.
+func approveReindexFixture(t *testing.T, kbRoot string) {
+	t.Helper()
+
+	draft := "---\ntype: note\ntitle: Draft Note\nsummary: test\ntags: test\n---\nCanonical sentence.\n<!-- olw-auto: action=review -->\n^[inferred] Secondary sentence.\nSee [[target]]."
+	if out, err := writeRun(kbRoot, "draft.md", draft); err != nil {
+		t.Fatalf("write draft: %s: %v", out, err)
+	}
+
+	target := "---\ntype: note\ntitle: Link Target\nsummary: test\ntags: test\n---\nTarget body."
+	if out, err := writeRun(kbRoot, "target.md", target); err != nil {
+		t.Fatalf("write target: %s: %v", out, err)
+	}
+
+	out, err := approveSearchRun(t, kbRoot, "review")
+	if err != nil {
+		t.Fatalf("search before approve: %s: %v", out, err)
+	}
+	if !strings.Contains(out, "kb/notes/draft.md") {
+		t.Fatalf("expected draft indexed verbatim before approval, got: %s", out)
+	}
+
+	out, err = approveBacklinksRun(t, kbRoot, "notes/target.md")
+	if err != nil {
+		t.Fatalf("backlinks before approve: %s: %v", out, err)
+	}
+	if strings.Contains(out, "kb/notes/draft.md") {
+		t.Fatalf("expected draft link unresolved before approval, got: %s", out)
+	}
+}
+
+// assertApproveReindexed checks that the search index and link graph reflect
+// the approved page: annotation and marker text gone, stripped body searchable,
+// and links re-resolved.
+func assertApproveReindexed(t *testing.T, kbRoot string) {
+	t.Helper()
+
+	for _, query := range []string{"review", "inferred"} {
+		out, err := approveSearchRun(t, kbRoot, query)
+		if err != nil {
+			t.Fatalf("search %q after approve: %s: %v", query, out, err)
+		}
+		if strings.Contains(out, "kb/notes/draft.md") {
+			t.Errorf("search %q should not match approved page, got: %s", query, out)
+		}
+	}
+
+	out, err := approveSearchRun(t, kbRoot, "Canonical")
+	if err != nil {
+		t.Fatalf("search after approve: %s: %v", out, err)
+	}
+	if !strings.Contains(out, "kb/notes/draft.md") {
+		t.Errorf("approved page missing from search results, got: %s", out)
+	}
+
+	out, err = approveBacklinksRun(t, kbRoot, "notes/target.md")
+	if err != nil {
+		t.Fatalf("backlinks after approve: %s: %v", out, err)
+	}
+	if !strings.Contains(out, "kb/notes/draft.md") {
+		t.Errorf("approved page missing from backlinks, got: %s", out)
+	}
+}
+
+func TestApproveReindexesSearchAndLinks(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	approveReindexFixture(t, kbRoot)
+
+	out, err := approveRun(kbRoot, "notes/draft.md")
+	if err != nil {
+		t.Fatalf("approve failed: %s: %v", out, err)
+	}
+
+	assertApproveReindexed(t, kbRoot)
+}
+
+func TestApproveAllDraftsReindexesSearchAndLinks(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	approveReindexFixture(t, kbRoot)
+
+	out, err := approveAllDraftsRun(kbRoot)
+	if err != nil {
+		t.Fatalf("approve --all-drafts failed: %s: %v", out, err)
+	}
+
+	assertApproveReindexed(t, kbRoot)
+}
+
 func TestApproveGitCommitMessage(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)

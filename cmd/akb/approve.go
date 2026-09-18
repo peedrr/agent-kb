@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"os"
@@ -9,12 +10,15 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/spf13/cobra"
 	yaml "github.com/goccy/go-yaml"
+	"github.com/spf13/cobra"
 
+	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/linkgraph"
 	"github.com/peedrr/agent-kb/internal/markdown"
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/search"
 	"github.com/peedrr/agent-kb/internal/storage"
 )
 
@@ -55,15 +59,24 @@ func runApprove(_ *cobra.Command, args []string) error {
 
 	ctx := context.Background()
 
+	dbConn, err := db.OpenKB(kbRoot)
+	if err != nil {
+		if isMissingDB(err) {
+			return fmt.Errorf("run `akb index rebuild` to create the search index")
+		}
+		return fmt.Errorf("open search database: %w", err)
+	}
+	defer dbConn.Close() //nolint:errcheck // DB close error non-critical on command exit
+
 	if approveAllDrafts {
-		return approveAllDraftPages(ctx, kbRoot)
+		return approveAllDraftPages(ctx, dbConn, kbRoot)
 	}
 
 	inputPath := args[0]
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
 	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
 
-	approved, err := approvePage(ctx, kbRoot, fullPath, inputPath)
+	approved, err := approvePage(ctx, dbConn, kbRoot, fullPath, inputPath)
 	if err != nil {
 		return err
 	}
@@ -75,7 +88,7 @@ func runApprove(_ *cobra.Command, args []string) error {
 	return nil
 }
 
-func approvePage(ctx context.Context, kbRoot, fullPath, inputPath string) (bool, error) {
+func approvePage(ctx context.Context, dbConn *sql.DB, kbRoot, fullPath, inputPath string) (bool, error) {
 	store := storage.NewGitProvider(kbRoot, noCommit)
 
 	content, err := store.Read(ctx, fullPath)
@@ -120,10 +133,28 @@ func approvePage(ctx context.Context, kbRoot, fullPath, inputPath string) (bool,
 		return false, fmt.Errorf("write page: %w", err)
 	}
 
+	relPath, err := filepath.Rel(kbRoot, fullPath)
+	if err != nil {
+		return false, fmt.Errorf("compute relative path: %w", err)
+	}
+	relPath = filepath.ToSlash(relPath)
+
+	searcher := search.NewSQLiteFTS5Searcher(dbConn)
+	tags := search.ExtractTags(fm.Fields)
+	summary := search.ExtractSummary(fm.Fields)
+	if err := searcher.IndexPage(ctx, relPath, fm.Title, bodyStr, tags, summary, fm.Type); err != nil {
+		return false, fmt.Errorf("index page: %w", err)
+	}
+
+	updater := linkgraph.NewSQLiteLinkGraph(dbConn)
+	if err := updater.UpdatePageLinks(ctx, relPath, string(finalContent)); err != nil {
+		return false, fmt.Errorf("update links: %w", err)
+	}
+
 	return true, nil
 }
 
-func approveAllDraftPages(ctx context.Context, kbRoot string) error {
+func approveAllDraftPages(ctx context.Context, dbConn *sql.DB, kbRoot string) error {
 	kbDir := filepath.Join(kbRoot, "kb")
 	var approvedCount int
 
@@ -143,7 +174,7 @@ func approveAllDraftPages(ctx context.Context, kbRoot string) error {
 			return nil
 		}
 
-		approved, err := approvePage(ctx, kbRoot, fullPath, relPath)
+		approved, err := approvePage(ctx, dbConn, kbRoot, fullPath, relPath)
 		if err != nil {
 			return err
 		}
