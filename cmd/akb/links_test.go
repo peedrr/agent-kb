@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,6 +45,14 @@ func setupLinkGraphDB(t *testing.T, kbRoot string) *sql.DB {
 		t.Fatalf("CreateSchema: %v", err)
 	}
 	return d
+}
+
+func corruptSearchDB(t *testing.T, kbRoot string) {
+	t.Helper()
+	garbage := bytes.Repeat([]byte("not a sqlite database;"), 64)
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "search.db"), garbage, 0600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func insertTestPage(t *testing.T, d *sql.DB, pagePath string) {
@@ -211,6 +220,91 @@ func TestBacklinks_NoInboundLinks(t *testing.T) {
 	}
 }
 
+func TestBacklinks_JSONWithInboundLinks(t *testing.T) {
+	kbRoot := setupLinksTestKB(t)
+	d := setupLinkGraphDB(t, kbRoot)
+	g := linkgraph.NewSQLiteLinkGraph(d)
+
+	insertTestPage(t, d, "kb/target.md")
+	if err := g.UpdatePageLinks(context.Background(), "kb/source.md", "See [[target]]."); err != nil {
+		t.Fatalf("UpdatePageLinks: %v", err)
+	}
+	writeTestPage(t, kbRoot, "target.md", "---\ntitle: Target\n---\nContent.")
+
+	origJSON := backlinksJSON
+	backlinksJSON = true
+	t.Cleanup(func() { backlinksJSON = origJSON })
+
+	output, err := captureOutput(func() error {
+		return runBacklinks(nil, []string{"target.md"})
+	})
+	if err != nil {
+		t.Fatalf("runBacklinks --json: %v", err)
+	}
+
+	trimmed := strings.TrimSpace(output)
+	var wire map[string][]map[string]string
+	if err := json.Unmarshal([]byte(trimmed), &wire); err != nil {
+		t.Fatalf("expected {\"backlinks\": [...]} object shape, unmarshal failed: %v (output: %q)", err, trimmed)
+	}
+	links, ok := wire["backlinks"]
+	if !ok {
+		t.Fatalf("JSON output has no \"backlinks\" key: %q", trimmed)
+	}
+	if len(links) != 1 {
+		t.Fatalf("expected 1 backlink, got %d (output: %q)", len(links), trimmed)
+	}
+	if got := links[0]["source_page"]; got != "kb/source.md" {
+		t.Errorf("source_page = %q, want %q", got, "kb/source.md")
+	}
+	if got := links[0]["raw_target"]; got != "target" {
+		t.Errorf("raw_target = %q, want %q", got, "target")
+	}
+	if got := links[0]["resolved_to"]; got != "kb/target.md" {
+		t.Errorf("resolved_to = %q, want %q", got, "kb/target.md")
+	}
+	if _, ok := links[0]["display"]; !ok {
+		t.Errorf("expected \"display\" key in backlink entry: %q", trimmed)
+	}
+}
+
+func TestBacklinks_JSONWithoutInboundLinks(t *testing.T) {
+	kbRoot := setupLinksTestKB(t)
+	d := setupLinkGraphDB(t, kbRoot)
+
+	insertTestPage(t, d, "kb/lonely.md")
+	writeTestPage(t, kbRoot, "lonely.md", "---\ntitle: Lonely\n---\nNo one links here.")
+
+	origJSON := backlinksJSON
+	backlinksJSON = true
+	t.Cleanup(func() { backlinksJSON = origJSON })
+
+	output, err := captureOutput(func() error {
+		return runBacklinks(nil, []string{"lonely.md"})
+	})
+	if err != nil {
+		t.Fatalf("runBacklinks --json: %v", err)
+	}
+
+	trimmed := strings.TrimSpace(output)
+	if want := `{"backlinks":[]}`; trimmed != want {
+		t.Errorf("backlinks --json with no backlinks = %q, want %q", trimmed, want)
+	}
+
+	var wire struct {
+		Backlinks []map[string]string `json:"backlinks"`
+	}
+	if err := json.Unmarshal([]byte(trimmed), &wire); err != nil {
+		t.Fatalf("unmarshal backlinks JSON: %v (output: %q)", err, trimmed)
+	}
+	if wire.Backlinks == nil {
+		t.Errorf("expected empty backlinks array, got null: %q", trimmed)
+	}
+	if len(wire.Backlinks) != 0 {
+		t.Errorf("expected 0 backlinks, got %d", len(wire.Backlinks))
+	}
+}
+
 func TestOrphans_WithOrphanPages(t *testing.T) {
 	kbRoot := setupLinksTestKB(t)
 	d := setupLinkGraphDB(t, kbRoot)
@@ -318,6 +412,54 @@ func TestOrphans_MissingDB(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "akb index rebuild") {
 		t.Errorf("expected 'akb index rebuild' error, got %q", err.Error())
+	}
+}
+
+func TestLinksShow_CorruptDB(t *testing.T) {
+	kbRoot := setupLinksTestKB(t)
+	corruptSearchDB(t, kbRoot)
+
+	err := runLinksShow(nil, []string{"some.md"})
+	if err == nil {
+		t.Fatal("expected error for corrupt DB")
+	}
+	if strings.Contains(err.Error(), "akb index rebuild") {
+		t.Errorf("corrupt DB must not suggest rebuild, got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "open search database") || !strings.Contains(err.Error(), "file is not a database") {
+		t.Errorf("expected underlying SQLite error to be surfaced, got %q", err.Error())
+	}
+}
+
+func TestBacklinks_CorruptDB(t *testing.T) {
+	kbRoot := setupLinksTestKB(t)
+	corruptSearchDB(t, kbRoot)
+
+	err := runBacklinks(nil, []string{"some.md"})
+	if err == nil {
+		t.Fatal("expected error for corrupt DB")
+	}
+	if strings.Contains(err.Error(), "akb index rebuild") {
+		t.Errorf("corrupt DB must not suggest rebuild, got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "open search database") || !strings.Contains(err.Error(), "file is not a database") {
+		t.Errorf("expected underlying SQLite error to be surfaced, got %q", err.Error())
+	}
+}
+
+func TestOrphans_CorruptDB(t *testing.T) {
+	kbRoot := setupLinksTestKB(t)
+	corruptSearchDB(t, kbRoot)
+
+	err := runOrphans(nil, nil)
+	if err == nil {
+		t.Fatal("expected error for corrupt DB")
+	}
+	if strings.Contains(err.Error(), "akb index rebuild") {
+		t.Errorf("corrupt DB must not suggest rebuild, got %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "open search database") || !strings.Contains(err.Error(), "file is not a database") {
+		t.Errorf("expected underlying SQLite error to be surfaced, got %q", err.Error())
 	}
 }
 

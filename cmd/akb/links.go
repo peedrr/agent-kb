@@ -55,7 +55,10 @@ func init() {
 func openLinkGraphDB(kbRoot string) (*sql.DB, *linkgraph.SQLiteLinkGraph, error) {
 	d, err := db.OpenKB(kbRoot)
 	if err != nil {
-		return nil, nil, fmt.Errorf("run `akb index rebuild` to create the search index")
+		if isMissingDB(err) {
+			return nil, nil, fmt.Errorf("run `akb index rebuild` to create the search index")
+		}
+		return nil, nil, fmt.Errorf("open search database: %w", err)
 	}
 	return d, linkgraph.NewSQLiteLinkGraph(d), nil
 }
@@ -145,6 +148,20 @@ func runLinksShow(_ *cobra.Command, args []string) error {
 	return nil
 }
 
+// backlinkJSON is the per-link representation emitted by `akb backlinks --json`.
+type backlinkJSON struct {
+	SourcePage string `json:"source_page"`
+	RawTarget  string `json:"raw_target"`
+	Display    string `json:"display"`
+	ResolvedTo string `json:"resolved_to"`
+}
+
+// backlinksResponse is the top-level shape of `akb backlinks --json`: always an
+// object holding a "backlinks" array, empty when no page links back.
+type backlinksResponse struct {
+	Backlinks []backlinkJSON `json:"backlinks"`
+}
+
 func runBacklinks(_ *cobra.Command, args []string) error {
 	kbRoot, err := path.ResolveKB()
 	if err != nil {
@@ -169,40 +186,31 @@ func runBacklinks(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("query inbound links: %w", err)
 	}
 
-	if len(inbound) == 0 {
-		if backlinksJSON {
-			fmt.Println(`{"backlinks": []}`)
-		} else {
-			fmt.Println("No backlinks found")
-		}
-		return nil
-	}
-
 	if backlinksJSON {
-		type backlinkJSON struct {
-			SourcePage string `json:"source_page"`
-			RawTarget  string `json:"raw_target"`
-			Display    string `json:"display"`
-			ResolvedTo string `json:"resolved_to"`
-		}
-		out := make([]backlinkJSON, len(inbound))
-		for i, l := range inbound {
-			out[i] = backlinkJSON{
+		out := backlinksResponse{Backlinks: make([]backlinkJSON, 0, len(inbound))}
+		for _, l := range inbound {
+			out.Backlinks = append(out.Backlinks, backlinkJSON{
 				SourcePage: l.SourcePage,
 				RawTarget:  l.RawTarget,
 				Display:    l.Display,
 				ResolvedTo: l.ResolvedTo,
-			}
+			})
 		}
 		data, err := json.Marshal(out)
 		if err != nil {
 			return fmt.Errorf("marshal JSON: %w", err)
 		}
 		fmt.Println(string(data))
-	} else {
-		for _, l := range inbound {
-			fmt.Println(l.SourcePage)
-		}
+		return nil
+	}
+
+	if len(inbound) == 0 {
+		fmt.Println("No backlinks found")
+		return nil
+	}
+
+	for _, l := range inbound {
+		fmt.Println(l.SourcePage)
 	}
 
 	return nil
