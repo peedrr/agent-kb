@@ -135,7 +135,7 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 	inputPath := args[0]
 
 	if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
-		return fmt.Errorf("use `akb raw delete`")
+		return &usageError{msg: "use `akb raw delete`"}
 	}
 
 	_, err = path.ResolveKBPath(kbRoot, inputPath)

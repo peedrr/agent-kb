@@ -110,7 +110,7 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 	// Reject index.md and log.md
 	base := filepath.Base(entryPath)
 	if base == "index.md" || base == "log.md" {
-		return fmt.Errorf("cannot add %s to index", base)
+		return &usageError{msg: fmt.Sprintf("cannot add %s to index", base)}
 	}
 
 	kbRoot, err := path.ResolveKB()
@@ -122,6 +122,15 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("resolve path: %w", err)
 	}
+
+	// Hold the repository lock across the read-modify-write of kb/index.md and
+	// the commit that records it, so a command running concurrently against the
+	// same index cannot overwrite this entry.
+	repoLock, err := storage.LockRepo(kbRoot)
+	if err != nil {
+		return fmt.Errorf("lock repository: %w", err)
+	}
+	defer repoLock.Release()
 
 	// Resolve the full file path
 	cleanPath := strings.TrimPrefix(entryPath, "kb/")
@@ -217,6 +226,15 @@ func runIndexRemove(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve path: %w", err)
 	}
 
+	// Hold the repository lock across the read-modify-write of kb/index.md and
+	// the commit that records it, so a command running concurrently against the
+	// same index cannot overwrite this removal.
+	repoLock, err := storage.LockRepo(kbRoot)
+	if err != nil {
+		return fmt.Errorf("lock repository: %w", err)
+	}
+	defer repoLock.Release()
+
 	indexPath := filepath.Join(kbRoot, "kb", "index.md")
 	oldContent, _ := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
 
@@ -257,6 +275,16 @@ func runIndexRebuild(_ *cobra.Command, _ []string) error {
 	}
 
 	indexPath := filepath.Join(kbRoot, "kb", "index.md")
+
+	// Hold the repository lock across the rebuild of kb/index.md and the commit
+	// that records it, so a command running concurrently against the same index
+	// cannot overwrite the rebuilt entries.
+	repoLock, err := storage.LockRepo(kbRoot)
+	if err != nil {
+		return fmt.Errorf("lock repository: %w", err)
+	}
+	defer repoLock.Release()
+
 	oldContent, _ := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
 
 	// Open or create search database

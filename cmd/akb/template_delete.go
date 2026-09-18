@@ -86,7 +86,7 @@ func runTemplateDelete(_ *cobra.Command, args []string) error {
 
 	if !tdForce {
 		fmt.Printf("Template %q is used by %d pages. Run `akb template delete %s --force` to delete.\n", name, count, name)
-		return fmt.Errorf("deletion refused without --force")
+		return &usageError{msg: "deletion refused without --force"}
 	}
 
 	// Hold the repository lock across the removal of the template files and the

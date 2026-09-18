@@ -112,17 +112,17 @@ func runWrite(_ *cobra.Command, args []string) error {
 
 	if len(writeFrontmatter) > 0 {
 		if writeAppend {
-			return fmt.Errorf("--frontmatter and --append cannot be used together")
+			return &usageError{msg: "--frontmatter and --append cannot be used together"}
 		}
 
 		// Validate .md extension
 		if !strings.HasSuffix(inputPath, ".md") {
-			return fmt.Errorf("page filename must end with .md")
+			return &usageError{msg: "page filename must end with .md"}
 		}
 
 		// Reject raw/ prefix
 		if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
-			return fmt.Errorf("use `akb raw write`")
+			return &usageError{msg: "use `akb raw write`"}
 		}
 
 		// Strip kb/ prefix
@@ -131,10 +131,10 @@ func runWrite(_ *cobra.Command, args []string) error {
 		// Guard: block write to managed files
 		base := filepath.Base(cleanPath)
 		if base == "index.md" {
-			return fmt.Errorf("cannot write index.md; use 'akb index add' to update")
+			return &usageError{msg: "cannot write index.md; use 'akb index add' to update"}
 		}
 		if base == "log.md" {
-			return fmt.Errorf("cannot write log.md; it is a managed file")
+			return &usageError{msg: "cannot write log.md; it is a managed file"}
 		}
 
 		// Reject .. and absolute paths via ResolveKBPath
@@ -142,6 +142,16 @@ func runWrite(_ *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("resolve path: %w", err)
 		}
+
+		// Hold the repository lock from the read of the existing page through the
+		// commit and the search and link-graph updates that follow it: the update
+		// is assembled from the page as it is at commit time, so concurrent
+		// updates of the same page cannot overwrite each other.
+		pageLock, err := storage.LockRepo(kbRoot)
+		if err != nil {
+			return fmt.Errorf("lock repository: %w", err)
+		}
+		defer pageLock.Release()
 
 		// Try to find the existing file
 		candidates := []string{filepath.Join(kbRoot, "kb", cleanPath)}
@@ -231,7 +241,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 			return fmt.Errorf("check stdin: %w", err)
 		}
 		if (stat.Mode() & os.ModeCharDevice) != 0 {
-			return fmt.Errorf("input required: pipe content to stdin")
+			return &usageError{msg: "input required: pipe content to stdin"}
 		}
 
 		stdinContent, err := io.ReadAll(os.Stdin)
@@ -242,12 +252,12 @@ func runWrite(_ *cobra.Command, args []string) error {
 		if writeAppend {
 			// Validate .md extension
 			if !strings.HasSuffix(inputPath, ".md") {
-				return fmt.Errorf("page filename must end with .md")
+				return &usageError{msg: "page filename must end with .md"}
 			}
 
 			// Reject raw/ prefix
 			if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
-				return fmt.Errorf("use `akb raw write`")
+				return &usageError{msg: "use `akb raw write`"}
 			}
 
 			// Strip kb/ prefix
@@ -256,10 +266,10 @@ func runWrite(_ *cobra.Command, args []string) error {
 			// Guard: block write to managed files
 			base := filepath.Base(cleanPath)
 			if base == "index.md" {
-				return fmt.Errorf("cannot write index.md; use 'akb index add' to update")
+				return &usageError{msg: "cannot write index.md; use 'akb index add' to update"}
 			}
 			if base == "log.md" {
-				return fmt.Errorf("cannot write log.md; it is a managed file")
+				return &usageError{msg: "cannot write log.md; it is a managed file"}
 			}
 
 			// Reject .. and absolute paths via ResolveKBPath
@@ -267,6 +277,15 @@ func runWrite(_ *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("resolve path: %w", err)
 			}
+
+			// Hold the repository lock from the read of the existing page through
+			// the commit and the search and link-graph updates that follow it, so
+			// concurrent appends cannot overwrite each other's content.
+			pageLock, err := storage.LockRepo(kbRoot)
+			if err != nil {
+				return fmt.Errorf("lock repository: %w", err)
+			}
+			defer pageLock.Release()
 
 			fullPath = filepath.Join(kbRoot, "kb", cleanPath)
 			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
@@ -374,12 +393,12 @@ func runWrite(_ *cobra.Command, args []string) error {
 
 			// Validate .md extension
 			if !strings.HasSuffix(inputPath, ".md") {
-				return fmt.Errorf("page filename must end with .md")
+				return &usageError{msg: "page filename must end with .md"}
 			}
 
 			// Reject raw/ prefix
 			if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
-				return fmt.Errorf("use `akb raw write`")
+				return &usageError{msg: "use `akb raw write`"}
 			}
 
 			// Strip kb/ prefix
@@ -388,10 +407,10 @@ func runWrite(_ *cobra.Command, args []string) error {
 			// Guard: block write to managed files
 			base := filepath.Base(cleanPath)
 			if base == "index.md" {
-				return fmt.Errorf("cannot write index.md; use 'akb index add' to update")
+				return &usageError{msg: "cannot write index.md; use 'akb index add' to update"}
 			}
 			if base == "log.md" {
-				return fmt.Errorf("cannot write log.md; it is a managed file")
+				return &usageError{msg: "cannot write log.md; it is a managed file"}
 			}
 
 			// Strip type-dir prefix if it matches the type's Dir

@@ -204,10 +204,13 @@ func (g *GitProvider) withRepoLock(fn func() error) error {
 }
 
 // RepoLock is a handle on the repository lock the process holds. Releasing the
-// handle drops one acquisition; the process keeps the flock until the
-// outermost acquisition is released.
+// handle drops the one acquisition it represents and is idempotent, so a
+// release run twice on the same handle cannot drop an acquisition another
+// holder of the process holds. The process keeps the flock until the outermost
+// acquisition is released.
 type RepoLock struct {
-	path string
+	path     string
+	released bool
 }
 
 // repoLockEntry is the lock the process holds on one repository: the open file
@@ -260,8 +263,11 @@ func LockRepo(kbRoot string) (*RepoLock, error) {
 	return &RepoLock{path: lockPath}, nil
 }
 
-// Release drops one acquisition of the repository lock. The flock is released
-// with the outermost acquisition; flock also releases it when the process exits.
+// Release drops one acquisition of the repository lock. A repeat release of the
+// same handle, like a release of a nil handle, is a no-op: the process holds the
+// flock until every acquisition that was actually taken is released. The flock
+// is released with the outermost acquisition; flock also releases it when the
+// process exits.
 func (l *RepoLock) Release() {
 	if l == nil {
 		return
@@ -269,6 +275,11 @@ func (l *RepoLock) Release() {
 
 	heldRepoLocksMu.Lock()
 	defer heldRepoLocksMu.Unlock()
+
+	if l.released {
+		return
+	}
+	l.released = true
 
 	entry, held := heldRepoLocks[l.path]
 	if !held {

@@ -2,10 +2,13 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/index"
@@ -520,5 +523,104 @@ func TestIndexRebuild_CreatesSearchDB(t *testing.T) {
 	}
 	if pageCount != 1 {
 		t.Errorf("expected 1 page in new DB, got %d", pageCount)
+	}
+}
+
+// TestConcurrentIndexAddsKeepEveryEntry runs several akb index add processes
+// against the same index: their read-modify-write cycles serialize on the
+// repository lock, so every added entry survives in kb/index.md and in the
+// commit that recorded it.
+func TestConcurrentIndexAddsKeepEveryEntry(t *testing.T) {
+	kbRoot := setupIndexTestKB(t)
+
+	origNoCommit := noCommit
+	noCommit = false
+	t.Cleanup(func() { noCommit = origNoCommit })
+
+	const writers = 4
+	notesDir := filepath.Join(kbRoot, "kb", "notes")
+	if err := os.MkdirAll(notesDir, 0750); err != nil {
+		t.Fatal(err)
+	}
+
+	entryPaths := make([]string, 0, writers)
+	for i := range writers {
+		relPath := fmt.Sprintf("kb/notes/page-%d.md", i)
+		entryPaths = append(entryPaths, relPath)
+		content := fmt.Sprintf("---\ntype: note\ntitle: Page %d\n---\nBody %d.\n", i, i)
+		if err := os.WriteFile(filepath.Join(kbRoot, filepath.FromSlash(relPath)), []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustGitInDir(t, kbRoot, "add", "--", "kb/notes")
+	mustGitInDir(t, kbRoot, "commit", "-m", "add pages")
+
+	cmds := make([]*exec.Cmd, 0, writers)
+	outputs := make([]*strings.Builder, 0, writers)
+	for i, relPath := range entryPaths {
+		cmd := exec.Command(akbBinPath, "index", "add", relPath, fmt.Sprintf("Summary %d", i)) //nolint:gosec // test helper launching akb binary
+		cmd.Dir = kbRoot
+		output := &strings.Builder{}
+		cmd.Stdout = output
+		cmd.Stderr = output
+		if err := cmd.Start(); err != nil {
+			t.Fatalf("start index add %d: %v", i, err)
+		}
+		cmds = append(cmds, cmd)
+		outputs = append(outputs, output)
+	}
+
+	waitErr := make(chan error, writers)
+	for i, cmd := range cmds {
+		go func(index int, cmd *exec.Cmd) {
+			if err := cmd.Wait(); err != nil {
+				waitErr <- fmt.Errorf("index add process %d failed: %w\n%s", index, err, outputs[index].String())
+				return
+			}
+			waitErr <- nil
+		}(i, cmd)
+	}
+	deadline := time.After(90 * time.Second)
+	for range writers {
+		select {
+		case err := <-waitErr:
+			if err != nil {
+				for _, cmd := range cmds {
+					_ = cmd.Process.Kill() //nolint:errcheck // test cleanup
+				}
+				t.Fatal(err)
+			}
+		case <-deadline:
+			for _, cmd := range cmds {
+				_ = cmd.Process.Kill() //nolint:errcheck // test cleanup
+			}
+			t.Fatal("concurrent index add processes did not finish in time")
+		}
+	}
+
+	entries, err := index.ReadIndex(kbRoot)
+	if err != nil {
+		t.Fatalf("read index: %v", err)
+	}
+	indexed := make(map[string]int, len(entries))
+	for _, entry := range entries {
+		indexed[entry.Path]++
+	}
+	for _, relPath := range entryPaths {
+		if indexed[relPath] != 1 {
+			t.Errorf("kb/index.md holds %d entries for %s, want 1 — an index add was lost", indexed[relPath], relPath)
+		}
+		if !strings.Contains(mustGitInDir(t, kbRoot, "show", "HEAD:kb/index.md"), relPath) {
+			t.Errorf("commit did not record the index entry of %s — an index add was lost", relPath)
+		}
+		if commits := mustGitInDir(t, kbRoot, "log", "--format=%s"); !strings.Contains(commits, "akb: index add "+relPath) {
+			t.Errorf("no commit for the index add of %s", relPath)
+		}
+	}
+
+	for _, line := range strings.Split(mustGitInDir(t, kbRoot, "status", "--porcelain"), "\n") {
+		if len(line) > 3 && strings.HasPrefix(line[3:], "kb/") {
+			t.Errorf("KB left dirty after the concurrent index adds: %q", line)
+		}
 	}
 }

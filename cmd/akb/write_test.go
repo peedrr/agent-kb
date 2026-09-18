@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/template"
@@ -518,5 +520,94 @@ func TestWriteGitCommitMessageADR(t *testing.T) {
 	}
 	if !strings.Contains(string(gitOut), "akb: write kb/decisions/my-adr.md") {
 		t.Errorf("expected commit message 'akb: write kb/decisions/my-adr.md', got: %s", string(gitOut))
+	}
+}
+
+// TestConcurrentWriteAppendsSerializeWithoutLostUpdates runs several
+// `akb write --append` processes against the same page: each process reads the
+// page and assembles its new content under the repository lock, so every append
+// survives in the page and in its own commit.
+func TestConcurrentWriteAppendsSerializeWithoutLostUpdates(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const relPath = "kb/notes/shared-append.md"
+	const commitSubject = "akb: write " + relPath
+
+	seed := "---\ntype: note\ntitle: Shared Append Note\nsummary: test\ntags: test\n---\nOriginal body."
+	if out, err := writeRun(kbRoot, "shared-append.md", seed); err != nil {
+		t.Fatalf("seed write failed: %s: %v", out, err)
+	}
+
+	const writers = 4
+	cmds := make([]*exec.Cmd, 0, writers)
+	outputs := make([]*strings.Builder, 0, writers)
+	for i := range writers {
+		cmd := exec.Command(akbBinPath, "write", "--append", "notes/shared-append.md") //nolint:gosec // test helper launching akb binary
+		cmd.Dir = kbRoot
+		cmd.Stdin = strings.NewReader(fmt.Sprintf("Appended by writer %d.", i))
+		output := &strings.Builder{}
+		cmd.Stdout = output
+		cmd.Stderr = output
+		if err := cmd.Start(); err != nil {
+			t.Fatalf("start write --append %d: %v", i, err)
+		}
+		cmds = append(cmds, cmd)
+		outputs = append(outputs, output)
+	}
+
+	waitErr := make(chan error, writers)
+	for i, cmd := range cmds {
+		go func(index int, cmd *exec.Cmd) {
+			if err := cmd.Wait(); err != nil {
+				waitErr <- fmt.Errorf("write --append process %d failed: %w\n%s", index, err, outputs[index].String())
+				return
+			}
+			waitErr <- nil
+		}(i, cmd)
+	}
+	deadline := time.After(90 * time.Second)
+	for range writers {
+		select {
+		case err := <-waitErr:
+			if err != nil {
+				for _, cmd := range cmds {
+					_ = cmd.Process.Kill() //nolint:errcheck // test cleanup
+				}
+				t.Fatal(err)
+			}
+		case <-deadline:
+			for _, cmd := range cmds {
+				_ = cmd.Process.Kill() //nolint:errcheck // test cleanup
+			}
+			t.Fatal("concurrent write --append processes did not finish in time")
+		}
+	}
+
+	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "shared-append.md")) //nolint:gosec // test reading known temp file
+	if err != nil {
+		t.Fatalf("read shared page: %v", err)
+	}
+	body := string(data)
+	for i := range writers {
+		if !strings.Contains(body, fmt.Sprintf("Appended by writer %d.", i)) {
+			t.Errorf("append of writer %d is missing from the page:\n%s", i, body)
+		}
+	}
+
+	commits := 0
+	for _, subject := range strings.Split(mustGitInDir(t, kbRoot, "log", "--format=%s"), "\n") {
+		if strings.TrimSpace(subject) == commitSubject {
+			commits++
+		}
+	}
+	if commits != writers+1 {
+		t.Errorf("commits for %s = %d, want %d (the seed write plus one per append) — an append was lost", relPath, commits, writers+1)
+	}
+
+	for _, line := range strings.Split(mustGitInDir(t, kbRoot, "status", "--porcelain"), "\n") {
+		if len(line) > 3 && strings.HasPrefix(line[3:], "kb/") {
+			t.Errorf("page left dirty after the concurrent write --append runs: %q", line)
+		}
 	}
 }

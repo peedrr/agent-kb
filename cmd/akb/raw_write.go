@@ -35,7 +35,7 @@ func runRawWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("check stdin: %w", err)
 	}
 	if (stat.Mode() & os.ModeCharDevice) != 0 {
-		return fmt.Errorf("input required: pipe content to stdin")
+		return &usageError{msg: "input required: pipe content to stdin"}
 	}
 
 	stdinContent, err := io.ReadAll(os.Stdin)
@@ -63,7 +63,7 @@ func runRawWrite(_ *cobra.Command, args []string) error {
 	relPath = filepath.ToSlash(relPath)
 
 	if filepath.Base(relPath) == "files.log" {
-		return fmt.Errorf("cannot write files.log directly; it is a managed file")
+		return &usageError{msg: "cannot write files.log directly; it is a managed file"}
 	}
 
 	if err := manifest.ValidateFilename(relPath); err != nil {

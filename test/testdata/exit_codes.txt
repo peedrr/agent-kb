@@ -96,6 +96,41 @@ stdout 'akb-exit=2$'
 stderr 'usage: resolve path: .*must not contain'
 exists kb/index.md
 
+# === USAGE ERROR: page, raw and index invocation mistakes ===
+
+exec bash -c 'akb write raw/escape.md <../ok-note.md; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: use `akb raw write`'
+! stderr 'execute command:'
+
+exec bash -c 'akb write --frontmatter title=Other --append notes/ok.md <../ok-note.md; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: --frontmatter and --append cannot be used together'
+
+exec bash -c 'akb write notes/ok.md </dev/null; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: input required: pipe content to stdin'
+
+exec bash -c 'akb read raw/data.csv; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: use `akb raw read`'
+
+exec bash -c 'akb raw read kb/notes/ok.md; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: use `akb read`'
+
+exec bash -c 'akb index add kb/index.md "Bad entry"; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: cannot add index.md to index'
+
+exec bash -c 'akb raw write files.log <../raw-data.csv; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: cannot write files.log directly'
+
+exec bash -c 'akb template delete note; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: deletion refused without --force'
+
 -- ok-note.md --
 ---
 type: note

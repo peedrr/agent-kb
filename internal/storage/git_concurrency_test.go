@@ -660,6 +660,37 @@ func TestLockRepoGatesOtherProcesses(t *testing.T) {
 	}
 }
 
+// TestRepoLockSecondReleaseKeepsOuterAcquisition asserts that releasing one
+// handle twice drops only the acquisition that handle stands for: the lock the
+// outer acquisition holds keeps gating other processes until it is released.
+func TestRepoLockSecondReleaseKeepsOuterAcquisition(t *testing.T) {
+	repo := initRepo(t)
+	commitKBTree(t, repo, repo)
+
+	outer, err := storage.LockRepo(repo)
+	if err != nil {
+		t.Fatalf("LockRepo: %v", err)
+	}
+	defer outer.Release()
+
+	inner, err := storage.LockRepo(repo)
+	if err != nil {
+		t.Fatalf("nested LockRepo: %v", err)
+	}
+	inner.Release()
+	inner.Release()
+
+	const rel = "kb/notes/blocked-by-outer-acquisition.md"
+	helper := blockedWriter(t, repo, rel, "blocked content\n", "akb: write "+rel)
+
+	outer.Release()
+	helper.wait(t)
+
+	if head := mustGit(t, repo, "log", "-1", "--format=%s"); head != "akb: write "+rel {
+		t.Errorf("HEAD subject = %q, want %q", head, "akb: write "+rel)
+	}
+}
+
 // TestGitProviderRetriesWhileIndexLockHeld asserts that a write survives the git
 // index lock held by another tool: it waits for the lock instead of failing.
 func TestGitProviderRetriesWhileIndexLockHeld(t *testing.T) {

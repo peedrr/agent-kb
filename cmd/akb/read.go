@@ -44,7 +44,7 @@ func runRead(_ *cobra.Command, args []string) error {
 	_, err = path.ResolveKBPath(kbRoot, inputPath)
 	if err != nil {
 		if errors.Is(err, path.ErrUseAKBRawWrite) {
-			return fmt.Errorf("use `akb raw read`")
+			return &usageError{msg: "use `akb raw read`"}
 		}
 		return fmt.Errorf("resolve path: %w", err)
 	}

@@ -48,7 +48,7 @@ func runAppend(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("check stdin: %w", err)
 	}
 	if isTTY {
-		return fmt.Errorf("input required: pipe content to stdin")
+		return &usageError{msg: "input required: pipe content to stdin"}
 	}
 
 	stdinContent, err := io.ReadAll(os.Stdin)
@@ -76,7 +76,7 @@ func runAppend(_ *cobra.Command, args []string) error {
 	}
 
 	if strings.HasPrefix(inputPath, "raw/") || inputPath == "raw" {
-		return fmt.Errorf("use `akb raw write`")
+		return &usageError{msg: "use `akb raw write`"}
 	}
 
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
@@ -84,10 +84,10 @@ func runAppend(_ *cobra.Command, args []string) error {
 	// Guard: block append to managed files
 	base := filepath.Base(cleanPath)
 	if base == "index.md" {
-		return fmt.Errorf("cannot append to index.md; use 'akb index add' to update")
+		return &usageError{msg: "cannot append to index.md; use 'akb index add' to update"}
 	}
 	if base == "log.md" {
-		return fmt.Errorf("cannot append to log.md; it is a managed file")
+		return &usageError{msg: "cannot append to log.md; it is a managed file"}
 	}
 
 	_, err = path.ResolveKBPath(kbRoot, inputPath)
