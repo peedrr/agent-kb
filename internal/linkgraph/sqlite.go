@@ -30,9 +30,25 @@ func NewSQLiteLinkGraph(db *sql.DB) *SQLiteLinkGraph {
 	return &SQLiteLinkGraph{db: db}
 }
 
+// dedupeWikilinksByTarget keeps the first occurrence of each wikilink target.
+// The links table is keyed by (source_page, raw_target), so repeated targets in
+// one page body would otherwise violate the primary key.
+func dedupeWikilinksByTarget(wikilinks []markdown.Wikilink) []markdown.Wikilink {
+	seen := make(map[string]bool, len(wikilinks))
+	deduped := make([]markdown.Wikilink, 0, len(wikilinks))
+	for _, wl := range wikilinks {
+		if seen[wl.Target] {
+			continue
+		}
+		seen[wl.Target] = true
+		deduped = append(deduped, wl)
+	}
+	return deduped
+}
+
 // UpdatePageLinks implements Updater.UpdatePageLinks.
 func (g *SQLiteLinkGraph) UpdatePageLinks(ctx context.Context, path string, content string) error {
-	wikilinks := markdown.ParseWikilinks(content)
+	wikilinks := dedupeWikilinksByTarget(markdown.ParseWikilinks(content))
 
 	tx, err := g.db.BeginTx(ctx, nil)
 	if err != nil {

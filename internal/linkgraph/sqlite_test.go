@@ -196,6 +196,44 @@ func TestSQLiteLinkGraph_UpdatePageLinks_ReplacesExistingLinks(t *testing.T) {
 	}
 }
 
+func TestSQLiteLinkGraph_UpdatePageLinks_DuplicateTargets(t *testing.T) {
+	d := setupTestDB(t)
+	g := NewSQLiteLinkGraph(d)
+	ctx := context.Background()
+
+	insertPage(t, d, "foo.md")
+
+	err := g.UpdatePageLinks(ctx, "index.md", "See [[foo]] and again [[foo|Foo]].")
+	if err != nil {
+		t.Fatalf("UpdatePageLinks: %v", err)
+	}
+
+	var count int
+	if err := d.QueryRow("SELECT COUNT(*) FROM links WHERE source_page = ?", "index.md").Scan(&count); err != nil {
+		t.Fatalf("count links: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("links count = %d, want 1", count)
+	}
+
+	links, err := g.GetOutboundLinks(ctx, "index.md")
+	if err != nil {
+		t.Fatalf("GetOutboundLinks: %v", err)
+	}
+	if len(links) != 1 {
+		t.Fatalf("len(links) = %d, want 1", len(links))
+	}
+	if links[0].RawTarget != "foo" {
+		t.Errorf("RawTarget = %q, want %q", links[0].RawTarget, "foo")
+	}
+	if links[0].Display != "foo" {
+		t.Errorf("Display = %q, want %q (first occurrence kept)", links[0].Display, "foo")
+	}
+	if links[0].ResolvedTo != "foo.md" {
+		t.Errorf("ResolvedTo = %q, want %q", links[0].ResolvedTo, "foo.md")
+	}
+}
+
 func TestSQLiteLinkGraph_UpdatePageLinks_SkipsHeadingOnlyLinks(t *testing.T) {
 	d := setupTestDB(t)
 	g := NewSQLiteLinkGraph(d)
