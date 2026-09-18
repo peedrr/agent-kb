@@ -39,6 +39,10 @@
         { pkgs, system }:
         {
           default = pkgs.mkShellNoCC {
+            # The SQLite driver is pure Go; the integration test harness
+            # also forces CGO_ENABLED=0, so the dev shell matches it.
+            env.CGO_ENABLED = "0";
+
             packages = with pkgs; [
               # go (version is specified by overlay)
               go
@@ -76,7 +80,7 @@
             # 1. Set vendorHash = lib.fakeHash;
             # 2. Run 'nix build'
             # 3. Copy the 'got:' hash from the error message
-            vendorHash = pkgs.lib.fakeHash;
+            vendorHash = "sha256-nPgj+yPf2JEhV4l+TlCrwrdvi/8QV0YSiUWZYHJFwMk=";
 
             subPackages = [ "cmd/akb" ];
 
