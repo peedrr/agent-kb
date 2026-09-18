@@ -30,12 +30,15 @@ stdout 'Written to kb/notes/no-user-note.md'
 exec git log --oneline -1
 stdout 'akb: write kb/notes/no-user-note.md'
 
-# Verify git config was auto-set
-exec git config user.name
-stdout 'akb'
+# Verify the commit used the akb identity
 
-exec git config user.email
-stdout 'akb@local'
+exec git log -1 --format='%an <%ae>'
+stdout 'akb <akb@local>'
+
+# and that the repository identity was left untouched
+! exec git config --local user.name
+
+! exec git config --local user.email
 
 # === DELETE ALSO WORKS WITHOUT USER CONFIG ===
 exec git config --unset user.name

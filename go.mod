@@ -13,6 +13,7 @@ require (
 	github.com/rogpeppe/go-internal v1.14.1
 	github.com/yuin/goldmark v1.8.2
 	go.abhg.dev/goldmark/frontmatter v0.3.0
+	golang.org/x/sys v0.43.0
 )
 
 require (
@@ -36,7 +37,6 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
-	golang.org/x/sys v0.43.0 // indirect
 	modernc.org/libc v1.72.0 // indirect; NOTE: do not upgrade independently
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect

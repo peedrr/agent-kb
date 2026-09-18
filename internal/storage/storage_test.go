@@ -689,7 +689,7 @@ func TestGitProvider_MergeConflictDetection(t *testing.T) {
 	})
 }
 
-func TestGitProvider_EnsureGitConfig(t *testing.T) {
+func TestGitProvider_CommitWithoutRepoIdentity(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "git-config-test")
 	if err != nil {
 		t.Fatal(err)
@@ -736,11 +736,11 @@ func TestGitProvider_EnsureGitConfig(t *testing.T) {
 	p := NewGitProvider(tmpDir, false)
 	ctx := context.Background()
 
-	t.Run("auto-configures git user and succeeds", func(t *testing.T) {
+	t.Run("commits without writing repository identity", func(t *testing.T) {
 		path := filepath.Join(tmpDir, "kb", "auto-config.md")
 		err := p.Write(ctx, path, []byte("auto config test"))
 		if err != nil {
-			t.Fatalf("Write with auto-config failed: %v", err)
+			t.Fatalf("Write without repository identity failed: %v", err)
 		}
 
 		data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
@@ -751,16 +751,25 @@ func TestGitProvider_EnsureGitConfig(t *testing.T) {
 			t.Errorf("content = %q, want %q", string(data), "auto config test")
 		}
 
-		cmd := exec.Command( //nolint:gosec // test helper launching akb binary
-			"git", "config", "--local", "user.name")
-		cmd.Dir = tmpDir
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
-		out, err := cmd.Output()
+		author := exec.Command( //nolint:gosec // test helper launching akb binary
+			"git", "log", "-1", "--format=%an <%ae>")
+		author.Dir = tmpDir
+		out, err := author.Output()
 		if err != nil {
-			t.Fatalf("git config --local user.name: %v", err)
+			t.Fatalf("git log: %v", err)
 		}
-		if strings.TrimSpace(string(out)) != "akb" {
-			t.Errorf("user.name = %q, want %q", strings.TrimSpace(string(out)), "akb")
+		if strings.TrimSpace(string(out)) != "akb <akb@local>" {
+			t.Errorf("author = %q, want %q", strings.TrimSpace(string(out)), "akb <akb@local>")
+		}
+
+		for _, key := range []string{"user.name", "user.email"} {
+			cmd := exec.Command( //nolint:gosec // test helper launching akb binary
+				"git", "config", "--local", key)
+			cmd.Dir = tmpDir
+			cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
+			if out, err := cmd.Output(); err == nil {
+				t.Errorf("repository config %s = %q, want it unset", key, strings.TrimSpace(string(out)))
+			}
 		}
 	})
 }
