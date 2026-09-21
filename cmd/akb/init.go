@@ -12,7 +12,6 @@ import (
 
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/db"
-	"github.com/peedrr/agent-kb/internal/registry"
 	"github.com/peedrr/agent-kb/internal/template"
 )
 
@@ -20,7 +19,7 @@ var initCmd = &cobra.Command{
 	Use:   "init <name>",
 	Short: "Initialize a new Agent Knowledge Base",
 	Long:  `Create a new KB directory with the standard structure, git repo, and configuration.`,
-	Example: `  # Initialize a new KB and set as default
+	Example: `  # Initialize a new KB
   akb init my-kb
 
   # Initialize a KB in a specific directory
@@ -77,31 +76,8 @@ func runInit(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("resolve absolute path: %w", err)
 	}
-	if err := registry.AddEntry(registry.Entry{
-		Name:    name,
-		Path:    absPath,
-		Created: now,
-	}); err != nil {
-		return fmt.Errorf("add registry entry: %w", err)
-	}
 
-	regPath, err := registry.Path()
-	if err != nil {
-		return fmt.Errorf("get registry path: %w", err)
-	}
-	reg, err := registry.Load(regPath)
-	if err != nil {
-		return fmt.Errorf("load registry: %w", err)
-	}
-
-	if reg.Default == "" {
-		if err := registry.SetDefault(name); err != nil {
-			return fmt.Errorf("set default registry: %w", err)
-		}
-		fmt.Printf("Initialized KB %q at %s and set as default\n", name, absPath)
-	} else {
-		fmt.Printf("Initialized KB %q at %s\n", name, absPath)
-	}
+	fmt.Printf("Initialized KB %q at %s\n", name, absPath)
 	return nil
 }
 

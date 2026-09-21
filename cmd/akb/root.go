@@ -43,8 +43,6 @@ func init() {
 	RootCmd.AddCommand(orphansCmd)
 	RootCmd.AddCommand(rawCmd)
 	RootCmd.AddCommand(lintCmd)
-	RootCmd.AddCommand(registryCmd)
-	RootCmd.AddCommand(useCmd)
 	RootCmd.AddCommand(approveCmd)
 	RootCmd.AddCommand(skillCmd)
 	RootCmd.AddCommand(templateCmd)
