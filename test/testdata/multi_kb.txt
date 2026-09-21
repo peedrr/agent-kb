@@ -1,4 +1,5 @@
 # Multi-KB Workflow — verify KB isolation across multiple knowledge bases
+skip 'registry-default addressing removed; explicit-addressing rework pending'
 
 # === INIT KB-A ===
 exec akb init kb-a

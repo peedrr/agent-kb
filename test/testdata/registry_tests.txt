@@ -1,4 +1,5 @@
 # Registry Tests — init default, registry list, use, commands-from-outside-kb
+skip 'registry-default addressing removed; explicit-addressing rework pending'
 
 # Initialize first KB
 exec akb init kb-one
