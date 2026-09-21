@@ -196,6 +196,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 			return &internalError{err: fmt.Errorf("CEL engine error: %w", err)}
 		}
 
+		explicitUpdated := false
 		for _, arg := range writeFrontmatter {
 			parts := strings.SplitN(arg, "=", 2)
 			if len(parts) != 2 {
@@ -208,8 +209,17 @@ func runWrite(_ *cobra.Command, args []string) error {
 			} else if key == "title" {
 				fm.Title = value
 			} else {
+				if key == "updated" {
+					explicitUpdated = true
+				}
 				fm.Fields[key] = value
 			}
+		}
+
+		// The update time moves on unless the caller supplied an explicit
+		// `updated` value.
+		if !explicitUpdated {
+			fm.Fields["updated"] = time.Now().UTC().Format(time.RFC3339)
 		}
 
 		// Validate type after potential update
