@@ -1,34 +1,5 @@
 # Raw Commands E2E — full end-to-end flow for raw operations
 
--- csv-input.txt --
-hello,world
--- csv-input.txt --
-
--- logo-input.txt --
-logodata
--- logo-input.txt --
-
--- config-input.txt --
-key=value
--- config-input.txt --
-
--- modified-input.txt --
-modified content
--- modified-input.txt --
-
--- note-input.md --
----
-type: note
-title: Data Source Note
-sources: data.csv
----
-Note referencing data.csv
--- note-input.md --
-
--- append-input.md --
-Appended content
--- append-input.md --
-
 # === INIT ===
 
 exec akb init test-kb
@@ -37,13 +8,16 @@ cd test-kb
 # === RAW WRITE ===
 
 # Write multiple raw files
-exec akb raw write data.csv <../csv-input.txt
+stdin ../csv-input.txt
+exec akb raw write data.csv
 stdout 'Written to raw/data.csv'
 
-exec akb raw write images/logo.png <../logo-input.txt
+stdin ../logo-input.txt
+exec akb raw write images/logo.png
 stdout 'Written to raw/images/logo.png'
 
-exec akb raw write config/settings.ini <../config-input.txt
+stdin ../config-input.txt
+exec akb raw write config/settings.ini
 stdout 'Written to raw/config/settings.ini'
 
 # === RAW LIST ===
@@ -83,7 +57,7 @@ stdout 'no drift'
 
 # Modify file externally → drift detected
 cp ../modified-input.txt raw/data.csv
-exec akb raw status
+! exec akb raw status
 stdout 'MODIFIED data.csv'
 ! stdout 'UNTRACKED'
 ! stdout 'MISSING'
@@ -93,12 +67,12 @@ stdout 'MODIFIED data.csv'
 
 # Create untracked file
 exec bash -c 'echo "untracked" > raw/untracked.txt'
-exec akb raw status
+! exec akb raw status
 stdout 'UNTRACKED untracked.txt'
 
 # Delete tracked file → missing
 rm raw/config/settings.ini
-exec akb raw status
+! exec akb raw status
 stdout 'MISSING config/settings.ini'
 
 # === RAW SYNC — FIX DRIFT ===
@@ -117,7 +91,8 @@ stdout 'No changes to sync.'
 # === RAW DELETE ===
 
 # Write a file for deletion
-exec akb raw write temp.txt <../csv-input.txt
+stdin ../csv-input.txt
+exec akb raw write temp.txt
 stdout 'Written to raw/temp.txt'
 
 # Delete the file
@@ -134,10 +109,12 @@ exec akb raw list
 # === SOURCES SCAN WARNING ===
 
 # Write a raw file and create a KB page referencing it
-exec akb raw write data.csv <../csv-input.txt
+stdin ../csv-input.txt
+exec akb raw write data.csv
 stdout 'Written to raw/data.csv'
 
-exec akb write source-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write source-note.md
 stdout 'Written to kb/notes/source-note.md'
 
 # Delete the raw file — should warn about source reference
@@ -148,7 +125,8 @@ stdout 'Pages referencing this file: notes/source-note.md'
 # === CROSS-NAMESPACE GUARDS ===
 
 # Block raw/ prefix on regular write
-! exec akb write raw/notes/test.md <../note-input.md
+stdin ../note-input.md
+! exec akb write raw/notes/test.md
 stderr 'akb raw write'
 
 # Block raw/ prefix on regular read
@@ -160,11 +138,13 @@ stderr 'akb raw read'
 stderr 'akb raw delete'
 
 # Block raw/ prefix on regular append
-! exec akb append raw/notes/test.md <../append-input.md
+stdin ../append-input.md
+! exec akb append raw/notes/test.md
 stderr 'akb raw write'
 
 # Block kb/ prefix on raw write
-! exec akb raw write kb/test.md <../csv-input.txt
+stdin ../csv-input.txt
+! exec akb raw write kb/test.md
 stderr 'akb write'
 
 # Block kb/ prefix on raw read
@@ -174,7 +154,8 @@ stderr 'akb read'
 # === --no-commit FLAG ===
 
 # Write with --no-commit
-exec akb raw write nocommit.txt <../csv-input.txt --no-commit
+stdin ../csv-input.txt
+exec akb raw write nocommit.txt --no-commit
 stdout 'Written to raw/nocommit.txt'
 
 # Verify file exists
@@ -194,3 +175,26 @@ exec akb raw delete nocommit.txt --no-commit
 stdout 'Deleted raw/nocommit.txt'
 
 ! exists raw/nocommit.txt
+
+-- csv-input.txt --
+hello,world
+
+-- logo-input.txt --
+logodata
+
+-- config-input.txt --
+key=value
+
+-- modified-input.txt --
+modified content
+
+-- note-input.md --
+---
+type: note
+title: Data Source Note
+sources: data.csv
+---
+Note referencing data.csv
+
+-- append-input.md --
+Appended content

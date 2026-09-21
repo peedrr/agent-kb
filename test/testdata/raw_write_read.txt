@@ -1,23 +1,12 @@
 # Raw Write/Read/List — verify raw file operations
 
--- csv-input.txt --
-hello
--- csv-input.txt --
-
--- logo-input.txt --
-data
--- logo-input.txt --
-
--- pipe-input.txt --
-data
--- pipe-input.txt --
-
 # Setup: initialize a KB
 exec akb init test-kb
 cd test-kb
 
 # --- Write a raw file ---
-exec akb raw write test.csv <../csv-input.txt
+stdin ../csv-input.txt
+exec akb raw write test.csv
 stdout 'Written to raw/test.csv'
 
 # --- Verify file exists on disk ---
@@ -36,7 +25,8 @@ exec akb raw list
 stdout 'test.csv'
 
 # --- Write a raw file in a subdirectory ---
-exec akb raw write images/logo.png <../logo-input.txt
+stdin ../logo-input.txt
+exec akb raw write images/logo.png
 stdout 'Written to raw/images/logo.png'
 
 # --- Verify subdirectory was created ---
@@ -52,27 +42,33 @@ exec akb raw list
 ! stdout 'files.log'
 
 # --- Block writing files.log ---
-! exec akb raw write files.log <../csv-input.txt
+stdin ../csv-input.txt
+! exec akb raw write files.log
 stderr 'managed file'
 
 # --- Block kb/ prefix on raw write ---
-! exec akb raw write kb/test.md <../csv-input.txt
+stdin ../csv-input.txt
+! exec akb raw write kb/test.md
 stderr 'akb write'
 
 # --- Block raw/ prefix on regular write ---
-! exec akb write raw/test.md <../csv-input.txt
+stdin ../note-input.md
+! exec akb write raw/test.md
 stderr 'akb raw write'
 
 # --- Block pipe character in filename ---
-! exec akb raw write "data|with|pipes.txt" <../pipe-input.txt
+stdin ../pipe-input.txt
+! exec akb raw write "data|with|pipes.txt"
 stderr 'must not contain'
 
 # --- Block .. in path ---
-! exec akb raw write ../etc/passwd <../csv-input.txt
+stdin ../csv-input.txt
+! exec akb raw write ../etc/passwd
 stderr 'must not contain'
 
 # --- Block absolute path ---
-! exec akb raw write /tmp/evil.txt <../csv-input.txt
+stdin ../csv-input.txt
+! exec akb raw write /tmp/evil.txt
 stderr 'must be relative'
 
 # --- Read nonexistent file ---
@@ -82,3 +78,21 @@ stderr 'raw file not found'
 # --- Block kb/ prefix on raw read ---
 ! exec akb raw read kb/test.md
 stderr 'akb read'
+
+-- csv-input.txt --
+hello
+
+-- logo-input.txt --
+data
+
+-- pipe-input.txt --
+data
+
+-- note-input.md --
+---
+type: note
+title: Raw Write Guard Note
+summary: Note for the raw/ prefix guard check
+tags: test
+---
+Guard note content.

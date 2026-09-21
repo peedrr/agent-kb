@@ -1,46 +1,19 @@
 # Round Trip — write → read → append → read → delete cycle
 
--- note-input.md --
----
-type: note
-title: My Note
-summary: A test note
-tags: test
----
-First content line.
--- note-input.md --
-
--- append-input.md --
-Second content line.
--- append-input.md --
-
--- adr-input.md --
----
-type: adr
-title: My Decision
-status: proposed
-deciders: team
-summary: A test decision
-tags: test
-created: '2026-01-01'
-updated: '2026-01-01'
----
-ADR content here.
--- adr-input.md --
-
 # Setup: initialize a KB
 exec akb init test-kb
 cd test-kb
 
 # --- Write a note page ---
-exec akb write my-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write my-note.md
 stdout 'Written to kb/notes/my-note.md'
 
 # --- Verify file exists on disk ---
 exists kb/notes/my-note.md
 
 # --- Read the page back ---
-exec akb read my-note.md
+exec akb read notes/my-note.md
 stdout 'First content line.'
 stdout 'type: note'
 stdout 'title: My Note'
@@ -54,7 +27,8 @@ exec akb read notes/my-note.md
 stdout 'First content line.'
 
 # --- Append to the page ---
-exec akb append notes/my-note.md <../append-input.md
+stdin ../append-input.md
+exec akb append notes/my-note.md
 stdout 'Appended to kb/notes/my-note.md'
 
 # --- Read after append — both lines present ---
@@ -68,7 +42,8 @@ stdout 'type: note'
 stdout 'title: My Note'
 
 # --- Write an ADR page ---
-exec akb write my-decision.md <../adr-input.md
+stdin ../adr-input.md
+exec akb write my-decision.md
 stdout 'Written to kb/decisions/my-decision.md'
 
 # --- Verify ADR file exists ---
@@ -91,3 +66,38 @@ stdout 'Deleted kb/decisions/my-decision.md'
 
 # --- Verify ADR file is gone ---
 ! exists kb/decisions/my-decision.md
+
+-- note-input.md --
+---
+type: note
+title: My Note
+summary: A test note
+tags: test
+---
+First content line.
+
+-- append-input.md --
+Second content line.
+
+-- adr-input.md --
+---
+type: adr
+title: My Decision
+status: proposed
+deciders: team
+summary: A test decision
+tags: test
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+## Context
+
+Round-trip coverage needs a decision page.
+
+## Decision
+
+ADR content here.
+
+## Consequences
+
+The decision can be read back and deleted like a note.

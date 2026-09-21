@@ -1,47 +1,12 @@
 # Path Guard Rails — error cases for invalid paths
 
--- raw-prefix-input.md --
----
-type: note
-title: Raw Test
----
-Content
--- raw-prefix-input.md --
-
--- traversal-input.md --
----
-type: note
-title: Traversal
----
-Content
--- traversal-input.md --
-
--- absolute-input.md --
----
-type: note
-title: Absolute
----
-Content
--- absolute-input.md --
-
--- no-ext-input.md --
----
-type: note
-title: No Extension
----
-Content
--- no-ext-input.md --
-
--- append-input.md --
-Appended content
--- append-input.md --
-
 # Setup: initialize a KB
 exec akb init test-kb
 cd test-kb
 
 # --- raw/ prefix on write ---
-! exec akb write raw/notes/test.md <../raw-prefix-input.md
+stdin ../raw-prefix-input.md
+! exec akb write raw/notes/test.md
 stderr 'akb raw write'
 
 # --- raw/ prefix on read ---
@@ -53,11 +18,13 @@ stderr 'akb raw read'
 stderr 'akb raw delete'
 
 # --- raw/ prefix on append ---
-! exec akb append raw/notes/test.md <../append-input.md
+stdin ../append-input.md
+! exec akb append raw/notes/test.md
 stderr 'akb raw write'
 
 # --- .. in path on write ---
-! exec akb write ../etc/passwd.md <../traversal-input.md
+stdin ../traversal-input.md
+! exec akb write ../etc/passwd.md
 stderr 'must not contain'
 
 # --- .. in path on read ---
@@ -65,7 +32,8 @@ stderr 'must not contain'
 stderr 'must not contain'
 
 # --- Absolute path on write ---
-! exec akb write /tmp/evil.md <../absolute-input.md
+stdin ../absolute-input.md
+! exec akb write /tmp/evil.md
 stderr 'must be relative'
 
 # --- Absolute path on read ---
@@ -73,7 +41,8 @@ stderr 'must be relative'
 stderr 'must be relative'
 
 # --- No .md extension on write ---
-! exec akb write mypage.txt <../no-ext-input.md
+stdin ../no-ext-input.md
+! exec akb write mypage.txt
 stderr 'must end with .md'
 
 # --- Page not found on read ---
@@ -85,5 +54,37 @@ stderr 'page not found'
 stderr 'page not found'
 
 # --- Page not found on append ---
-! exec akb append notes/nonexistent.md <../append-input.md
+stdin ../append-input.md
+! exec akb append notes/nonexistent.md
 stderr 'page not found'
+
+-- raw-prefix-input.md --
+---
+type: note
+title: Raw Test
+---
+Content
+
+-- traversal-input.md --
+---
+type: note
+title: Traversal
+---
+Content
+
+-- absolute-input.md --
+---
+type: note
+title: Absolute
+---
+Content
+
+-- no-ext-input.md --
+---
+type: note
+title: No Extension
+---
+Content
+
+-- append-input.md --
+Appended content

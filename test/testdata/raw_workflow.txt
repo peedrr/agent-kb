@@ -1,19 +1,12 @@
 # Raw Workflow — focused end-to-end raw file operations
 
--- csv-input.txt --
-hello,world
--- csv-input.txt --
-
--- modified-input.txt --
-modified content
--- modified-input.txt --
-
 # === INIT ===
 exec akb init raw-kb
 cd raw-kb
 
 # === RAW WRITE ===
-exec akb raw write data.csv <../csv-input.txt
+stdin ../csv-input.txt
+exec akb raw write data.csv
 stdout 'Written to raw/data.csv'
 
 # === RAW STATUS (NO DRIFT) ===
@@ -24,7 +17,7 @@ stdout 'no drift'
 cp ../modified-input.txt raw/data.csv
 
 # === RAW STATUS (DRIFT DETECTED) ===
-exec akb raw status
+! exec akb raw status
 stdout 'MODIFIED data.csv'
 
 # === RAW SYNC (FIX DRIFT) ===
@@ -43,3 +36,9 @@ stdout 'Deleted raw/data.csv'
 # === RAW LIST EMPTY ===
 exec akb raw list
 ! stdout .
+
+-- csv-input.txt --
+hello,world
+
+-- modified-input.txt --
+modified content

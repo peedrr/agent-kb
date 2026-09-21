@@ -1,61 +1,61 @@
 # Write Error Cases — type validation errors
 
+# Setup: initialize a KB
+exec akb init test-kb
+cd test-kb
+
+# --- Unknown type: type not in templates ---
+stdin ../unknown-type.md
+! exec akb write unknown-type.md
+stderr 'unknown type'
+
+# --- Missing type field entirely ---
+stdin ../no-type.md
+! exec akb write no-type.md
+stderr 'missing required field .type.'
+
+# --- Missing title field ---
+stdin ../no-title.md
+! exec akb write no-title.md
+stderr 'missing required field .title.'
+
+# --- Empty frontmatter ---
+stdin ../empty-fm.md
+! exec akb write empty-fm.md
+stderr 'empty frontmatter'
+
+# --- No frontmatter at all ---
+stdin ../no-fm.md
+! exec akb write no-fm.md
+stderr 'no frontmatter found'
+
+# --- Stdin required (no pipe) ---
+! exec bash -c 'akb write no-stdin.md </dev/null'
+stderr 'input required'
+
 -- unknown-type.md --
 ---
 type: nonexistent
 title: Test
 ---
 Content
--- unknown-type.md --
 
 -- no-type.md --
 ---
 title: No Type
 ---
 Content
--- no-type.md --
 
 -- no-title.md --
 ---
 type: note
 ---
 Content
--- no-title.md --
 
 -- empty-fm.md --
 ---
 ---
 Content
--- empty-fm.md --
 
 -- no-fm.md --
 Just some content without frontmatter
--- no-fm.md --
-
-# Setup: initialize a KB
-exec akb init test-kb
-cd test-kb
-
-# --- Unknown type: type not in templates ---
-! exec akb write unknown-type.md <../unknown-type.md
-stderr 'unknown type'
-
-# --- Missing type field entirely ---
-! exec akb write no-type.md <../no-type.md
-stderr 'missing required field .type.'
-
-# --- Missing title field ---
-! exec akb write no-title.md <../no-title.md
-stderr 'missing required field .title.'
-
-# --- Empty frontmatter ---
-! exec akb write empty-fm.md <../empty-fm.md
-stderr 'empty frontmatter'
-
-# --- No frontmatter at all ---
-! exec akb write no-fm.md <../no-fm.md
-stderr 'no frontmatter found'
-
-# --- Stdin required (no pipe) ---
-! exec akb write no-stdin.md
-stderr 'input required'

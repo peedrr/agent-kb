@@ -1,51 +1,20 @@
 # Search Command Tests — FTS5 search with BM25 ranking
 
--- note-input.md --
----
-type: note
-title: Search Test Note
-summary: A note for search testing
-tags: searchtest
----
-This note is about distributed systems and consensus algorithms.
--- note-input.md --
-
--- note2-input.md --
----
-type: note
-title: Another Search Note
-summary: Second note for search
-tags: searchtest
----
-Content about machine learning and neural networks.
--- note2-input.md --
-
--- adr-input.md --
----
-type: adr
-title: Search Decision
-status: proposed
-deciders: team
-summary: Decision for search testing
-tags: searchtest
-created: '2026-01-01'
-updated: '2026-01-01'
----
-We decided to use distributed systems for our architecture.
--- adr-input.md --
-
 # --- Setup: initialize KB and write pages ---
 
 exec akb init test-kb
 cd test-kb
 
-exec akb write search-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write search-note.md
 stdout 'Written to kb/notes/search-note.md'
 
-exec akb write another-note.md <../note2-input.md
+stdin ../note2-input.md
+exec akb write another-note.md
 stdout 'Written to kb/notes/another-note.md'
 
-exec akb write search-decision.md <../adr-input.md
+stdin ../adr-input.md
+exec akb write search-decision.md
 stdout 'Written to kb/decisions/search-decision.md'
 
 # --- Search finds page by content ---
@@ -55,7 +24,7 @@ stdout 'notes/search-note.md'
 
 # --- Search finds page by title ---
 
-exec akb search "Search Test Note"
+exec akb search 'Search Test Note'
 stdout 'notes/search-note.md'
 
 # --- Search finds page by tags ---
@@ -66,7 +35,7 @@ stdout 'notes/another-note.md'
 
 # --- Search with multi-word query ---
 
-exec akb search "distributed systems"
+exec akb search 'distributed systems'
 stdout 'notes/search-note.md'
 
 # --- Search returns results in BM25 rank order ---
@@ -98,7 +67,7 @@ stdout 'notes/search-note.md'
 
 # --- Search with FTS5 operators (OR, AND, NOT stripped) ---
 
-exec akb search "distributed OR systems"
+exec akb search 'distributed OR systems'
 stdout 'notes/search-note.md'
 
 # --- Search finds ADR content ---
@@ -108,8 +77,8 @@ stdout 'decisions/search-decision.md'
 
 # --- Search snippet contains match context ---
 
-exec akb search "distributed"
-stdout 'distributed'
+exec akb search 'Search Test Note'
+stdout '→Search←'
 
 # --- Missing search.db produces rebuild hint ---
 
@@ -126,3 +95,44 @@ stdout 'Index rebuilt'
 
 exec akb search "distributed"
 stdout 'notes/search-note.md'
+
+-- note-input.md --
+---
+type: note
+title: Search Test Note
+summary: A note for search testing
+tags: searchtest
+---
+This note is about distributed systems and consensus algorithms.
+
+-- note2-input.md --
+---
+type: note
+title: Another Search Note
+summary: Second note for search
+tags: searchtest
+---
+Content about machine learning and neural networks.
+
+-- adr-input.md --
+---
+type: adr
+title: Search Decision
+status: proposed
+deciders: team
+summary: Decision for search testing
+tags: searchtest
+created: '2026-01-01'
+updated: '2026-01-01'
+---
+## Context
+
+The architecture needs a searchable decision record.
+
+## Decision
+
+We decided to use distributed systems for our architecture.
+
+## Consequences
+
+The decision is indexed alongside notes.
