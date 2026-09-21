@@ -211,6 +211,56 @@ func TestLog(t *testing.T) {
 			t.Error("expected to find lint entry after --no-commit append")
 		}
 	})
+
+	t.Run("new operations accepted", func(t *testing.T) {
+		newOps := []string{"distill", "approve", "plan"}
+
+		for _, op := range newOps {
+			logAppendTitle = ""
+			if err := runLogAppend(logAppendCmd, []string{op, "Extended vocabulary entry"}); err != nil {
+				t.Fatalf("append with operation %q failed: %v", op, err)
+			}
+		}
+
+		entries, err := kblog.ReadLog(kbRoot)
+		if err != nil {
+			t.Fatalf("ReadLog failed: %v", err)
+		}
+		for _, op := range newOps {
+			found := false
+			for _, e := range entries {
+				if e.Operation == op {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected a %q entry in the log", op)
+			}
+		}
+	})
+
+	t.Run("existing operations still accepted", func(t *testing.T) {
+		for _, op := range []string{"ingest", "delete", "update", "lint", "query"} {
+			if !isValidOperation(op) {
+				t.Errorf("operation %q is no longer accepted", op)
+			}
+		}
+	})
+
+	t.Run("invalid operation error lists the extended vocabulary", func(t *testing.T) {
+		logAppendTitle = ""
+
+		err := runLogAppend(logAppendCmd, []string{"not_an_operation", "Bad operation"})
+		if err == nil {
+			t.Fatal("expected error for invalid operation, got nil")
+		}
+		for _, op := range []string{"distill", "approve", "plan"} {
+			if !strings.Contains(err.Error(), op) {
+				t.Errorf("expected %q in the invalid-operation error, got: %v", op, err)
+			}
+		}
+	})
 }
 
 func setupLogTestKB(t *testing.T, kbRoot string) {

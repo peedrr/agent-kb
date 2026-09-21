@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -411,5 +412,89 @@ func TestAppendBumpsUpdated(t *testing.T) {
 	assertRecentTimestamp(t, updated)
 	if got := frontmatterString(t, fm, "created"); got != stale {
 		t.Errorf("created = %q, want %q preserved", got, stale)
+	}
+}
+
+// datedHeading is the `## YYYY-MM-DD` heading a --dated append writes.
+func datedHeading(t *testing.T) string {
+	t.Helper()
+	return "## " + time.Now().Format("2006-01-02")
+}
+
+func TestAppendDatedWrapsContentUnderHeading(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	content := "---\ntype: note\ntitle: Dated Append\nsummary: test\ntags: test\n---\nOriginal body."
+	writePageForAppend(t, kbRoot, "dated-append.md", content)
+
+	out, err := appendRun(kbRoot, "notes/dated-append.md", "Dated addition.", "--dated")
+	if err != nil {
+		t.Fatalf("akb append --dated failed: %s: %v", out, err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "dated-append.md")) //nolint:gosec // test reading known temp file
+	if err != nil {
+		t.Fatalf("read written file: %v", err)
+	}
+
+	body := string(data)
+	want := "Original body.\n" + datedHeading(t) + "\n\nDated addition."
+	if !strings.Contains(body, want) {
+		t.Errorf("expected the page to contain %q, got: %s", want, body)
+	}
+	if count := strings.Count(body, "type: note"); count != 1 {
+		t.Errorf("frontmatter 'type: note' appears %d times, want 1", count)
+	}
+}
+
+func TestWriteAppendDatedWrapsContentUnderHeading(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	content := "---\ntype: note\ntitle: Dated Write Append\nsummary: test\ntags: test\n---\nOriginal body."
+	writePageForAppend(t, kbRoot, "dated-write.md", content)
+
+	out, err := writeRun(kbRoot, "notes/dated-write.md", "Dated addition.", "--append", "--dated")
+	if err != nil {
+		t.Fatalf("akb write --append --dated failed: %s: %v", out, err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "dated-write.md")) //nolint:gosec // test reading known temp file
+	if err != nil {
+		t.Fatalf("read written file: %v", err)
+	}
+
+	body := string(data)
+	want := "Original body.\n" + datedHeading(t) + "\n\nDated addition."
+	if !strings.Contains(body, want) {
+		t.Errorf("expected the page to contain %q, got: %s", want, body)
+	}
+	if count := strings.Count(body, "type: note"); count != 1 {
+		t.Errorf("frontmatter 'type: note' appears %d times, want 1", count)
+	}
+}
+
+func TestWriteDatedRequiresAppend(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	out, err := writeRun(kbRoot, "notes/undated.md", "body without a dated append", "--dated")
+	if err == nil {
+		t.Fatalf("expected --dated without --append to fail, got: %s", out)
+	}
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected an exit error, got %T: %v", err, err)
+	}
+	if code := exitErr.ExitCode(); code != exitFault {
+		t.Errorf("exit code = %d, want %d; output: %s", code, exitFault, out)
+	}
+	if !strings.Contains(out, "usage: --dated requires --append") {
+		t.Errorf("expected the usage report for --dated without --append, got: %s", out)
+	}
+	if _, statErr := os.Stat(filepath.Join(kbRoot, "kb", "notes", "undated.md")); !os.IsNotExist(statErr) {
+		t.Errorf("expected no page to be written, stat error = %v", statErr)
 	}
 }
