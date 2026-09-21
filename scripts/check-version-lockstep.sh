@@ -5,9 +5,12 @@ set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-makefile_version="$(sed -n 's/^VERSION[[:space:]]*:=[[:space:]]*\(.*\)$/\1/p' "$root_dir/Makefile" | head -n 1 | tr -d '[:space:]')"
-flake_version="$(sed -n 's/^[[:space:]]*akbVersion[[:space:]]*=[[:space:]]*"\([^"]*\)".*$/\1/p' "$root_dir/flake.nix" | head -n 1)"
-agents_version="$(sed -n 's/^\*\*Status:\*\*[[:space:]]*v\([^[:space:]]*\).*$/\1/p' "$root_dir/AGENTS.md" | head -n 1)"
+# Each pipeline tolerates an unreadable file (|| true after the pipeline) so a
+# missing lockstep file is reported by the diagnostics table below, not by an
+# abort inside the command substitution under set -euo pipefail.
+makefile_version="$(sed -n 's/^VERSION[[:space:]]*:=[[:space:]]*\(.*\)$/\1/p' "$root_dir/Makefile" 2>/dev/null | head -n 1 | tr -d '[:space:]' || true)"
+flake_version="$(sed -n 's/^[[:space:]]*akbVersion[[:space:]]*=[[:space:]]*"\([^"]*\)".*$/\1/p' "$root_dir/flake.nix" 2>/dev/null | head -n 1 || true)"
+agents_version="$(sed -n 's/^\*\*Status:\*\*[[:space:]]*v\([^[:space:]]*\).*$/\1/p' "$root_dir/AGENTS.md" 2>/dev/null | head -n 1 || true)"
 
 report() {
   printf '  %-24s %s\n' "$1" "${2:-<not found>}" >&2
