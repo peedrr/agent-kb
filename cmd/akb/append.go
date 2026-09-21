@@ -28,9 +28,24 @@ var appendCmd = &cobra.Command{
 	Long:  `Read content from stdin and append it to the body of an existing page. Frontmatter is preserved.`,
 	Example: `  # Append content to a page
   echo "
-More content here" | akb append notes/my-note.md`,
+More content here" | akb append notes/my-note.md
+
+  # Append a dated section
+  echo "More content here" | akb append --dated notes/journal.md`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAppend,
+}
+
+var appendDated bool
+
+func init() {
+	appendCmd.Flags().BoolVar(&appendDated, "dated", false, "prefix the appended content with a `## YYYY-MM-DD` heading (local date)")
+}
+
+// datedSection wraps content under a `## YYYY-MM-DD` heading. The heading uses
+// the local calendar date, matching the heading convention of kb/log.md.
+func datedSection(content string) string {
+	return "## " + time.Now().Format("2006-01-02") + "\n\n" + content
 }
 
 var isStdinTTY = func() (bool, error) {
@@ -131,7 +146,12 @@ func runAppend(_ *cobra.Command, args []string) error {
 	// The page content changes, so stamp the update time.
 	fm.Fields["updated"] = time.Now().UTC().Format(time.RFC3339)
 
-	newBody := string(body) + "\n" + string(stdinContent)
+	appended := string(stdinContent)
+	if appendDated {
+		appended = datedSection(appended)
+	}
+
+	newBody := string(body) + "\n" + appended
 
 	allFields := map[string]any{
 		"type":  fm.Type,

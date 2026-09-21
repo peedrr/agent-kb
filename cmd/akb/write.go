@@ -28,6 +28,7 @@ import (
 )
 
 var writeAppend bool
+var writeDated bool
 var writeFrontmatter []string
 
 var writeCmd = &cobra.Command{
@@ -62,11 +63,17 @@ Content here" | akb write my-note.md
 
 func init() {
 	writeCmd.Flags().BoolVar(&writeAppend, "append", false, "append stdin to existing page body")
+	writeCmd.Flags().BoolVar(&writeDated, "dated", false, "with --append, prefix the appended content with a `## YYYY-MM-DD` heading (local date)")
 	writeCmd.Flags().StringArrayVar(&writeFrontmatter, "frontmatter", nil, "update frontmatter field(s) as key=value")
 }
 
 func runWrite(_ *cobra.Command, args []string) error {
 	inputPath := args[0]
+
+	// --dated only changes what an append writes.
+	if writeDated && !writeAppend {
+		return &usageError{msg: "--dated requires --append"}
+	}
 
 	// Resolve KB root
 	kbRoot, err := path.ResolveKB(kbFlag)
@@ -335,7 +342,12 @@ func runWrite(_ *cobra.Command, args []string) error {
 			// comes from the on-disk page and keeps the pre-bump timestamp.
 			fm.Fields["updated"] = time.Now().UTC().Format(time.RFC3339)
 
-			newBody := string(body) + "\n" + string(stdinContent)
+			appended := string(stdinContent)
+			if writeDated {
+				appended = datedSection(appended)
+			}
+
+			newBody := string(body) + "\n" + appended
 
 			allFields := map[string]any{
 				"type":  fm.Type,
