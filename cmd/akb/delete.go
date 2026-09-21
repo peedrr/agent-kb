@@ -226,7 +226,7 @@ func deletePage(ctx context.Context, kbRoot string, dbConn *sql.DB, relPath, ful
 
 	store := storage.NewGitProvider(kbRoot, noCommit)
 	if err := store.Delete(ctx, fullPath); err != nil {
-		return fmt.Errorf("delete page: %w — the page was already removed from the search index and link graph but its deletion did not complete; run `akb index rebuild` to rebuild the search index and link graph", err)
+		return fmt.Errorf("delete page: %w — the page was already removed from the search index and link graph but its file removal or its commit did not complete; if the page file still exists, run `akb index rebuild` to rebuild the search index and link graph; if the file is gone, run `git status` and commit the staged deletion manually", err)
 	}
 
 	return nil

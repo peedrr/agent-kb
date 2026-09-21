@@ -423,6 +423,9 @@ func TestDeleteFileStepFailureAfterIndexRemovalReportsRemediation(t *testing.T) 
 	if !strings.Contains(err.Error(), "already removed from the search index and link graph") {
 		t.Errorf("expected the delete error to surface the removed derived records, got: %v", err)
 	}
+	if !strings.Contains(err.Error(), "file removal or its commit did not complete") {
+		t.Errorf("expected the delete error to stay truthful across both failure sub-cases, got: %v", err)
+	}
 	if !strings.Contains(err.Error(), "akb index rebuild") {
 		t.Errorf("expected the delete error to carry the rebuild remediation, got: %v", err)
 	}
