@@ -97,7 +97,13 @@ func TestKBFlagSelectsKnowledgeBase(t *testing.T) {
 }
 
 func TestStatusWithoutKBSelectionClassifiesAsUsage(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
+	work := filepath.Join(home, "work")
+	if err := os.MkdirAll(work, 0750); err != nil {
+		t.Fatalf("create work directory: %v", err)
+	}
+	t.Setenv("HOME", home)
+	t.Chdir(work)
 	t.Setenv(path.KBEnvVar, "")
 	resetKBFlag(t)
 
