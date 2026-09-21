@@ -563,7 +563,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 	// their pre-write state instead of one step behind the other.
 	tx, err := dbConn.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin index transaction: %w", err)
+		return fmt.Errorf("begin index transaction: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState())
 	}
 	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
 
