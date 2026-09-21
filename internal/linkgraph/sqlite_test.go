@@ -3,7 +3,9 @@ package linkgraph
 import (
 	"context"
 	"database/sql"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/peedrr/agent-kb/internal/db"
@@ -486,6 +488,113 @@ func TestSQLiteLinkGraph_GetAmbiguousLinks(t *testing.T) {
 	want := "AMBIGUOUS:archive/note.md,notes/note.md"
 	if ambiguous[0].ResolvedTo != want {
 		t.Errorf("ResolvedTo = %q, want %q", ambiguous[0].ResolvedTo, want)
+	}
+}
+
+func writeKBFile(t *testing.T, kbRoot, relPath, content string) {
+	t.Helper()
+	fullPath := filepath.Join(kbRoot, relPath)
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0750); err != nil {
+		t.Fatalf("MkdirAll %q: %v", filepath.Dir(fullPath), err)
+	}
+	if err := os.WriteFile(fullPath, []byte(content), 0600); err != nil {
+		t.Fatalf("WriteFile %q: %v", relPath, err)
+	}
+}
+
+func TestSQLiteLinkGraph_RebuildLinks_RollsBackPriorLinksOnWalkFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("unreadable directories stay listable as root, so the walk cannot be failed")
+	}
+	d := setupTestDB(t)
+	g := NewSQLiteLinkGraph(d)
+	ctx := context.Background()
+
+	kbRoot := t.TempDir()
+	// aaa-target.md sorts before mmm-source.md, so the link resolves during a rebuild
+	// that starts from an empty pages table.
+	writeKBFile(t, kbRoot, "kb/notes/aaa-target.md", "Target body.\n")
+	writeKBFile(t, kbRoot, "kb/notes/mmm-source.md", "See [[aaa-target]] for details.\n")
+
+	if err := g.RebuildLinks(ctx, kbRoot); err != nil {
+		t.Fatalf("initial RebuildLinks: %v", err)
+	}
+
+	links, err := g.GetOutboundLinks(ctx, "kb/notes/mmm-source.md")
+	if err != nil {
+		t.Fatalf("GetOutboundLinks: %v", err)
+	}
+	if len(links) != 1 {
+		t.Fatalf("len(links) = %d before failed rebuild, want 1", len(links))
+	}
+	if links[0].ResolvedTo != "kb/notes/aaa-target.md" {
+		t.Fatalf("ResolvedTo = %q before failed rebuild, want %q", links[0].ResolvedTo, "kb/notes/aaa-target.md")
+	}
+
+	// nnn-gamma.md sorts before the unreadable directory, so the failing walk resolves it
+	// before aborting.
+	writeKBFile(t, kbRoot, "kb/notes/nnn-gamma.md", "See [[aaa-target]] again.\n")
+	lockedDir := filepath.Join(kbRoot, "kb", "zzz-locked")
+	if err := os.Mkdir(lockedDir, 0750); err != nil {
+		t.Fatalf("Mkdir locked dir failed: %v", err)
+	}
+	if err := os.Chmod(lockedDir, 0000); err != nil {
+		t.Fatalf("Chmod locked dir failed: %v", err)
+	}
+	// The directory is empty so that it can be removed without restoring its
+	// permissions first.
+	t.Cleanup(func() { _ = os.Remove(lockedDir) }) //nolint:errcheck // removal only needs write access to the parent directory
+
+	err = g.RebuildLinks(ctx, kbRoot)
+	if err == nil {
+		t.Fatal("RebuildLinks succeeded despite unreadable directory, want error")
+	}
+	if !strings.Contains(err.Error(), "walk kb directory") {
+		t.Errorf("RebuildLinks error = %v, want walk failure", err)
+	}
+
+	// Links resolved before the failed walk are still intact.
+	links, err = g.GetOutboundLinks(ctx, "kb/notes/mmm-source.md")
+	if err != nil {
+		t.Fatalf("GetOutboundLinks after failed rebuild: %v", err)
+	}
+	if len(links) != 1 {
+		t.Errorf("len(links) = %d after failed rebuild, want 1", len(links))
+	} else if links[0].ResolvedTo != "kb/notes/aaa-target.md" {
+		t.Errorf("ResolvedTo = %q after failed rebuild, want %q", links[0].ResolvedTo, "kb/notes/aaa-target.md")
+	}
+
+	var linkCount int
+	if err := d.QueryRow("SELECT COUNT(*) FROM links").Scan(&linkCount); err != nil {
+		t.Fatalf("query links: %v", err)
+	}
+	if linkCount != 1 {
+		t.Errorf("expected 1 link row after failed rebuild, got %d", linkCount)
+	}
+
+	// Rows written by the aborted walk are gone.
+	gammaLinks, err := g.GetOutboundLinks(ctx, "kb/notes/nnn-gamma.md")
+	if err != nil {
+		t.Fatalf("GetOutboundLinks for gamma: %v", err)
+	}
+	if len(gammaLinks) != 0 {
+		t.Errorf("expected 0 links for gamma after failed rebuild, got %d", len(gammaLinks))
+	}
+
+	var strayPages int
+	if err := d.QueryRow("SELECT COUNT(*) FROM pages WHERE path = ?", "kb/notes/nnn-gamma.md").Scan(&strayPages); err != nil {
+		t.Fatalf("query stray pages: %v", err)
+	}
+	if strayPages != 0 {
+		t.Errorf("expected 0 pages for gamma after failed rebuild, got %d", strayPages)
+	}
+
+	var pageCount int
+	if err := d.QueryRow("SELECT COUNT(*) FROM pages").Scan(&pageCount); err != nil {
+		t.Fatalf("query pages: %v", err)
+	}
+	if pageCount != 2 {
+		t.Errorf("expected 2 page rows (aaa-target, mmm-source) after failed rebuild, got %d", pageCount)
 	}
 }
 

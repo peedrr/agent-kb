@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/peedrr/agent-kb/internal/db"
@@ -503,6 +504,103 @@ func TestEscapeFTS5Query(t *testing.T) {
 				t.Errorf("escapeFTS5Query(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestSQLiteFTS5Searcher_RebuildIndex_RollsBackPriorContentOnWalkFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("unreadable directories stay listable as root, so the walk cannot be failed")
+	}
+	conn := setupTestDB(t)
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
+	s := NewSQLiteFTS5Searcher(conn)
+	ctx := context.Background()
+
+	kbRoot := setupTestKB(t, map[string]string{
+		"kb/notes/alpha.md": "---\ntype: note\ntitle: Alpha Title\nsummary: Alpha summary\n---\nalpha body content\n",
+	})
+	if err := s.RebuildIndex(ctx, kbRoot); err != nil {
+		t.Fatalf("initial RebuildIndex failed: %v", err)
+	}
+
+	// beta.md sorts before the unreadable directory, so the failing walk indexes it
+	// before aborting.
+	if err := os.WriteFile(filepath.Join(kbRoot, "kb", "notes", "beta.md"), []byte("---\ntype: note\ntitle: Beta Title\nsummary: Beta summary\n---\nbeta body content\n"), 0600); err != nil {
+		t.Fatalf("WriteFile beta failed: %v", err)
+	}
+	lockedDir := filepath.Join(kbRoot, "kb", "zzz-locked")
+	if err := os.Mkdir(lockedDir, 0750); err != nil {
+		t.Fatalf("Mkdir locked dir failed: %v", err)
+	}
+	if err := os.Chmod(lockedDir, 0000); err != nil {
+		t.Fatalf("Chmod locked dir failed: %v", err)
+	}
+	// The directory is empty so that it can be removed without restoring its
+	// permissions first.
+	t.Cleanup(func() { _ = os.Remove(lockedDir) }) //nolint:errcheck // removal only needs write access to the parent directory
+
+	err := s.RebuildIndex(ctx, kbRoot)
+	if err == nil {
+		t.Fatal("RebuildIndex succeeded despite unreadable directory, want error")
+	}
+	if !strings.Contains(err.Error(), "walk kb directory") {
+		t.Errorf("RebuildIndex error = %v, want walk failure", err)
+	}
+
+	// The index built before the failed walk is still intact.
+	var docCount int
+	if err := conn.QueryRow("SELECT COUNT(*) FROM documents").Scan(&docCount); err != nil {
+		t.Fatalf("query documents: %v", err)
+	}
+	if docCount != 1 {
+		t.Errorf("expected 1 document after failed rebuild, got %d", docCount)
+	}
+	var path string
+	if err := conn.QueryRow("SELECT path FROM documents").Scan(&path); err != nil {
+		t.Fatalf("query document path: %v", err)
+	}
+	if path != "kb/notes/alpha.md" {
+		t.Errorf("expected document path %q, got %q", "kb/notes/alpha.md", path)
+	}
+
+	var pageCount int
+	if err := conn.QueryRow("SELECT COUNT(*) FROM pages").Scan(&pageCount); err != nil {
+		t.Fatalf("query pages: %v", err)
+	}
+	if pageCount != 1 {
+		t.Errorf("expected 1 page after failed rebuild, got %d", pageCount)
+	}
+
+	// Rows inserted by the aborted walk are gone.
+	for _, q := range []string{"documents", "pages"} {
+		var betaCount int
+		if err := conn.QueryRow("SELECT COUNT(*) FROM "+q+" WHERE path = ?", "kb/notes/beta.md").Scan(&betaCount); err != nil {
+			t.Fatalf("query %s for beta: %v", q, err)
+		}
+		if betaCount != 0 {
+			t.Errorf("expected beta.md to be absent from %s after failed rebuild, got %d rows", q, betaCount)
+		}
+	}
+
+	// The FTS table was dropped and recreated inside the rolled back transaction,
+	// so it must still serve the previously indexed content.
+	results, err := s.Search(ctx, "Alpha", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search after failed rebuild: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 search result after failed rebuild, got %d", len(results))
+	}
+	if results[0].Path != "kb/notes/alpha.md" {
+		t.Errorf("expected search result path %q, got %q", "kb/notes/alpha.md", results[0].Path)
+	}
+
+	betaResults, err := s.Search(ctx, "Beta", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search for beta after failed rebuild: %v", err)
+	}
+	if len(betaResults) != 0 {
+		t.Errorf("expected 0 search results for beta after failed rebuild, got %d", len(betaResults))
 	}
 }
 
