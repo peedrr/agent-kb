@@ -321,6 +321,10 @@ func runWrite(_ *cobra.Command, args []string) error {
 				return &internalError{err: fmt.Errorf("CEL engine error: %w", err)}
 			}
 
+			// The page content changes, so stamp the update time. old_page above
+			// comes from the on-disk page and keeps the pre-bump timestamp.
+			fm.Fields["updated"] = time.Now().UTC().Format(time.RFC3339)
+
 			newBody := string(body) + "\n" + string(stdinContent)
 
 			allFields := map[string]any{
@@ -366,21 +370,6 @@ func runWrite(_ *cobra.Command, args []string) error {
 					delete(fm.Fields, "is_draft")
 					needsReserialize = true
 				}
-			}
-
-			if needsReserialize {
-				allFields := map[string]any{
-					"type":  fm.Type,
-					"title": fm.Title,
-				}
-				for k, v := range fm.Fields {
-					allFields[k] = v
-				}
-				yamlBytes, err := yaml.Marshal(allFields)
-				if err != nil {
-					return fmt.Errorf("re-serialize frontmatter: %w", err)
-				}
-				writeContent = []byte("---\n" + string(yamlBytes) + "---\n" + string(body))
 			}
 
 			// Resolve type-derived directory
@@ -439,6 +428,31 @@ func runWrite(_ *cobra.Command, args []string) error {
 				relPath = filepath.Join("kb", cleanPath)
 			}
 			relPath = filepath.ToSlash(relPath)
+
+			// The update time moves on with a content change: overwriting an
+			// existing page always gets a fresh `updated`, while a new page only
+			// defaults it and keeps an explicit value from stdin.
+			_, statErr := os.Stat(fullPath)
+			_, hasUpdated := fm.Fields["updated"]
+			if statErr == nil || !hasUpdated {
+				fm.Fields["updated"] = time.Now().UTC().Format(time.RFC3339)
+				needsReserialize = true
+			}
+
+			if needsReserialize {
+				allFields := map[string]any{
+					"type":  fm.Type,
+					"title": fm.Title,
+				}
+				for k, v := range fm.Fields {
+					allFields[k] = v
+				}
+				yamlBytes, err := yaml.Marshal(allFields)
+				if err != nil {
+					return fmt.Errorf("re-serialize frontmatter: %w", err)
+				}
+				writeContent = []byte("---\n" + string(yamlBytes) + "---\n" + string(body))
+			}
 
 			// old_page is nil for new stdin writes
 			oldPage = nil
