@@ -52,6 +52,41 @@ Before performing ANY KB-related work, you MUST:
 
 If the request matches multiple triggers, prefer the one higher in the table.
 
+## Selecting the Knowledge Base
+
+`akb` keeps no stored default: every invocation resolves exactly one base.
+
+1. `--kb <path>` — the flag wins when it is passed.
+2. `AKB_KB=<path>` — the environment variable selects when the flag is absent.
+3. Neither — the command fails with a usage error (exit 2) that lists the
+   knowledge bases found near the working directory, nearest first.
+
+A path may be absolute, relative to the working directory, or start with `~`.
+
+```bash
+akb --kb "$HOME/kbs/notes" status   # flag: the base this invocation acts on
+AKB_KB="$HOME/kbs/notes" akb list   # environment: the base this shell acts on
+akb --kb . list                     # the base you are standing in
+```
+
+Find a base you do not know the path of:
+
+```bash
+akb discover          # bases near the working directory, nearest first
+akb discover ../work  # bases near another directory
+akb discover --json   # one object per base: name, path, and optional description
+```
+
+`akb discover` only reports; it never selects a base. Neither does `akb init`,
+which creates the base at `<working directory>/<name>` and leaves the selection
+to you.
+
+There is no registry and no "current KB": `akb use` and `akb registry` were
+removed, and a `~/.config/agent-kb/registry.yaml` left on disk is ignored (a
+one-line note is printed). Pass `--kb` on every invocation, or export `AKB_KB`
+for a session or directory (for example through direnv). Mutating commands echo
+the base they act on to stderr as `kb: <name> (<absolute path>)`.
+
 ## Constraints
 
 These rules apply to ALL KB operations. The reference files assume you know these.
@@ -68,6 +103,9 @@ These rules apply to ALL KB operations. The reference files assume you know thes
 ---
 
 ## Command Quick Reference
+
+Every command below is shown without its selection: pass `--kb <path>` or set
+`AKB_KB` (see *Selecting the Knowledge Base* above).
 
 | Operation | Command |
 |-----------|---------|
@@ -98,5 +136,4 @@ These rules apply to ALL KB operations. The reference files assume you know thes
 | Raw list | `akb raw list` |
 | Raw read | `akb raw read <path>` |
 | Raw delete | `akb raw delete <path>` |
-| Registry | `akb registry` |
-| Switch KB | `akb use <name>` |
+| Discover nearby KBs | `akb discover [dir] [--json]` |
