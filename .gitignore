@@ -55,3 +55,6 @@ ehthumbs.db
 
 .pi/*
 !.pi/exec-profile.md
+
+# coordinator runtime artifacts
+/err*.txt
