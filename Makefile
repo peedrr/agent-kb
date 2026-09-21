@@ -1,4 +1,4 @@
-.PHONY: build test lint clean
+.PHONY: build test lint clean release
 
 VERSION := 0.16.0
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -16,3 +16,10 @@ lint:
 
 clean:
 	rm -rf bin/
+
+# Release: verify the version string agrees across Makefile, flake.nix and
+# AGENTS.md, then tag the current commit. The guard runs first, so a mismatch
+# aborts before any tag is created.
+release:
+	scripts/check-version-lockstep.sh
+	git tag -a v$(VERSION) -m "akb v$(VERSION)"
