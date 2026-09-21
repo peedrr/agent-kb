@@ -4,9 +4,14 @@ package path
 import (
 	"errors"
 	"fmt"
+	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	yaml "github.com/goccy/go-yaml"
 )
 
 // KBEnvVar is the environment variable that selects the knowledge base when
@@ -127,7 +132,7 @@ func ResolveKB(flagKB string) (string, error) {
 		selected = strings.TrimSpace(os.Getenv(KBEnvVar))
 	}
 	if selected == "" {
-		if note := deprecatedRegistryNote(); note != "" {
+		if note := DeprecatedRegistryNote(); note != "" {
 			fmt.Fprintln(os.Stderr, note)
 		}
 		return "", &GuardError{rule: ErrNoKB}
@@ -161,11 +166,12 @@ func expandHome(p string) (string, error) {
 	return filepath.Join(home, p[2:]), nil
 }
 
-// deprecatedRegistryNote returns the one-line notice printed when a command ran
-// without a knowledge base selected while the removed registry file is still
-// on disk. The file is never read for resolution; its presence only triggers
-// the notice. It returns "" when there is nothing to note.
-func deprecatedRegistryNote() string {
+// DeprecatedRegistryNote returns the one-line notice printed when a command
+// ran without a knowledge base selected while the removed registry file is
+// still on disk, and when `akb discover` runs. The file is never read for
+// resolution; its presence only triggers the notice. It returns "" when there
+// is nothing to note.
+func DeprecatedRegistryNote() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
@@ -177,19 +183,18 @@ func deprecatedRegistryNote() string {
 	return fmt.Sprintf("note: %s is no longer used; select a knowledge base with --kb or the %s environment variable", registryPath, KBEnvVar)
 }
 
-// KBRoot finds the KB root by walking up from cwd looking for .akb directory.
-func KBRoot() (string, error) {
-	// Start from current working directory
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("get working directory: %w", err)
-	}
+// KBRoot reports the root of the knowledge base that dir belongs to: dir
+// itself when it holds a .akb directory, otherwise the nearest ancestor that
+// does. It reports an error when no directory from dir up to the filesystem
+// root holds one. A directory is a knowledge base root exactly when KBRoot
+// reports the directory itself, which is how a discovery scan detects the
+// .akb/ marker.
+func KBRoot(dir string) (string, error) {
+	dir = filepath.Clean(dir)
 
 	// Walk up the directory tree
 	for {
-		// Check for .akb directory
-		akbDir := filepath.Join(dir, ".akb")
-		if info, err := os.Stat(akbDir); err == nil && info.IsDir() {
+		if isKBRoot(dir) {
 			return dir, nil
 		}
 
@@ -203,4 +208,233 @@ func KBRoot() (string, error) {
 	}
 
 	return "", errors.New("not in a knowledge base directory (no .akb/ found)")
+}
+
+// isKBRoot reports whether dir itself holds the .akb directory that marks a
+// knowledge base root.
+func isKBRoot(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, ".akb"))
+	return err == nil && info.IsDir()
+}
+
+// Discovery bounds: the scan checks every directory it visits for the .akb/
+// marker, descends to discoverDepth levels below each visited directory, and
+// stops after discoverBudget filesystem entries, so a deep or crowded tree
+// cannot make an invocation crawl.
+const (
+	discoverDepth  = 2
+	discoverBudget = 1000
+)
+
+// discoverSkipDirs names the directories the scan never descends into or
+// records: repository and dependency internals rather than knowledge bases
+// users address. Hidden directories are skipped for the same reason, next to
+// these names.
+var discoverSkipDirs = map[string]bool{
+	".git":         true,
+	"node_modules": true,
+	"vendor":       true,
+}
+
+// DiscoveredKB reports one knowledge base found by a discovery scan.
+type DiscoveredKB struct {
+	Name        string `json:"name"`
+	Path        string `json:"path"`
+	Description string `json:"description,omitempty"`
+}
+
+// Discover reports the knowledge bases in the neighborhood of root: root
+// itself, the directories below it to two levels, and the same for every
+// ancestor up to the home directory — or, when root does not live below it, up
+// to the filesystem root. Hidden directories and the .git, node_modules, and
+// vendor directories are skipped, and the walk stops after a fixed entry
+// budget.
+//
+// Entries come nearest-first, by their distance in path components from root
+// and then by path, so the base a caller stands in is reported before the ones
+// further out. Discovery is read-only and never selects a base: callers
+// address what it finds with --kb or AKB_KB.
+func Discover(root string) []DiscoveredKB {
+	// Distances and the home boundary compare between absolute paths, so a
+	// relative root is resolved against the working directory first.
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	} else {
+		root = filepath.Clean(root)
+	}
+
+	candidates := map[string]int{}
+	remaining := discoverBudget
+	for _, anchor := range discoverAnchors(root) {
+		walkDiscoveryAnchor(anchor, root, candidates, &remaining)
+		if remaining <= 0 {
+			break
+		}
+	}
+
+	type ranked struct {
+		kb       DiscoveredKB
+		distance int
+	}
+	found := make([]ranked, 0, len(candidates))
+	for dir, distance := range candidates {
+		// A directory is a knowledge base root when it is its own KBRoot: a
+		// directory that merely lives inside a base is not reported.
+		kbRoot, err := KBRoot(dir)
+		if err != nil || kbRoot != dir {
+			continue
+		}
+
+		name, description := readKBMetadata(dir)
+		found = append(found, ranked{
+			kb:       DiscoveredKB{Name: name, Path: dir, Description: description},
+			distance: distance,
+		})
+	}
+
+	sort.Slice(found, func(i, j int) bool {
+		if found[i].distance != found[j].distance {
+			return found[i].distance < found[j].distance
+		}
+		return found[i].kb.Path < found[j].kb.Path
+	})
+
+	discovered := make([]DiscoveredKB, 0, len(found))
+	for _, entry := range found {
+		discovered = append(discovered, entry.kb)
+	}
+	return discovered
+}
+
+// discoverAnchors lists the directories whose neighborhoods a scan covers:
+// root and every ancestor up to the home directory, or up to the filesystem
+// root when the home directory does not contain root.
+func discoverAnchors(root string) []string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = ""
+	}
+
+	anchors := make([]string, 0, 8)
+	for dir := root; ; {
+		anchors = append(anchors, dir)
+
+		if dir == home {
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return anchors
+}
+
+// walkDiscoveryAnchor visits the directories in anchor's neighborhood: anchor
+// itself and its descendants to discoverDepth levels. Every visited directory
+// becomes a candidate at its distance from root, skipped names are neither
+// recorded nor descended into, and the shared budget stops the walk once the
+// scan has seen enough entries.
+func walkDiscoveryAnchor(anchor, root string, candidates map[string]int, remaining *int) {
+	// WalkDir reports per-entry problems to the callback and returns only the
+	// callback's own result, which is always nil here.
+	_ = filepath.WalkDir(anchor, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			// An unreadable branch is skipped, not reported: the scan informs,
+			// so it must not fail an invocation.
+			if entry != nil && entry.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+
+		if *remaining <= 0 {
+			return fs.SkipAll
+		}
+		*remaining--
+
+		if !entry.IsDir() {
+			return nil
+		}
+		if path != anchor && isDiscoverSkip(entry.Name()) {
+			return fs.SkipDir
+		}
+
+		distance := pathDistance(root, path)
+		if current, ok := candidates[path]; !ok || distance < current {
+			candidates[path] = distance
+		}
+
+		if pathDistance(anchor, path) >= discoverDepth {
+			return fs.SkipDir
+		}
+		return nil
+	})
+}
+
+// isDiscoverSkip reports whether a discovery scan avoids the directory with
+// this name: repository and dependency internals, plus hidden directories.
+func isDiscoverSkip(name string) bool {
+	return discoverSkipDirs[name] || strings.HasPrefix(name, ".")
+}
+
+// pathDistance counts the path components between two directories: 0 when they
+// name the same directory, 1 for a directory and its direct child, and so on.
+// Paths the platform cannot relate sort last.
+func pathDistance(from, to string) int {
+	rel, err := filepath.Rel(from, to)
+	if err != nil {
+		return math.MaxInt
+	}
+	if rel == "." {
+		return 0
+	}
+	return len(strings.Split(rel, string(filepath.Separator)))
+}
+
+// kbMetadata is the part of a knowledge base's .akb.yaml that discovery
+// reports.
+type kbMetadata struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+}
+
+// readKBMetadata reads the name and optional description a knowledge base
+// reports about itself. A base whose config is missing, unreadable, or without
+// a name is still reported, under its directory name: discovery informs, so a
+// torn config must not hide the base.
+func readKBMetadata(root string) (name, description string) {
+	data, err := os.ReadFile(filepath.Join(root, ".akb", ".akb.yaml")) //nolint:gosec // KB root supplied by the scan
+	if err == nil {
+		var metadata kbMetadata
+		if err := yaml.Unmarshal(data, &metadata); err == nil {
+			name = strings.TrimSpace(metadata.Name)
+			description = strings.TrimSpace(metadata.Description)
+		}
+	}
+	if name == "" {
+		name = filepath.Base(root)
+	}
+	return name, description
+}
+
+// FormatDiscovered renders discovered knowledge bases, nearest first, as the
+// listing a human reads. It is the single spelling of that listing, shared by
+// the no-selection usage error and `akb discover`.
+func FormatDiscovered(discovered []DiscoveredKB) string {
+	var b strings.Builder
+	b.WriteString("discovered knowledge bases (nearest first):")
+	for _, kb := range discovered {
+		b.WriteString("\n  ")
+		b.WriteString(kb.Name)
+		b.WriteString("  ")
+		b.WriteString(kb.Path)
+		if kb.Description != "" {
+			b.WriteString("  ")
+			b.WriteString(kb.Description)
+		}
+	}
+	b.WriteString("\n\nselect one with --kb <path> or AKB_KB=<path>")
+	return b.String()
 }

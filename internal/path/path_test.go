@@ -2,9 +2,12 @@ package path
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -318,85 +321,52 @@ func TestResolveRawPath(t *testing.T) {
 }
 
 func TestKBRoot(t *testing.T) {
-	// Create temp directory structure for testing
-	tmpDir, err := os.MkdirTemp("", "kb-test")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
-
-	// Test case: KB root found with .akb directory
-	t.Run("finds .akb directory", func(t *testing.T) {
-		workDir, err := os.MkdirTemp(tmpDir, "work")
-		if err != nil {
-			t.Fatalf("failed to create work dir: %v", err)
-		}
-
-		akbDir := filepath.Join(workDir, ".akb")
-		if err := os.MkdirAll(akbDir, 0750); err != nil {
+	t.Run("reports a directory that holds .akb", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, ".akb"), 0750); err != nil {
 			t.Fatalf("failed to create .akb dir: %v", err)
 		}
 
-		if err := os.Chdir(workDir); err != nil {
-			t.Fatalf("failed to chdir: %v", err)
-		}
-
-		root, err := KBRoot()
+		got, err := KBRoot(root)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if root != workDir {
-			t.Fatalf("expected %q but got %q", workDir, root)
+		if got != root {
+			t.Fatalf("expected %q but got %q", root, got)
 		}
 	})
 
-	// Test case: KB root NOT found
-	t.Run("not found returns error", func(t *testing.T) {
-		workDir, err := os.MkdirTemp(tmpDir, "work3")
+	t.Run("reports the nearest ancestor that holds .akb", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, ".akb"), 0750); err != nil {
+			t.Fatalf("failed to create .akb dir: %v", err)
+		}
+		subDir := filepath.Join(root, "docs", "notes")
+		if err := os.MkdirAll(subDir, 0750); err != nil {
+			t.Fatalf("failed to create sub dir: %v", err)
+		}
+
+		got, err := KBRoot(subDir)
 		if err != nil {
-			t.Fatalf("failed to create work dir: %v", err)
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != root {
+			t.Fatalf("expected %q but got %q", root, got)
+		}
+	})
+
+	t.Run("not found returns error", func(t *testing.T) {
+		subDir := filepath.Join(t.TempDir(), "plain")
+		if err := os.MkdirAll(subDir, 0750); err != nil {
+			t.Fatalf("failed to create sub dir: %v", err)
 		}
 
-		if err := os.Chdir(workDir); err != nil {
-			t.Fatalf("failed to chdir: %v", err)
-		}
-
-		_, err = KBRoot()
+		_, err := KBRoot(subDir)
 		if err == nil {
 			t.Fatalf("expected error but got nil")
 		}
 		if !strings.Contains(err.Error(), "not in a knowledge base") {
 			t.Errorf("error should contain 'not in a knowledge base', got: %v", err)
-		}
-	})
-
-	// Test case: finds root in parent directory
-	t.Run("finds root in parent directory", func(t *testing.T) {
-		parentDir, err := os.MkdirTemp(tmpDir, "parent")
-		if err != nil {
-			t.Fatalf("failed to create parent dir: %v", err)
-		}
-
-		subDir := filepath.Join(parentDir, "sub")
-		if err := os.MkdirAll(subDir, 0750); err != nil {
-			t.Fatalf("failed to create sub dir: %v", err)
-		}
-
-		akbDir := filepath.Join(parentDir, ".akb")
-		if err := os.MkdirAll(akbDir, 0750); err != nil {
-			t.Fatalf("failed to create .akb dir: %v", err)
-		}
-
-		if err := os.Chdir(subDir); err != nil {
-			t.Fatalf("failed to chdir: %v", err)
-		}
-
-		root, err := KBRoot()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if root != parentDir {
-			t.Fatalf("expected %q but got %q", parentDir, root)
 		}
 	})
 }
@@ -572,4 +542,174 @@ func captureStderr(t *testing.T, fn func()) string {
 		t.Fatalf("read stderr pipe: %v", err)
 	}
 	return string(data)
+}
+
+// scanEnvironment isolates a discovery scan in a temporary tree: home is the
+// boundary the scan stops at and work is the directory it runs from, so the
+// tree below home is the whole scan region.
+func scanEnvironment(t *testing.T) (home, work string) {
+	t.Helper()
+
+	home = t.TempDir()
+	work = filepath.Join(home, "work")
+	if err := os.MkdirAll(work, 0750); err != nil {
+		t.Fatalf("create work directory: %v", err)
+	}
+	t.Setenv("HOME", home)
+	t.Chdir(work)
+	return home, work
+}
+
+// makeKBFixture creates a minimal knowledge base in dir: the .akb directory
+// that marks a root, plus a config when one is given.
+func makeKBFixture(t *testing.T, dir, config string) {
+	t.Helper()
+
+	if err := os.MkdirAll(filepath.Join(dir, ".akb"), 0750); err != nil {
+		t.Fatalf("create .akb directory: %v", err)
+	}
+	if config == "" {
+		return
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".akb", ".akb.yaml"), []byte(config), 0600); err != nil {
+		t.Fatalf("write .akb.yaml: %v", err)
+	}
+}
+
+// treeSnapshot records every path below root with its size and modification
+// time, so a test can pin that a read-only scan changed nothing.
+func treeSnapshot(t *testing.T, root string) map[string]string {
+	t.Helper()
+
+	snapshot := map[string]string{}
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		snapshot[path] = fmt.Sprintf("%d %s", info.Size(), info.ModTime())
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("snapshot %s: %v", root, err)
+	}
+	return snapshot
+}
+
+func TestDiscoverReportsNearestFirst(t *testing.T) {
+	_, work := scanEnvironment(t)
+
+	// A base nested two levels below the scan root, one one level below, and
+	// one beside the parent of the scan root.
+	makeKBFixture(t, filepath.Join(work, "docs", "kb"), "name: nested\ndescription: nested base\n")
+	makeKBFixture(t, filepath.Join(work, "project"), "name: project\n")
+	makeKBFixture(t, filepath.Join(filepath.Dir(work), "project-kb"), "name: project-kb\n")
+
+	got := Discover(work)
+	want := []DiscoveredKB{
+		{Name: "project", Path: filepath.Join(work, "project")},
+		{Name: "project-kb", Path: filepath.Join(filepath.Dir(work), "project-kb")},
+		{Name: "nested", Path: filepath.Join(work, "docs", "kb"), Description: "nested base"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Discover = %#v, want %#v", got, want)
+	}
+}
+
+func TestDiscoverResolvesRelativeRoots(t *testing.T) {
+	_, work := scanEnvironment(t)
+
+	makeKBFixture(t, filepath.Join(work, "kb"), "name: kb\n")
+
+	got := Discover(".")
+	want := []DiscoveredKB{{Name: "kb", Path: filepath.Join(work, "kb")}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Discover = %#v, want %#v", got, want)
+	}
+}
+
+func TestDiscoverSkipsInternalAndHiddenDirs(t *testing.T) {
+	_, work := scanEnvironment(t)
+
+	makeKBFixture(t, filepath.Join(work, "visible"), "name: visible\n")
+	for _, name := range []string{".git", "node_modules", "vendor", ".hidden"} {
+		makeKBFixture(t, filepath.Join(work, name, "hidden-kb"), "name: hidden-kb\n")
+	}
+
+	got := Discover(work)
+	want := []DiscoveredKB{{Name: "visible", Path: filepath.Join(work, "visible")}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Discover = %#v, want %#v", got, want)
+	}
+}
+
+func TestDiscoverRespectsEntryBudget(t *testing.T) {
+	_, work := scanEnvironment(t)
+
+	makeKBFixture(t, filepath.Join(work, "0-first"), "name: first\n")
+
+	crowded := filepath.Join(work, "a-crowded")
+	if err := os.MkdirAll(crowded, 0750); err != nil {
+		t.Fatalf("create crowded directory: %v", err)
+	}
+	for i := 0; i <= discoverBudget; i++ {
+		name := filepath.Join(crowded, fmt.Sprintf("entry-%04d", i))
+		if err := os.WriteFile(name, nil, 0600); err != nil {
+			t.Fatalf("create budget entry: %v", err)
+		}
+	}
+
+	makeKBFixture(t, filepath.Join(work, "z-last"), "name: last\n")
+
+	got := Discover(work)
+	foundFirst := false
+	for _, kb := range got {
+		if kb.Path == filepath.Join(work, "z-last") {
+			t.Errorf("Discover reported %q past its %d-entry budget", kb.Path, discoverBudget)
+		}
+		if kb.Path == filepath.Join(work, "0-first") {
+			foundFirst = true
+		}
+	}
+	if !foundFirst {
+		t.Errorf("Discover = %#v, want the base visited before the crowded directory", got)
+	}
+}
+
+func TestDiscoverReadsNameAndDescription(t *testing.T) {
+	_, work := scanEnvironment(t)
+
+	makeKBFixture(t, filepath.Join(work, "named"), "name: named-kb\ndescription: a named base\n")
+	makeKBFixture(t, filepath.Join(work, "no-description"), "name: bare\n")
+	makeKBFixture(t, filepath.Join(work, "no-config"), "")
+
+	got := Discover(work)
+	want := []DiscoveredKB{
+		{Name: "named-kb", Path: filepath.Join(work, "named"), Description: "a named base"},
+		{Name: "no-config", Path: filepath.Join(work, "no-config")},
+		{Name: "bare", Path: filepath.Join(work, "no-description")},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Discover = %#v, want %#v", got, want)
+	}
+}
+
+func TestDiscoverLeavesTheTreeUnchanged(t *testing.T) {
+	_, work := scanEnvironment(t)
+
+	makeKBFixture(t, filepath.Join(work, "kb"), "name: kb\n")
+	if err := os.WriteFile(filepath.Join(work, "kb", "note.md"), []byte("body\n"), 0600); err != nil {
+		t.Fatalf("create page: %v", err)
+	}
+
+	before := treeSnapshot(t, work)
+	Discover(work)
+	after := treeSnapshot(t, work)
+
+	if !reflect.DeepEqual(before, after) {
+		t.Errorf("Discover changed the tree:\nbefore: %v\nafter:  %v", before, after)
+	}
 }
