@@ -4,8 +4,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 
 	"github.com/peedrr/agent-kb/internal/path"
 )
@@ -43,6 +47,34 @@ func captureStderr(t *testing.T, fn func()) string {
 		t.Fatalf("read stderr pipe: %v", err)
 	}
 	return string(data)
+}
+
+// resolveCommandPath walks the registered command tree from RootCmd down a
+// space-separated command path and returns the command it names, failing the
+// test when a segment matches no registered command.
+func resolveCommandPath(t *testing.T, commandPath string) *cobra.Command {
+	t.Helper()
+
+	segments := strings.Fields(commandPath)
+	if len(segments) == 0 || segments[0] != RootCmd.Name() {
+		t.Fatalf("command path %q does not start at the root command %q", commandPath, RootCmd.Name())
+	}
+
+	cmd := RootCmd
+	for _, segment := range segments[1:] {
+		var next *cobra.Command
+		for _, sub := range cmd.Commands() {
+			if sub.Name() == segment {
+				next = sub
+				break
+			}
+		}
+		if next == nil {
+			t.Fatalf("command path %q: no registered command named %q under %q", commandPath, segment, cmd.CommandPath())
+		}
+		cmd = next
+	}
+	return cmd
 }
 
 func TestKBFlagSelectsKnowledgeBase(t *testing.T) {
@@ -132,6 +164,48 @@ func TestCommandsOutsideAKnowledgeBaseReportNothing(t *testing.T) {
 	})
 	if stderr != "" {
 		t.Errorf("stderr = %q, want no identity line", stderr)
+	}
+}
+
+// TestMutatingCommandsMatchRegisteredTree pins the hand-maintained
+// mutatingCommands map against the registered command tree: the key set must
+// equal the expected list and every key must resolve to a registered command
+// with a RunE. Renaming a command's Use string, restructuring the tree, or
+// adding a mutating command without updating the map fails here instead of
+// silently dropping the stderr identity line.
+func TestMutatingCommandsMatchRegisteredTree(t *testing.T) {
+	expected := []string{
+		"akb write",
+		"akb append",
+		"akb delete",
+		"akb approve",
+		"akb index add",
+		"akb index remove",
+		"akb index rebuild",
+		"akb log append",
+		"akb raw write",
+		"akb raw delete",
+		"akb raw sync",
+		"akb template write",
+		"akb template delete",
+	}
+
+	got := make([]string, 0, len(mutatingCommands))
+	for commandPath := range mutatingCommands {
+		got = append(got, commandPath)
+	}
+	sort.Strings(got)
+
+	want := append([]string(nil), expected...)
+	sort.Strings(want)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("mutatingCommands keys = %v, want %v", got, want)
+	}
+
+	for _, commandPath := range got {
+		if cmd := resolveCommandPath(t, commandPath); cmd.RunE == nil {
+			t.Errorf("mutating command %q has no RunE, so the identity hook cannot run", commandPath)
+		}
 	}
 }
 
