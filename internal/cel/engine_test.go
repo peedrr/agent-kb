@@ -141,6 +141,78 @@ func TestCostLimit(t *testing.T) {
 	}
 }
 
+// tripleHeadingsRule scans every triple of headings and its predicate is never
+// satisfied, so its evaluation cost grows cubically with the heading count.
+const tripleHeadingsRule = "page.ast.headings.exists(a, page.ast.headings.exists(b, page.ast.headings.exists(c, a.level == 0 && b.level == 0 && c.level == 0)))"
+
+// tripleHeadingsVars builds a page whose heading list makes tripleHeadingsRule
+// exhaustively expensive: n headings cost n*n*n evaluated triples.
+func tripleHeadingsVars(n int) map[string]any {
+	headings := make([]any, n)
+	for i := range headings {
+		headings[i] = map[string]any{"level": i%6 + 1}
+	}
+	return map[string]any{
+		"page": map[string]any{
+			"ast": map[string]any{"headings": headings},
+		},
+	}
+}
+
+func TestCompileRuleCostLimit(t *testing.T) {
+	env, err := NewEnv()
+	if err != nil {
+		t.Fatalf("NewEnv: %v", err)
+	}
+
+	t.Run("pathological rule", func(t *testing.T) {
+		prg, err := CompileRule(env, tripleHeadingsRule)
+		if err != nil {
+			t.Fatalf("CompileRule: %v", err)
+		}
+
+		evaluated := make(chan error, 1)
+		go func() {
+			_, err := Evaluate(context.Background(), prg, tripleHeadingsVars(2048), MaxCostLimit)
+			evaluated <- err
+		}()
+
+		select {
+		case err := <-evaluated:
+			if err == nil {
+				t.Fatal("rule evaluated without hitting the compiled cost budget")
+			}
+			if want := "exceeded compute budget"; err.Error() != want {
+				t.Errorf("error = %q, want %q", err.Error(), want)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("rule did not stop at the cost budget: still evaluating after 10s")
+		}
+	})
+
+	t.Run("tiny budget", func(t *testing.T) {
+		ast, issues := env.Compile(tripleHeadingsRule)
+		if issues != nil && issues.Err() != nil {
+			t.Fatalf("Compile: %v", issues.Err())
+		}
+
+		const tinyCostLimit = 1
+		prg, err := env.Program(ast, cel.CostLimit(tinyCostLimit))
+		if err != nil {
+			t.Fatalf("Program: %v", err)
+		}
+
+		_, err = Evaluate(context.Background(), prg, tripleHeadingsVars(16), tinyCostLimit)
+		if err == nil {
+			t.Fatal("expected error for cost limit exceeded")
+		}
+		want := "exceeded compute budget"
+		if err.Error() != want {
+			t.Errorf("error = %q, want %q", err.Error(), want)
+		}
+	})
+}
+
 type panicProgram struct {
 	panicWith any
 }
