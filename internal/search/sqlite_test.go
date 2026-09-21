@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/peedrr/agent-kb/internal/db"
+	"github.com/peedrr/agent-kb/internal/linkgraph"
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
@@ -620,5 +621,224 @@ func TestSQLiteFTS5Searcher_Search_NoResults(t *testing.T) {
 	}
 	if len(results) != 0 {
 		t.Errorf("expected 0 results for nonexistent query, got %d", len(results))
+	}
+}
+
+func TestSQLiteFTS5Searcher_IndexPageTx_CommitsWithLinkGraphStep(t *testing.T) {
+	conn := setupTestDB(t)
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
+	s := NewSQLiteFTS5Searcher(conn)
+	g := linkgraph.NewSQLiteLinkGraph(conn)
+	ctx := context.Background()
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("BeginTx failed: %v", err)
+	}
+
+	// First step: the search index records the page on the shared transaction.
+	if err := s.IndexPageTx(ctx, tx, "kb/notes/alpha.md", "Alpha Title", "alpha body content", "tag1", "alpha summary", "note"); err != nil {
+		t.Fatalf("IndexPageTx failed: %v", err)
+	}
+	// Second step: the link graph records the page's links on the same transaction.
+	if err := g.UpdatePageLinksTx(ctx, tx, "kb/notes/alpha.md", "See [[beta]] for details."); err != nil {
+		t.Fatalf("UpdatePageLinksTx failed: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("Commit failed: %v", err)
+	}
+
+	var docCount int
+	if err := conn.QueryRow("SELECT COUNT(*) FROM documents WHERE path = ?", "kb/notes/alpha.md").Scan(&docCount); err != nil {
+		t.Fatalf("query documents: %v", err)
+	}
+	if docCount != 1 {
+		t.Errorf("expected 1 document after commit, got %d", docCount)
+	}
+
+	results, err := s.Search(ctx, "Alpha", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 search result after commit, got %d", len(results))
+	}
+	if results[0].Path != "kb/notes/alpha.md" {
+		t.Errorf("search result path = %q, want %q", results[0].Path, "kb/notes/alpha.md")
+	}
+
+	links, err := g.GetOutboundLinks(ctx, "kb/notes/alpha.md")
+	if err != nil {
+		t.Fatalf("GetOutboundLinks failed: %v", err)
+	}
+	if len(links) != 1 {
+		t.Fatalf("expected 1 outbound link after commit, got %d", len(links))
+	}
+	if links[0].RawTarget != "beta" {
+		t.Errorf("link raw target = %q, want %q", links[0].RawTarget, "beta")
+	}
+}
+
+func TestSQLiteFTS5Searcher_IndexPageTx_RollsBackWhenLinkGraphStepFails(t *testing.T) {
+	conn := setupTestDB(t)
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
+	s := NewSQLiteFTS5Searcher(conn)
+	g := linkgraph.NewSQLiteLinkGraph(conn)
+	ctx := context.Background()
+
+	// Pre-command state: the page is indexed with its original content.
+	if err := s.IndexPage(ctx, "kb/notes/alpha.md", "Alpha Title", "alpha original body", "tag1", "alpha summary", "note"); err != nil {
+		t.Fatalf("IndexPage failed: %v", err)
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("BeginTx failed: %v", err)
+	}
+
+	// First step: the rewritten page is visible on the shared transaction.
+	if err := s.IndexPageTx(ctx, tx, "kb/notes/alpha.md", "Alpha Rewritten", "alpha rewritten body", "tag2", "alpha summary", "note"); err != nil {
+		t.Fatalf("IndexPageTx failed: %v", err)
+	}
+	var pendingTitle string
+	if err := tx.QueryRowContext(ctx, "SELECT title FROM documents WHERE path = ?", "kb/notes/alpha.md").Scan(&pendingTitle); err != nil {
+		t.Fatalf("query document inside transaction: %v", err)
+	}
+	if pendingTitle != "Alpha Rewritten" {
+		t.Errorf("pending title = %q, want %q", pendingTitle, "Alpha Rewritten")
+	}
+
+	// Second step fails: its table is dropped inside the transaction, so the
+	// link-graph step errors on a real SQL statement.
+	if _, err := tx.ExecContext(ctx, "DROP TABLE links"); err != nil {
+		t.Fatalf("drop links table: %v", err)
+	}
+	err = g.UpdatePageLinksTx(ctx, tx, "kb/notes/alpha.md", "See [[alpha]] for details.")
+	if err == nil {
+		t.Fatal("expected the link-graph step to fail without its table, got nil error")
+	}
+	if !strings.Contains(err.Error(), "no such table: links") {
+		t.Errorf("link-graph step error = %v, want missing links table", err)
+	}
+
+	// The caller rolls the shared transaction back.
+	if err := tx.Rollback(); err != nil {
+		t.Fatalf("Rollback failed: %v", err)
+	}
+
+	// The search index is back to the pre-command state.
+	var title, content string
+	if err := conn.QueryRow("SELECT title, content FROM documents WHERE path = ?", "kb/notes/alpha.md").Scan(&title, &content); err != nil {
+		t.Fatalf("query document after rollback: %v", err)
+	}
+	if title != "Alpha Title" || content != "alpha original body" {
+		t.Errorf("document after rollback = (%q, %q), want pre-command (%q, %q)", title, content, "Alpha Title", "alpha original body")
+	}
+
+	// The dropped table came back with the rollback, without the aborted step's rows.
+	var linkCount int
+	if err := conn.QueryRow("SELECT COUNT(*) FROM links").Scan(&linkCount); err != nil {
+		t.Fatalf("query links after rollback: %v", err)
+	}
+	if linkCount != 0 {
+		t.Errorf("expected 0 links after rollback, got %d", linkCount)
+	}
+
+	// The full-text content matches the rolled back row, not the pending rewrite.
+	results, err := s.Search(ctx, "original", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Errorf("expected 1 search result for the pre-command body, got %d", len(results))
+	}
+	rewritten, err := s.Search(ctx, "rewritten", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if len(rewritten) != 0 {
+		t.Errorf("expected 0 search results for the rolled back body, got %d", len(rewritten))
+	}
+}
+
+func TestSQLiteFTS5Searcher_RemovePageTx_RollsBackWhenLinkGraphStepFails(t *testing.T) {
+	conn := setupTestDB(t)
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
+	s := NewSQLiteFTS5Searcher(conn)
+	g := linkgraph.NewSQLiteLinkGraph(conn)
+	ctx := context.Background()
+
+	// Pre-command state: the page is in both indexes with one outgoing link.
+	if err := s.IndexPage(ctx, "kb/notes/alpha.md", "Alpha Title", "alpha body content", "tag1", "alpha summary", "note"); err != nil {
+		t.Fatalf("IndexPage failed: %v", err)
+	}
+	if err := g.UpdatePageLinks(ctx, "kb/notes/alpha.md", "See [[beta]] for details."); err != nil {
+		t.Fatalf("UpdatePageLinks failed: %v", err)
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("BeginTx failed: %v", err)
+	}
+
+	// First step: the page is gone from the search index on the shared transaction.
+	if err := s.RemovePageTx(ctx, tx, "kb/notes/alpha.md"); err != nil {
+		t.Fatalf("RemovePageTx failed: %v", err)
+	}
+	var pendingCount int
+	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM documents WHERE path = ?", "kb/notes/alpha.md").Scan(&pendingCount); err != nil {
+		t.Fatalf("query document inside transaction: %v", err)
+	}
+	if pendingCount != 0 {
+		t.Errorf("expected the page to be gone inside the transaction, got %d documents", pendingCount)
+	}
+
+	// Second step fails: its table is dropped inside the transaction, so the
+	// link-graph removal errors on a real SQL statement.
+	if _, err := tx.ExecContext(ctx, "DROP TABLE links"); err != nil {
+		t.Fatalf("drop links table: %v", err)
+	}
+	err = g.RemovePageTx(ctx, tx, "kb/notes/alpha.md")
+	if err == nil {
+		t.Fatal("expected the link-graph removal to fail without its table, got nil error")
+	}
+	if !strings.Contains(err.Error(), "no such table: links") {
+		t.Errorf("link-graph removal error = %v, want missing links table", err)
+	}
+
+	// The caller rolls the shared transaction back.
+	if err := tx.Rollback(); err != nil {
+		t.Fatalf("Rollback failed: %v", err)
+	}
+
+	// Both index structures are back to the pre-command state.
+	results, err := s.Search(ctx, "Alpha", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 search result after rollback, got %d", len(results))
+	}
+	if results[0].Path != "kb/notes/alpha.md" {
+		t.Errorf("search result path = %q, want %q", results[0].Path, "kb/notes/alpha.md")
+	}
+
+	links, err := g.GetOutboundLinks(ctx, "kb/notes/alpha.md")
+	if err != nil {
+		t.Fatalf("GetOutboundLinks failed: %v", err)
+	}
+	if len(links) != 1 {
+		t.Fatalf("expected 1 outbound link after rollback, got %d", len(links))
+	}
+	if links[0].RawTarget != "beta" {
+		t.Errorf("link raw target = %q, want %q", links[0].RawTarget, "beta")
+	}
+
+	var pageCount int
+	if err := conn.QueryRow("SELECT COUNT(*) FROM pages WHERE path = ?", "kb/notes/alpha.md").Scan(&pageCount); err != nil {
+		t.Fatalf("query pages after rollback: %v", err)
+	}
+	if pageCount != 1 {
+		t.Errorf("expected 1 page row after rollback, got %d", pageCount)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/peedrr/agent-kb/internal/db"
+	"github.com/peedrr/agent-kb/internal/search"
 )
 
 func setupTestDB(t *testing.T) *sql.DB {
@@ -600,4 +601,243 @@ func TestSQLiteLinkGraph_RebuildLinks_RollsBackPriorLinksOnWalkFailure(t *testin
 
 func TestSQLiteLinkGraph_ImplementsInterface(_ *testing.T) {
 	var _ Updater = (*SQLiteLinkGraph)(nil)
+}
+
+func TestSQLiteLinkGraph_UpdatePageLinksTx_CommitsWithSearchStep(t *testing.T) {
+	d := setupTestDB(t)
+	g := NewSQLiteLinkGraph(d)
+	s := search.NewSQLiteFTS5Searcher(d)
+	ctx := context.Background()
+
+	insertPage(t, d, "kb/notes/aaa-target.md")
+
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("BeginTx: %v", err)
+	}
+
+	// First step: the link graph records the page's links on the shared transaction.
+	if err := g.UpdatePageLinksTx(ctx, tx, "kb/notes/mmm-source.md", "See [[aaa-target]] for details."); err != nil {
+		t.Fatalf("UpdatePageLinksTx: %v", err)
+	}
+	// Second step: the search index records the same page on the same transaction.
+	if err := s.IndexPageTx(ctx, tx, "kb/notes/mmm-source.md", "Source Title", "source body content", "tag1", "source summary", "note"); err != nil {
+		t.Fatalf("IndexPageTx: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+
+	links, err := g.GetOutboundLinks(ctx, "kb/notes/mmm-source.md")
+	if err != nil {
+		t.Fatalf("GetOutboundLinks: %v", err)
+	}
+	if len(links) != 1 {
+		t.Fatalf("len(links) = %d after commit, want 1", len(links))
+	}
+	if links[0].ResolvedTo != "kb/notes/aaa-target.md" {
+		t.Errorf("ResolvedTo = %q after commit, want %q", links[0].ResolvedTo, "kb/notes/aaa-target.md")
+	}
+
+	results, err := s.Search(ctx, "Source", search.SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d after commit, want 1", len(results))
+	}
+	if results[0].Path != "kb/notes/mmm-source.md" {
+		t.Errorf("search result path = %q after commit, want %q", results[0].Path, "kb/notes/mmm-source.md")
+	}
+}
+
+func TestSQLiteLinkGraph_UpdatePageLinksTx_RollsBackWhenSearchStepFails(t *testing.T) {
+	d := setupTestDB(t)
+	g := NewSQLiteLinkGraph(d)
+	s := search.NewSQLiteFTS5Searcher(d)
+	ctx := context.Background()
+
+	// Pre-command state: a resolved target, a source page linking to it, and one
+	// indexed page.
+	insertPage(t, d, "kb/notes/aaa-target.md")
+	insertPage(t, d, "kb/notes/bbb-target.md")
+	if err := g.UpdatePageLinks(ctx, "kb/notes/mmm-source.md", "See [[aaa-target]] for details."); err != nil {
+		t.Fatalf("UpdatePageLinks: %v", err)
+	}
+	if err := s.IndexPage(ctx, "kb/notes/zzz-report.md", "Report Title", "report body content", "tag1", "report summary", "note"); err != nil {
+		t.Fatalf("IndexPage: %v", err)
+	}
+
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("BeginTx: %v", err)
+	}
+
+	// First step: the link graph re-resolves the source page on the shared transaction.
+	if err := g.UpdatePageLinksTx(ctx, tx, "kb/notes/mmm-source.md", "See [[bbb-target]] now."); err != nil {
+		t.Fatalf("UpdatePageLinksTx: %v", err)
+	}
+	var pendingTarget string
+	if err := tx.QueryRowContext(ctx, "SELECT raw_target FROM links WHERE source_page = ?", "kb/notes/mmm-source.md").Scan(&pendingTarget); err != nil {
+		t.Fatalf("query links inside transaction: %v", err)
+	}
+	if pendingTarget != "bbb-target" {
+		t.Errorf("pending raw target = %q, want %q", pendingTarget, "bbb-target")
+	}
+
+	// Second step fails: the pages table is dropped inside the transaction, so the
+	// search-index step errors on its final statement.
+	if _, err := tx.ExecContext(ctx, "DROP TABLE pages"); err != nil {
+		t.Fatalf("drop pages table: %v", err)
+	}
+	err = s.IndexPageTx(ctx, tx, "kb/notes/nnn-new.md", "New Title", "new body content", "tag1", "new summary", "note")
+	if err == nil {
+		t.Fatal("expected the search-index step to fail without the pages table, got nil error")
+	}
+	if !strings.Contains(err.Error(), "no such table: pages") {
+		t.Errorf("search-index step error = %v, want missing pages table", err)
+	}
+
+	// The caller rolls the shared transaction back.
+	if err := tx.Rollback(); err != nil {
+		t.Fatalf("Rollback: %v", err)
+	}
+
+	// The link graph is back to the pre-command state.
+	links, err := g.GetOutboundLinks(ctx, "kb/notes/mmm-source.md")
+	if err != nil {
+		t.Fatalf("GetOutboundLinks after rollback: %v", err)
+	}
+	if len(links) != 1 {
+		t.Fatalf("len(links) = %d after rollback, want 1", len(links))
+	}
+	if links[0].RawTarget != "aaa-target" {
+		t.Errorf("RawTarget = %q after rollback, want %q", links[0].RawTarget, "aaa-target")
+	}
+	if links[0].ResolvedTo != "kb/notes/aaa-target.md" {
+		t.Errorf("ResolvedTo = %q after rollback, want %q", links[0].ResolvedTo, "kb/notes/aaa-target.md")
+	}
+
+	var linkCount int
+	if err := d.QueryRow("SELECT COUNT(*) FROM links").Scan(&linkCount); err != nil {
+		t.Fatalf("query links after rollback: %v", err)
+	}
+	if linkCount != 1 {
+		t.Errorf("links count = %d after rollback, want 1", linkCount)
+	}
+
+	// The search index is back to the pre-command state; the dropped table came back
+	// with the rollback and without the aborted step's rows.
+	var docCount int
+	if err := d.QueryRow("SELECT COUNT(*) FROM documents").Scan(&docCount); err != nil {
+		t.Fatalf("query documents after rollback: %v", err)
+	}
+	if docCount != 1 {
+		t.Errorf("documents count = %d after rollback, want 1", docCount)
+	}
+	var strayDocuments int
+	if err := d.QueryRow("SELECT COUNT(*) FROM documents WHERE path = ?", "kb/notes/nnn-new.md").Scan(&strayDocuments); err != nil {
+		t.Fatalf("query documents for the aborted page: %v", err)
+	}
+	if strayDocuments != 0 {
+		t.Errorf("expected nnn-new.md absent from documents after rollback, got %d rows", strayDocuments)
+	}
+
+	results, err := s.Search(ctx, "Report", search.SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(results) != 1 {
+		t.Errorf("len(results) = %d after rollback, want 1", len(results))
+	}
+}
+
+func TestSQLiteLinkGraph_RemovePageTx_RollsBackWhenSearchStepFails(t *testing.T) {
+	d := setupTestDB(t)
+	g := NewSQLiteLinkGraph(d)
+	s := search.NewSQLiteFTS5Searcher(d)
+	ctx := context.Background()
+
+	// Pre-command state: the source page is in both indexes with one link.
+	insertPage(t, d, "kb/notes/aaa-target.md")
+	if err := g.UpdatePageLinks(ctx, "kb/notes/mmm-source.md", "See [[aaa-target]] for details."); err != nil {
+		t.Fatalf("UpdatePageLinks: %v", err)
+	}
+	if err := s.IndexPage(ctx, "kb/notes/mmm-source.md", "Source Title", "source body content", "tag1", "source summary", "note"); err != nil {
+		t.Fatalf("IndexPage: %v", err)
+	}
+
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("BeginTx: %v", err)
+	}
+
+	// First step: the link graph drops the page and its links on the shared transaction.
+	if err := g.RemovePageTx(ctx, tx, "kb/notes/mmm-source.md"); err != nil {
+		t.Fatalf("RemovePageTx: %v", err)
+	}
+	var pendingLinks int
+	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM links WHERE source_page = ?", "kb/notes/mmm-source.md").Scan(&pendingLinks); err != nil {
+		t.Fatalf("query links inside transaction: %v", err)
+	}
+	if pendingLinks != 0 {
+		t.Errorf("links inside transaction = %d, want 0", pendingLinks)
+	}
+
+	// Second step fails: the pages table is dropped inside the transaction, so the
+	// search-index removal errors on its final statement.
+	if _, err := tx.ExecContext(ctx, "DROP TABLE pages"); err != nil {
+		t.Fatalf("drop pages table: %v", err)
+	}
+	err = s.RemovePageTx(ctx, tx, "kb/notes/mmm-source.md")
+	if err == nil {
+		t.Fatal("expected the search-index removal to fail without the pages table, got nil error")
+	}
+	if !strings.Contains(err.Error(), "no such table: pages") {
+		t.Errorf("search-index removal error = %v, want missing pages table", err)
+	}
+
+	// The caller rolls the shared transaction back.
+	if err := tx.Rollback(); err != nil {
+		t.Fatalf("Rollback: %v", err)
+	}
+
+	// Both index structures are back to the pre-command state.
+	links, err := g.GetOutboundLinks(ctx, "kb/notes/mmm-source.md")
+	if err != nil {
+		t.Fatalf("GetOutboundLinks after rollback: %v", err)
+	}
+	if len(links) != 1 {
+		t.Fatalf("len(links) = %d after rollback, want 1", len(links))
+	}
+	if links[0].RawTarget != "aaa-target" {
+		t.Errorf("RawTarget = %q after rollback, want %q", links[0].RawTarget, "aaa-target")
+	}
+
+	var pageCount int
+	if err := d.QueryRow("SELECT COUNT(*) FROM pages WHERE path = ?", "kb/notes/mmm-source.md").Scan(&pageCount); err != nil {
+		t.Fatalf("query pages after rollback: %v", err)
+	}
+	if pageCount != 1 {
+		t.Errorf("pages count = %d after rollback, want 1", pageCount)
+	}
+
+	var title string
+	if err := d.QueryRow("SELECT title FROM documents WHERE path = ?", "kb/notes/mmm-source.md").Scan(&title); err != nil {
+		t.Fatalf("query documents after rollback: %v", err)
+	}
+	if title != "Source Title" {
+		t.Errorf("document title = %q after rollback, want %q", title, "Source Title")
+	}
+
+	results, err := s.Search(ctx, "Source", search.SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d after rollback, want 1", len(results))
+	}
+	if results[0].Path != "kb/notes/mmm-source.md" {
+		t.Errorf("search result path = %q after rollback, want %q", results[0].Path, "kb/notes/mmm-source.md")
+	}
 }
