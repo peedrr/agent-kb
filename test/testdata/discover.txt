@@ -1,0 +1,65 @@
+# Discover — list nearby knowledge bases without selecting one.
+
+exec akb init project
+stdout 'Initialized KB .project.'
+
+exec akb init project-kb
+stdout 'Initialized KB .project-kb.'
+
+# A knowledge base nested two levels below the scenario root.
+mkdir docs
+cd docs
+exec akb init kb
+stdout 'Initialized KB .kb.'
+cd $WORK
+
+# Knowledge bases below skipped directories are not discovered.
+mkdir .git/nested/.akb node_modules/nested/.akb vendor/nested/.akb .hidden/nested/.akb
+
+# Discovery starts at the working directory and reports nearest first.
+exec akb discover
+stdout 'discovered knowledge bases \(nearest first\):'
+stdout '^  project  [^\n]*\n  project-kb  '
+stdout '(?s)  project-kb  .*  kb  .*/docs/kb'
+stdout '^  kb  .*/docs/kb$'
+stdout 'select one with --kb <path> or AKB_KB=<path>'
+! stdout 'nested'
+! stdout 'node_modules'
+! stdout 'vendor'
+! stdout '\.git'
+! stdout '\.hidden'
+
+# The scan can be rooted at an explicit directory.
+exec akb discover docs
+stdout '^  kb  .*/docs/kb$'
+
+# Discovery is read-only: the addressed base stays clean.
+exec akb --kb project status
+stdout 'Git: clean'
+exec akb discover docs
+exec akb --kb project status
+stdout 'Git: clean'
+
+# The name comes from .akb.yaml, and its optional description is reported.
+cp described.yaml project/.akb/.akb.yaml
+exec akb discover
+stdout '^  project  .*/project  project knowledge base$'
+
+# JSON output pins names, paths, and the description.
+exec akb discover --json
+stdout '^\[.*\]$'
+stdout '{"name":"project","path":"[^"]*/project","description":"project knowledge base"}'
+stdout '{"name":"project-kb","path":"[^"]*/project-kb"}'
+stdout '{"name":"kb","path":"[^"]*/docs/kb"}'
+
+# A neighborhood without a knowledge base reports none, in text and JSON.
+mkdir $WORK/home/empty
+cd $WORK/home/empty
+exec akb discover
+stdout 'no knowledge bases found near .*empty'
+exec akb discover --json
+stdout '^\[\]$'
+
+-- described.yaml --
+name: project
+description: project knowledge base

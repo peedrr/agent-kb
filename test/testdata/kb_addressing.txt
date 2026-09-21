@@ -1,0 +1,41 @@
+# KB Addressing — flag over environment, an empty environment counts as unset,
+# relative and tilde paths, and the no-selection usage error.
+
+exec akb init kb-one
+stdout 'Initialized KB .kb-one.'
+
+exec akb init kb-two
+stdout 'Initialized KB .kb-two.'
+
+# The flag wins over the environment selection.
+env AKB_KB=kb-two
+exec akb --kb kb-one status
+stdout 'Name: kb-one'
+
+# Without a flag, the environment selects.
+exec akb status
+stdout 'Name: kb-two'
+
+# A relative --kb path resolves against the command's working directory.
+cd kb-one
+env AKB_KB=
+exec akb --kb . status
+stdout 'Name: kb-one'
+
+# A tilde --kb path expands to the home directory.
+cd $WORK/home
+exec akb init kb-home
+stdout 'Initialized KB .kb-home.'
+
+cd $WORK
+exec akb --kb ~/kb-home status
+stdout 'Name: kb-home'
+
+# With neither selection, the command reports a usage mistake and lists the
+# nearby bases, nearest first, with the remediation for selecting one.
+env AKB_KB=
+! exec akb status
+stderr 'usage: resolve knowledge base: no knowledge base selected'
+stderr 'discovered knowledge bases \(nearest first\):'
+stderr '(?s)  kb-one  .*  kb-two  '
+stderr 'select one with --kb <path> or AKB_KB=<path>'

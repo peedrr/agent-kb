@@ -1,82 +1,59 @@
-# Registry Tests — init default, registry list, use, commands-from-outside-kb
-skip 'registry-default addressing removed; explicit-addressing rework pending'
+# Explicit Addressing — selecting a KB from inside and outside it, the removed
+# registry commands, and the absent home registry file.
 
-# Initialize first KB
 exec akb init kb-one
-stdout 'Initialized KB .kb-one. at .* and set as default'
+stdout 'Initialized KB .kb-one.'
+! exists $HOME/.config/agent-kb/registry.yaml
 
-# Verify registry lists it as active
-exec akb registry
-stdout '^\* kb-one .*kb-one$'
-
-# Initialize second KB
 exec akb init kb-two
-stdout 'Initialized KB .kb-two. at .*'
+stdout 'Initialized KB .kb-two.'
+! exists $HOME/.config/agent-kb/registry.yaml
 
-# Verify registry lists both, kb-one still active
-exec akb registry
-stdout '^\* kb-one .*kb-one$'
-stdout '^  kb-two .*kb-two$'
-
-# Switch default to kb-two
-exec akb use kb-two
-stdout 'Default KB set to ''kb-two'' at .*kb-two'
-
-# Verify kb-two is now active
-exec akb registry
-stdout '^  kb-one .*kb-one$'
-stdout '^\* kb-two .*kb-two$'
-
-# Write a page from inside kb-two
-cd kb-two
+# Inside a KB the harness selection (AKB_KB=.) addresses it.
+cd kb-one
 stdin ../note-input.md
 exec akb write my-note.md
 stdout 'Written to kb/notes/my-note.md'
 
-# Go outside both KBs and verify commands still work via registry default
-cd ..
-
-# Read from outside KB using registry default
 exec akb read notes/my-note.md
 stdout 'Note content.'
 
-# List from outside KB
 exec akb list
 stdout 'notes/my-note.md'
 
-# Search from outside KB
 exec akb search test
 stdout 'notes/my-note.md'
 
-# Status from outside KB
-exec akb status
-stdout 'Name: kb-two'
-
-# Switch back to kb-one
-exec akb use kb-one
-stdout 'Default KB set to ''kb-one'' at .*kb-one'
-
-# Verify kb-one is now the default for commands
 exec akb status
 stdout 'Name: kb-one'
 
-# Try to use non-existent KB
-! exec akb use nonexistent
-stderr 'kb ''nonexistent'' not found in registry; use ''akb registry'' to list available kbs'
+# Outside any KB, the flag selects one explicitly.
+cd $WORK
+exec akb --kb kb-one status
+stdout 'Name: kb-one'
 
-# Empty registry should show message
-# We can't truly empty the registry without deleting the file, but we can test the message
-# by creating a fresh HOME and running registry there.
-# Instead, let's verify the registry command works with empty entries by creating a new HOME:
-mkdir empty-home
-env HOME=$WORK/empty-home
-exec akb registry
-stdout 'No KBs registered. Use .akb init <name>. to create one.'
+# The flag wins over a conflicting environment selection.
+env AKB_KB=kb-two
+exec akb --kb kb-one status
+stdout 'Name: kb-one'
+
+# Without any selection the invocation is a usage mistake that lists the
+# nearby bases.
+env AKB_KB=
+! exec akb status
+stderr 'usage: resolve knowledge base: no knowledge base selected'
+stderr '(?s)discovered knowledge bases \(nearest first\):.*  kb-one  .*  kb-two  '
+
+# The removed registry commands are unknown commands.
+! exec akb use kb-one
+stderr 'unknown command "use"'
+! exec akb registry
+stderr 'unknown command "registry"'
 
 -- note-input.md --
 ---
 type: note
-title: Registry Test Note
+title: Explicit Addressing Test Note
 summary: A test note
 tags: test
 ---

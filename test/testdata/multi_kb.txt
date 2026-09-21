@@ -1,69 +1,49 @@
-# Multi-KB Workflow — verify KB isolation across multiple knowledge bases
-skip 'registry-default addressing removed; explicit-addressing rework pending'
+# Multi-KB Workflow — verify two knowledge bases stay isolated. Every
+# invocation addresses exactly one base, with --kb or AKB_KB.
 
-# === INIT KB-A ===
 exec akb init kb-a
 stdout 'Initialized KB .kb-a.'
 
-# === INIT KB-B ===
 exec akb init kb-b
 stdout 'Initialized KB .kb-b.'
 
-# === REGISTRY SHOWS BOTH ===
-exec akb registry
-stdout 'kb-a'
-stdout 'kb-b'
-
-# === USE KB-A AND WRITE ===
-exec akb use kb-a
-stdout 'Default KB set to ''kb-a'''
-
+# Write to KB-A only.
 stdin note-a.md
-exec akb write note-a.md
+exec akb --kb kb-a write note-a.md
 stdout 'Written to kb/notes/note-a.md'
 
-# === VERIFY KB-A HAS ONLY ITS PAGE ===
-exec akb list
+# KB-A shows its page and none of KB-B's work.
+exec akb --kb kb-a list
 stdout 'notes/note-a.md'
 ! stdout 'note-b'
 
-exec akb search 'knowledge base A'
+exec akb --kb kb-a search 'knowledge base A'
 stdout 'notes/note-a.md'
 ! stdout 'note-b'
 
-# === SWITCH TO KB-B AND WRITE ===
-exec akb use kb-b
-stdout 'Default KB set to ''kb-b'''
-
+# Write to KB-B only.
 stdin note-b.md
-exec akb write note-b.md
+exec akb --kb kb-b write note-b.md
 stdout 'Written to kb/notes/note-b.md'
 
-# === VERIFY KB-B HAS ONLY ITS PAGE ===
-exec akb list
+exec akb --kb kb-b list
 stdout 'notes/note-b.md'
 ! stdout 'note-a'
 
-exec akb search 'knowledge base B'
+exec akb --kb kb-b search 'knowledge base B'
 stdout 'notes/note-b.md'
 ! stdout 'note-a'
 
-# === VERIFY KB-A IS UNCHANGED ===
-exec akb use kb-a
-stdout 'Default KB set to ''kb-a'''
+# KB-A is unchanged by the work in KB-B.
+exec akb --kb kb-a list
+stdout 'notes/note-a.md'
+! stdout 'note-b'
 
+# An environment selection addresses the same base as the flag.
+env AKB_KB=kb-a
 exec akb list
 stdout 'notes/note-a.md'
 ! stdout 'note-b'
-
-exec akb search 'knowledge base A'
-stdout 'notes/note-a.md'
-! stdout 'note-b'
-
-# === FINAL REGISTRY ===
-exec akb registry
-stdout 'kb-a'
-stdout 'kb-b'
 
 -- note-a.md --
 ---
