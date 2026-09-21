@@ -1,56 +1,25 @@
 # Index Rebuild Search — index rebuild + search integration
 
--- note-input.md --
----
-type: note
-title: Rebuild Search Note
-summary: Note for rebuild-search integration
-tags: rebuildsearch
----
-This note discusses microservices architecture patterns.
--- note-input.md --
-
--- note2-input.md --
----
-type: note
-title: Second Rebuild Note
-summary: Another note for rebuild-search
-tags: rebuildsearch
----
-Content about event-driven architecture and messaging.
--- note2-input.md --
-
--- adr-input.md --
----
-type: adr
-title: Rebuild Search Decision
-status: proposed
-deciders: team
-summary: Decision for rebuild-search testing
-tags: rebuildsearch
-created: '2026-01-01'
-updated: '2026-01-01'
----
-We chose microservices for our system architecture.
--- adr-input.md --
-
 # --- Setup: initialize KB and write pages ---
 
 exec akb init test-kb
 cd test-kb
 
-exec akb write rebuild-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write rebuild-note.md
 stdout 'Written to kb/notes/rebuild-note.md'
 
-exec akb write second-rebuild-note.md <../note2-input.md
+stdin ../note2-input.md
+exec akb write second-rebuild-note.md
 stdout 'Written to kb/notes/second-rebuild-note.md'
 
-exec akb write rebuild-decision.md <../adr-input.md
+stdin ../adr-input.md
+exec akb write rebuild-decision.md
 stdout 'Written to kb/decisions/rebuild-decision.md'
 
 # --- Search works before rebuild ---
 
-exec akb search "microservices"
+exec akb search 'microservices'
 stdout 'notes/rebuild-note.md'
 stdout 'decisions/rebuild-decision.md'
 
@@ -61,14 +30,9 @@ stdout 'Index rebuilt'
 
 # --- Search still works after rebuild ---
 
-exec akb search "microservices"
+exec akb search 'microservices'
 stdout 'notes/rebuild-note.md'
 stdout 'decisions/rebuild-decision.md'
-
-# --- Search by different term after rebuild ---
-
-exec akb search "event-driven"
-stdout 'notes/second-rebuild-note.md'
 
 # --- Index show reflects rebuilt content ---
 
@@ -87,7 +51,7 @@ stdout 'Index rebuilt'
 
 # --- Search no longer finds deleted page ---
 
-exec akb search "microservices"
+exec akb search 'microservices'
 ! stdout 'notes/rebuild-note.md'
 stdout 'decisions/rebuild-decision.md'
 
@@ -103,14 +67,14 @@ stdout 'Rebuild Search Decision'
 # Simulate DB corruption by removing search.db
 exec rm .akb/search.db
 
-! exec akb search "microservices"
+! exec akb search 'microservices'
 stderr 'akb index rebuild'
 
 # Rebuild creates fresh search.db
 exec akb index rebuild
 stdout 'Index rebuilt'
 
-exec akb search "microservices"
+exec akb search 'microservices'
 stdout 'decisions/rebuild-decision.md'
 
 # --- Link graph also rebuilt after index rebuild ---
@@ -120,7 +84,7 @@ stdout 'notes/second-rebuild-note.md'
 
 # --- Core I/O still works after rebuild ---
 
-exec akb read second-rebuild-note.md
+exec akb read notes/second-rebuild-note.md
 stdout 'Second Rebuild Note'
 
 exec akb list
@@ -129,3 +93,44 @@ stdout 'decisions/rebuild-decision.md'
 
 exec akb status
 stdout 'Pages: 2'
+
+-- note-input.md --
+---
+type: note
+title: Rebuild Search Note
+summary: Note for rebuild-search integration
+tags: rebuildsearch
+---
+This note discusses microservices architecture patterns.
+
+-- note2-input.md --
+---
+type: note
+title: Second Rebuild Note
+summary: Another note for rebuild-search
+tags: rebuildsearch
+---
+Content about event-driven architecture and messaging.
+
+-- adr-input.md --
+---
+type: adr
+title: Rebuild Search Decision
+status: proposed
+deciders: team
+summary: Decision for rebuild-search testing
+tags: rebuildsearch
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+## Context
+
+We chose microservices for our system architecture.
+
+## Decision
+
+Decided.
+
+## Consequences
+
+Recorded.

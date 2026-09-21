@@ -1,57 +1,10 @@
 # Core I/O Verification — verify complete write/read/append/delete contract
 
 # Input files for note operations
--- note-input.md --
----
-type: note
-title: Verification Note
-summary: Testing core I/O verification
-tags: test
----
-Note content for verification.
--- note-input.md --
-
--- append-input.md --
-Appended content line.
--- append-input.md --
 
 # Input files for ADR operations
--- adr-input.md --
----
-type: adr
-title: Verification ADR
-status: proposed
-deciders: team
-summary: Testing core I/O verification
-tags: test
-created: '2026-01-01'
-updated: '2026-01-01'
----
-ADR content for verification.
--- adr-input.md --
 
 # Input files for error cases
--- unknown-type-input.md --
----
-type: nonexistent
-title: Unknown Type Test
----
-Content
--- unknown-type-input.md --
-
--- no-type-input.md --
----
-title: No Type Test
----
-Content
--- no-type-input.md --
-
--- no-title-input.md --
----
-type: note
----
-Content
--- no-title-input.md --
 
 # === VERIFICATION SETUP ===
 
@@ -70,14 +23,16 @@ exists .akb/templates
 # === WRITE OPERATIONS ===
 
 # Write a note to kb/notes/
-exec akb write gate-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write gate-note.md
 stdout 'Written to kb/notes/gate-note.md'
 
 # Verify note file exists in correct location
 exists kb/notes/gate-note.md
 
 # Write an ADR to kb/decisions/
-exec akb write gate-adr.md <../adr-input.md
+stdin ../adr-input.md
+exec akb write gate-adr.md
 stdout 'Written to kb/decisions/gate-adr.md'
 
 # Verify ADR file exists in correct location
@@ -86,13 +41,13 @@ exists kb/decisions/gate-adr.md
 # === READ OPERATIONS ===
 
 # Read the note back
-exec akb read gate-note.md
+exec akb read notes/gate-note.md
 stdout 'Verification Note'
 stdout 'type: note'
 stdout 'Note content for verification.'
 
 # Read the ADR back
-exec akb read gate-adr.md
+exec akb read decisions/gate-adr.md
 stdout 'Verification ADR'
 stdout 'type: adr'
 stdout 'ADR content for verification.'
@@ -100,11 +55,12 @@ stdout 'ADR content for verification.'
 # === APPEND OPERATIONS ===
 
 # Append to note
-exec akb append notes/gate-note.md <../append-input.md
+stdin ../append-input.md
+exec akb append notes/gate-note.md
 stdout 'Appended to kb/notes/gate-note.md'
 
 # Verify frontmatter preserved and content extended
-exec akb read gate-note.md
+exec akb read notes/gate-note.md
 stdout 'type: note'
 stdout 'Verification Note'
 stdout 'Note content for verification.'
@@ -129,20 +85,24 @@ stdout 'Deleted kb/decisions/gate-adr.md'
 # === ERROR CASES ===
 
 # Unknown type error includes template suggestion
-! exec akb write bad-type.md <../unknown-type-input.md
+stdin ../unknown-type-input.md
+! exec akb write bad-type.md
 stderr 'unknown type'
 stderr 'Create .akb/templates'
 
 # Missing type error
-! exec akb write no-type.md <../no-type-input.md
+stdin ../no-type-input.md
+! exec akb write no-type.md
 stderr 'missing required field'
 
 # Missing title error
-! exec akb write no-title.md <../no-title-input.md
+stdin ../no-title-input.md
+! exec akb write no-title.md
 stderr 'missing required field'
 
 # raw/ prefix error on write
-! exec akb write raw/notes/test.md <../note-input.md
+stdin ../note-input.md
+! exec akb write raw/notes/test.md
 stderr 'akb raw write'
 
 # raw/ prefix error on read
@@ -154,13 +114,15 @@ stderr 'akb raw read'
 stderr 'akb raw delete'
 
 # raw/ prefix error on append
-! exec akb append raw/notes/test.md <../note-input.md
+stdin ../note-input.md
+! exec akb append raw/notes/test.md
 stderr 'akb raw write'
 
 # === --no-commit FLAG ===
 
 # Re-create note for no-commit test
-exec akb --no-commit write nocommit-note.md <../note-input.md
+stdin ../note-input.md
+exec akb --no-commit write nocommit-note.md
 stdout 'Written to kb/notes/nocommit-note.md'
 
 # Verify file exists
@@ -173,13 +135,15 @@ stdout ''
 # === GIT COMMIT MESSAGE FORMAT ===
 
 # Write creates commit with proper format
-exec akb write final-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write final-note.md
 
 exec git log --oneline -1
 stdout 'akb: write kb/notes/final-note.md'
 
 # Append creates commit with proper format
-exec akb append notes/final-note.md <../append-input.md
+stdin ../append-input.md
+exec akb append notes/final-note.md
 
 exec git log --oneline -1
 stdout 'akb: append kb/notes/final-note.md'
@@ -189,3 +153,57 @@ exec akb delete notes/final-note.md
 
 exec git log --oneline -1
 stdout 'akb: delete kb/notes/final-note.md'
+
+-- note-input.md --
+---
+type: note
+title: Verification Note
+summary: Testing core I/O verification
+tags: test
+---
+Note content for verification.
+
+-- append-input.md --
+Appended content line.
+
+-- adr-input.md --
+---
+type: adr
+title: Verification ADR
+status: proposed
+deciders: team
+summary: Testing core I/O verification
+tags: test
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+## Context
+
+ADR content for verification.
+
+## Decision
+
+Decided.
+
+## Consequences
+
+Recorded.
+
+-- unknown-type-input.md --
+---
+type: nonexistent
+title: Unknown Type Test
+---
+Content
+
+-- no-type-input.md --
+---
+title: No Type Test
+---
+Content
+
+-- no-title-input.md --
+---
+type: note
+---
+Content

@@ -1,0 +1,9 @@
+# Lint — missing search DB reports an actionable error
+
+exec akb init nodb-kb
+cd nodb-kb
+
+exec rm .akb/search.db
+
+! exec akb lint
+stderr 'akb init'

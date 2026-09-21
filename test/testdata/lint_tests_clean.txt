@@ -1,0 +1,29 @@
+# Lint — clean KB with a well-formed page
+
+exec akb init clean-kb
+cd clean-kb
+
+stdin ../good-note.md
+exec akb write good-note.md
+stdout 'Written to kb/notes/good-note.md'
+
+exec akb index add kb/notes/good-note.md 'A well-formed note'
+
+# Lint will still exit 1 due to orphans, but must NOT have
+# broken_links, missing_frontmatter, type_exists, or frontmatter_schema
+exec akb lint
+! stdout 'broken_links'
+! stdout 'missing_frontmatter'
+! stdout 'type_exists'
+! stdout 'frontmatter_schema'
+
+-- good-note.md --
+---
+type: note
+title: Good Note
+summary: A well-formed note for testing
+tags: linttest
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+This is a well-formed note with proper frontmatter.

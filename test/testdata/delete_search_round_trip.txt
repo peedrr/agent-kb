@@ -1,56 +1,25 @@
 # Delete Search Round Trip — delete → search confirms removal
 
--- note-input.md --
----
-type: note
-title: Delete Search Note
-summary: Note for delete-search round trip
-tags: deletesearch
----
-This note is about distributed databases and replication.
--- note-input.md --
-
--- note2-input.md --
----
-type: note
-title: Keep This Note
-summary: Note that stays after delete
-tags: deletesearch
----
-Content about distributed databases and caching.
--- note2-input.md --
-
--- adr-input.md --
----
-type: adr
-title: Delete Search Decision
-status: proposed
-deciders: team
-summary: Decision for delete-search round trip
-tags: deletesearch
-created: '2026-01-01'
-updated: '2026-01-01'
----
-We chose distributed databases for our data layer.
--- adr-input.md --
-
 # --- Setup: initialize KB and write pages ---
 
 exec akb init test-kb
 cd test-kb
 
-exec akb write delete-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write delete-note.md
 stdout 'Written to kb/notes/delete-note.md'
 
-exec akb write keep-note.md <../note2-input.md
+stdin ../note2-input.md
+exec akb write keep-note.md
 stdout 'Written to kb/notes/keep-note.md'
 
-exec akb write delete-decision.md <../adr-input.md
+stdin ../adr-input.md
+exec akb write delete-decision.md
 stdout 'Written to kb/decisions/delete-decision.md'
 
 # --- Search finds all pages before delete ---
 
-exec akb search "distributed databases"
+exec akb search 'distributed databases'
 stdout 'notes/delete-note.md'
 stdout 'notes/keep-note.md'
 stdout 'decisions/delete-decision.md'
@@ -62,14 +31,14 @@ stdout 'Deleted kb/notes/delete-note.md'
 
 # --- Search no longer finds deleted page ---
 
-exec akb search "distributed databases"
+exec akb search 'distributed databases'
 ! stdout 'notes/delete-note.md'
 stdout 'notes/keep-note.md'
 stdout 'decisions/delete-decision.md'
 
 # --- Search for unique content of deleted page returns nothing ---
 
-exec akb search "replication"
+exec akb search 'replication'
 ! stdout 'notes/delete-note.md'
 
 # --- Delete another page ---
@@ -79,13 +48,13 @@ stdout 'Deleted kb/decisions/delete-decision.md'
 
 # --- Search no longer finds second deleted page ---
 
-exec akb search "distributed databases"
+exec akb search 'distributed databases'
 ! stdout 'decisions/delete-decision.md'
 stdout 'notes/keep-note.md'
 
 # --- Remaining page still searchable ---
 
-exec akb search "caching"
+exec akb search 'caching'
 stdout 'notes/keep-note.md'
 
 # --- Delete last page ---
@@ -95,7 +64,7 @@ stdout 'Deleted kb/notes/keep-note.md'
 
 # --- Search returns no results ---
 
-exec akb search "distributed databases"
+exec akb search 'distributed databases'
 ! stdout .
 
 # --- Links also confirm removal ---
@@ -110,3 +79,44 @@ stdout 'Pages: 0'
 
 exec akb list
 ! stdout .
+
+-- note-input.md --
+---
+type: note
+title: Delete Search Note
+summary: Note for delete-search round trip
+tags: deletesearch
+---
+This note is about distributed databases and replication.
+
+-- note2-input.md --
+---
+type: note
+title: Keep This Note
+summary: Note that stays after delete
+tags: deletesearch
+---
+Content about distributed databases and caching.
+
+-- adr-input.md --
+---
+type: adr
+title: Delete Search Decision
+status: proposed
+deciders: team
+summary: Decision for delete-search round trip
+tags: deletesearch
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+## Context
+
+We chose distributed databases for our data layer.
+
+## Decision
+
+Decided.
+
+## Consequences
+
+Recorded.

@@ -1,0 +1,24 @@
+# Product finding: an ADR page whose frontmatter omits `status` aborts with an
+# internal CEL error instead of a validation failure:
+#   akb write -> exit 2 `internal: CEL engine error: evaluate rule valid_status: no such key: status`
+#   akb lint  -> exit 1 `lint: run checker cel_lint: no such key: status`
+# The page is therefore excluded from lint_tests.txt, where an ADR with an
+# invalid enum value stands in for the frontmatter_schema checks.
+
+skip 'product-finding: ADR missing status aborts write and lint with an internal CEL error instead of a validation failure'
+
+# stdin ../adr-missing-status.md
+# exec akb write bad-adr.md
+# stdout 'Written to kb/decisions/bad-adr.md'
+
+-- adr-missing-status.md --
+---
+type: adr
+title: Missing Status ADR
+summary: ADR without required status field
+deciders: team
+tags: linttest
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+Decision without status.

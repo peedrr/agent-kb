@@ -1,5 +1,48 @@
 # CEL Lint Integration Tests
 
+# ============================================================
+# Section 1: akb lint with CEL lint rules
+# ============================================================
+
+exec akb init cel-lint-kb
+cd cel-lint-kb
+
+# Write fresh pages
+stdin ../fresh-note.md
+exec akb write notes/fresh.md
+stdout 'Written to kb/notes/fresh.md'
+
+stdin ../fresh-adr.md
+exec akb write decisions/fresh-adr.md
+stdout 'Written to kb/decisions/fresh-adr.md'
+
+# Write stale pages
+stdin ../stale-note.md
+exec akb write notes/stale.md
+stdout 'Written to kb/notes/stale.md'
+
+stdin ../stale-adr.md
+exec akb write decisions/stale-adr.md
+stdout 'Written to kb/decisions/stale-adr.md'
+
+# Run lint — should find stale pages via cel_lint
+exec akb lint
+stdout 'cel_lint'
+stdout 'adr_stale'
+stdout 'note_stale'
+
+# ============================================================
+# Section 2: JSON output includes rule_id
+# ============================================================
+
+exec akb lint --json
+stdout '"cel_lint"'
+stdout '"rule_id"'
+stdout '"adr_stale"'
+stdout '"note_stale"'
+stdout '"severity"'
+stdout '"warning"'
+
 -- fresh-note.md --
 ---
 type: note
@@ -7,10 +50,9 @@ title: Fresh Note
 summary: A recently updated note
 tags: [linttest]
 created: "2026-01-01T00:00:00Z"
-updated: "2026-04-21T00:00:00Z"
+updated: "2026-09-01T00:00:00Z"
 ---
 This note is fresh.
--- fresh-note.md --
 
 -- stale-note.md --
 ---
@@ -22,7 +64,6 @@ created: "2020-01-01T00:00:00Z"
 updated: "2020-01-01T00:00:00Z"
 ---
 This note is very stale.
--- stale-note.md --
 
 -- fresh-adr.md --
 ---
@@ -33,7 +74,7 @@ tags: [linttest]
 status: accepted
 deciders: team
 created: "2026-01-01T00:00:00Z"
-updated: "2026-04-21T00:00:00Z"
+updated: "2026-09-01T00:00:00Z"
 ---
 
 # Fresh ADR
@@ -49,7 +90,6 @@ Fresh decision.
 ## Consequences
 
 Fresh consequences.
--- fresh-adr.md --
 
 -- stale-adr.md --
 ---
@@ -76,68 +116,3 @@ Old decision.
 ## Consequences
 
 Old consequences.
--- stale-adr.md --
-
-# ============================================================
-# Section 1: akb lint with CEL lint rules
-# ============================================================
-
-exec akb init cel-lint-kb
-cd cel-lint-kb
-
-# Write fresh pages
-exec akb write notes/fresh.md <../fresh-note.md
-stdout 'Written to kb/notes/fresh.md'
-
-exec akb write decisions/fresh-adr.md <../fresh-adr.md
-stdout 'Written to kb/decisions/fresh-adr.md'
-
-# Write stale pages
-exec akb write notes/stale.md <../stale-note.md
-stdout 'Written to kb/notes/stale.md'
-
-exec akb write decisions/stale-adr.md <../stale-adr.md
-stdout 'Written to kb/decisions/stale-adr.md'
-
-# Run lint — should find stale pages via cel_lint
-! exec akb lint
-stdout 'cel_lint'
-stdout 'adr_stale'
-stdout 'note_stale'
-
-# ============================================================
-# Section 2: JSON output includes rule_id
-# ============================================================
-
-! exec akb lint --json
-stdout '"cel_lint"'
-stdout '"rule_id"'
-stdout '"adr_stale"'
-stdout '"note_stale"'
-stdout '"severity"'
-stdout '"warning"'
-
-# ============================================================
-# Section 3: Exit code handling
-# ============================================================
-
-# Lint with warnings only should still exit 1 because there are errors
-# from other checks (orphans, broken_links, etc.)
-# But let's test a clean KB with only warnings
-
-# Create a clean KB
-exec akb init clean-cel-kb
-cd clean-cel-kb
-
-exec akb write notes/fresh.md <../fresh-note.md
-stdout 'Written to kb/notes/fresh.md'
-
-exec akb index add kb/notes/fresh.md "Fresh note"
-
-# In a clean KB with only fresh pages, lint should pass
-exec akb lint
-stdout 'No issues found.'
-
-# Verify exit code is 0
-exit 0
-

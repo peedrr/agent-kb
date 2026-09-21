@@ -1,49 +1,30 @@
 # is_draft Implicit Default Tests
 
--- new-page.md --
----
-type: note
-title: New Page
-summary: A new page
- tags: test
----
-Body content.
--- new-page.md --
-
--- explicit-draft.md --
----
-type: note
-title: Explicit Draft
-summary: With is_draft true
- tags: test
-is_draft: true
----
-Draft body.
--- explicit-draft.md --
-
 # Setup: initialize a KB
 exec akb init test-kb
 cd test-kb
 
 # --- Write new page without is_draft ---
-exec akb write new-page.md <../new-page.md
+stdin ../new-page.md
+exec akb write new-page.md
 stdout 'Written to kb/notes/new-page.md'
 
 # --- Verify is_draft is NOT in written frontmatter ---
 exec akb read notes/new-page.md
-! stdout 'is_draft'
+! stdout 'is_draft:'
 
 # --- Write explicit draft page ---
-exec akb write explicit-draft.md <../explicit-draft.md
+stdin ../explicit-draft.md
+exec akb write explicit-draft.md
 stdout 'Written to kb/notes/explicit-draft.md'
 
 # --- Verify is_draft:true is stripped from frontmatter ---
 exec akb read notes/explicit-draft.md
-! stdout 'is_draft'
+! stdout 'is_draft:'
 
 # --- Approve new page adds is_draft: false ---
 exec akb approve notes/new-page.md
-stdout "Approved 'notes/new-page.md'"
+stdout 'Approved ''notes/new-page.md'''
 
 # --- Verify is_draft: false is now present ---
 exec akb read notes/new-page.md
@@ -51,8 +32,27 @@ stdout 'is_draft: false'
 
 # --- Approve explicit-draft page ---
 exec akb approve notes/explicit-draft.md
-stdout "Approved 'notes/explicit-draft.md'"
+stdout 'Approved ''notes/explicit-draft.md'''
 
 # --- Verify is_draft: false is now present ---
 exec akb read notes/explicit-draft.md
 stdout 'is_draft: false'
+
+-- new-page.md --
+---
+type: note
+title: New Page
+summary: A new page
+tags: test
+---
+Body content.
+
+-- explicit-draft.md --
+---
+type: note
+title: Explicit Draft
+summary: With is_draft true
+tags: test
+is_draft: true
+---
+Draft body.

@@ -1,28 +1,5 @@
 # CEL Old Format Regression Tests
 
--- old-format-template.yaml --
-name: legacy
-description: Old format template
-required:
-  - title
-  - type
-optional:
-  - summary
-body: |
-  # {{title}}
--- old-format-template.yaml --
-
--- legacy-page.md --
----
-type: legacy
-title: Legacy Page
----
-
-# Legacy Page
-
-This uses the old template format.
--- legacy-page.md --
-
 # ============================================================
 # Section 1: akb lint fails with old-format template
 # ============================================================
@@ -41,31 +18,50 @@ stderr 'Template format has changed'
 # Section 2: akb write fails with old-format template
 # ============================================================
 
-! exec akb write legacy-page.md <../legacy-page.md
+stdin ../legacy-page.md
+! exec akb write legacy-page.md
 stderr 'Template format has changed'
 
 # ============================================================
 # Section 3: template write fails with old-format template
 # ============================================================
 
--- pass.md --
----
-type: legacy
-title: Test
----
-
-# Test
--- pass.md --
-
--- fail.md --
----
-type: legacy
-title: Test
----
-
-# Test
--- fail.md --
-
 ! exec akb template write legacy --template ../old-format-template.yaml --pass ../pass.md --fail ../fail.md
-stderr 'Template format has changed'
+stderr 'template format has changed'
 
+-- old-format-template.yaml --
+name: legacy
+description: Old format template
+required:
+  - title
+  - type
+optional:
+  - summary
+body: |
+  # {{title}}
+
+-- legacy-page.md --
+---
+type: legacy
+title: Legacy Page
+---
+
+# Legacy Page
+
+This uses the old template format.
+
+-- pass.md --
+---
+type: legacy
+title: Test
+---
+
+# Test
+
+-- fail.md --
+---
+type: legacy
+title: Test
+---
+
+# Test

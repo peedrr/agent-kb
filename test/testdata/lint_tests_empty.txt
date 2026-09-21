@@ -1,0 +1,7 @@
+# Lint — empty KB has no issues
+
+exec akb init empty-kb
+cd empty-kb
+
+exec akb lint
+stdout 'No issues found.'

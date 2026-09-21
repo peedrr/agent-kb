@@ -1,25 +1,5 @@
 # Multi-KB Workflow — verify KB isolation across multiple knowledge bases
 
--- note-a.md --
----
-type: note
-title: Note in KB A
-summary: Page for KB A
-tags: multikb
----
-Content for knowledge base A.
--- note-a.md --
-
--- note-b.md --
----
-type: note
-title: Note in KB B
-summary: Page for KB B
-tags: multikb
----
-Content for knowledge base B.
--- note-b.md --
-
 # === INIT KB-A ===
 exec akb init kb-a
 stdout 'Initialized KB .kb-a.'
@@ -35,9 +15,10 @@ stdout 'kb-b'
 
 # === USE KB-A AND WRITE ===
 exec akb use kb-a
-stdout "Default KB set to 'kb-a'"
+stdout 'Default KB set to ''kb-a'''
 
-exec akb write note-a.md <note-a.md
+stdin note-a.md
+exec akb write note-a.md
 stdout 'Written to kb/notes/note-a.md'
 
 # === VERIFY KB-A HAS ONLY ITS PAGE ===
@@ -51,9 +32,10 @@ stdout 'notes/note-a.md'
 
 # === SWITCH TO KB-B AND WRITE ===
 exec akb use kb-b
-stdout "Default KB set to 'kb-b'"
+stdout 'Default KB set to ''kb-b'''
 
-exec akb write note-b.md <note-b.md
+stdin note-b.md
+exec akb write note-b.md
 stdout 'Written to kb/notes/note-b.md'
 
 # === VERIFY KB-B HAS ONLY ITS PAGE ===
@@ -67,7 +49,7 @@ stdout 'notes/note-b.md'
 
 # === VERIFY KB-A IS UNCHANGED ===
 exec akb use kb-a
-stdout "Default KB set to 'kb-a'"
+stdout 'Default KB set to ''kb-a'''
 
 exec akb list
 stdout 'notes/note-a.md'
@@ -81,3 +63,21 @@ stdout 'notes/note-a.md'
 exec akb registry
 stdout 'kb-a'
 stdout 'kb-b'
+
+-- note-a.md --
+---
+type: note
+title: Note in KB A
+summary: Page for KB A
+tags: multikb
+---
+Content for knowledge base A.
+
+-- note-b.md --
+---
+type: note
+title: Note in KB B
+summary: Page for KB B
+tags: multikb
+---
+Content for knowledge base B.

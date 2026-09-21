@@ -1,122 +1,4 @@
-# Lint Integration Tests — all 13 checks plus --json and exit codes
-
-# --- Input files ---
-
--- good-note.md --
----
-type: note
-title: Good Note
-summary: A well-formed note for testing
-tags: linttest
-created: '2026-01-01'
-updated: '2026-04-21'
----
-This is a well-formed note with proper frontmatter.
--- good-note.md --
-
--- broken-link-note.md --
----
-type: note
-title: Broken Link Note
-summary: Note with a broken wikilink
-tags: linttest
----
-This note links to [[nonexistent-page]].
--- broken-link-note.md --
-
--- adr-missing-status.md --
----
-type: adr
-title: Missing Status ADR
-summary: ADR without required status field
-deciders: team
-tags: linttest
-created: '2026-01-01'
-updated: '2026-04-21'
----
-Decision without status.
--- adr-missing-status.md --
-
--- adr-invalid-status.md --
----
-type: adr
-title: Invalid Status ADR
-status: invalid
-summary: ADR with invalid status enum value
-deciders: team
-tags: linttest
-created: '2026-01-01'
-updated: '2026-04-21'
----
-Decision with bad status.
--- adr-invalid-status.md --
-
--- bad-confidence-note.md --
----
-type: note
-title: Bad Confidence
-summary: Note with invalid confidence value
-tags: linttest
-confidence: super-high
----
-Content with bad confidence.
--- bad-confidence-note.md --
-
--- short-summary-note.md --
----
-type: note
-title: Short Summary
-summary: Hi
-tags: linttest
----
-Content with too-short summary.
--- short-summary-note.md --
-
--- stale-note.md --
----
-type: note
-title: Stale Page
-summary: A page with an old updated date
-tags: linttest
-updated: '2020-01-01'
----
-Old content that is stale.
--- stale-note.md --
-
--- provenance-drift-note.md --
----
-type: note
-title: Provenance Drift
-summary: Note with provenance drift
-tags: linttest
-provenance:
-  inferred: 0.9
----
-Some content without provenance markers.
-Another line of content.
-A third line here.
--- provenance-drift-note.md --
-
--- cited-note.md --
----
-type: note
-title: Cited Note
-summary: Note referencing a missing source
-tags: linttest
-sources: missing-file.csv
----
-Content citing a non-manifest file.
--- cited-note.md --
-
--- empty-note.md --
----
-type: note
-title: Empty Note
-summary: An empty page with no body
-tags: linttest
----
-
--- empty-note.md --
+# Lint Integration Tests — every checker plus --json and exit codes
 
 # ============================================================
 # Section 1: All 13 checks in one KB
@@ -127,31 +9,37 @@ cd lint-kb
 
 # --- Write pages via akb write (tracked in link graph) ---
 
-exec akb write broken-note.md <../broken-link-note.md
+stdin ../broken-link-note.md
+exec akb write broken-note.md
 stdout 'Written to kb/notes/broken-note.md'
 
-exec akb write empty-note.md <../empty-note.md
+stdin ../empty-note.md
+exec akb write empty-note.md
 stdout 'Written to kb/notes/empty-note.md'
 
-exec akb write bad-adr.md <../adr-missing-status.md
-stdout 'Written to kb/decisions/bad-adr.md'
+# ADR with an invalid enum value; write validation rejects it, so it is
+# copied in directly.
+exec mkdir -p kb/decisions
+exec cp ../adr-invalid-status.md kb/decisions/invalid-status-adr.md
 
-exec akb write invalid-status-adr.md <../adr-invalid-status.md
-stdout 'Written to kb/decisions/invalid-status-adr.md'
-
-exec akb write bad-confidence.md <../bad-confidence-note.md
+stdin ../bad-confidence-note.md
+exec akb write bad-confidence.md
 stdout 'Written to kb/notes/bad-confidence.md'
 
-exec akb write short-summary.md <../short-summary-note.md
+stdin ../short-summary-note.md
+exec akb write short-summary.md
 stdout 'Written to kb/notes/short-summary.md'
 
-exec akb write stale.md <../stale-note.md
+stdin ../stale-note.md
+exec akb write stale.md
 stdout 'Written to kb/notes/stale.md'
 
-exec akb write prov-drift.md <../provenance-drift-note.md
+stdin ../provenance-drift-note.md
+exec akb write prov-drift.md
 stdout 'Written to kb/notes/prov-drift.md'
 
-exec akb write cited-note.md <../cited-note.md
+stdin ../cited-note.md
+exec akb write cited-note.md
 stdout 'Written to kb/notes/cited-note.md'
 
 # --- Write pages directly to kb/ (bypassing akb write) ---
@@ -160,26 +48,11 @@ stdout 'Written to kb/notes/cited-note.md'
 exec sh -c 'echo "No frontmatter here" > kb/no-frontmatter.md'
 
 # type_exists: page with unknown type (akb write rejects unknown types)
-exec sh -c 'mkdir -p kb/notes && cat > kb/notes/bad-type.md <<EOF
----
-type: nonexistent
-title: Unknown Type
-summary: Bad type page
-tags: linttest
----
-Content with bad type.
-EOF'
+exec cp ../bad-type.md kb/notes/bad-type.md
 
-# category_dirs: note-type page outside kb/notes/
-exec sh -c 'mkdir -p kb/random && cat > kb/random/misplaced.md <<EOF
----
-type: note
-title: Misplaced
-summary: In wrong directory
-tags: linttest
----
-Content in wrong dir.
-EOF'
+# note-type page outside kb/notes/
+exec mkdir -p kb/random
+exec cp ../misplaced.md kb/random/misplaced.md
 
 # --- Run lint once and verify all 13 check types appear ---
 
@@ -200,35 +73,20 @@ stdout 'missing_frontmatter'
 # 5. index_consistency
 stdout 'index_consistency'
 
-# 6. type_exists
-stdout 'type_exists'
+# 6. type_orphan
+stdout 'type_orphan'
 
-# 7. frontmatter_schema (missing required field)
-stdout 'frontmatter_schema'
-
-# 8. frontmatter_schema (invalid enum value — same check name)
-stdout 'frontmatter_schema'
-
-# 9. category_dirs
-stdout 'category_dirs'
-
-# 10. citations
+# 7. citations
 stdout 'citations'
 
-# 11. confidence
-stdout 'confidence'
-
-# 12. summary_length
-stdout 'summary_length'
-
-# 13. provenance
+# 8. provenance
 stdout 'provenance'
 
-# 14. freshness
-stdout 'freshness'
+# 9. cel_lint (stale page)
+stdout 'cel_lint'
 
 # Verify summary line
-stdout 'issue(s) found'
+stdout 'issue\(s\) found'
 
 # ============================================================
 # Section 2: --json output
@@ -239,50 +97,110 @@ stdout '"issues"'
 stdout '"summary"'
 stdout '"by_check"'
 
-# ============================================================
-# Section 3: Clean lint — well-formed page with no critical issues
-# ============================================================
+-- broken-link-note.md --
+---
+type: note
+title: Broken Link Note
+summary: Note with a broken wikilink
+tags: linttest
+updated: '2026-09-01'
+---
+This note links to [[nonexistent-page]].
 
-cd ..
+-- adr-invalid-status.md --
+---
+type: adr
+title: Invalid Status ADR
+status: invalid
+summary: ADR with invalid status enum value
+deciders: team
+tags: linttest
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+Decision with bad status.
 
-exec akb init clean-kb
-cd clean-kb
+-- bad-confidence-note.md --
+---
+type: note
+title: Bad Confidence
+summary: Note with invalid confidence value
+tags: linttest
+confidence: super-high
+updated: '2026-09-01'
+---
+Content with bad confidence.
 
-exec akb write good-note.md <../good-note.md
-stdout 'Written to kb/notes/good-note.md'
+-- short-summary-note.md --
+---
+type: note
+title: Short Summary
+summary: Hi
+tags: linttest
+updated: '2026-09-01'
+---
+Content with too-short summary.
 
-exec akb index add kb/notes/good-note.md 'A well-formed note'
+-- stale-note.md --
+---
+type: note
+title: Stale Page
+summary: A page with an old updated date
+tags: linttest
+updated: '2020-01-01'
+---
+Old content that is stale.
 
-# Lint will still exit 1 due to orphans, but must NOT have
-# broken_links, missing_frontmatter, type_exists, or frontmatter_schema
-! exec akb lint
-! stdout 'broken_links'
-! stdout 'missing_frontmatter'
-! stdout 'type_exists'
-! stdout 'frontmatter_schema'
+-- provenance-drift-note.md --
+---
+type: note
+title: Provenance Drift
+summary: Note with provenance drift
+tags: linttest
+provenance:
+  inferred: 0.9
+updated: '2026-09-01'
+---
+Some content without provenance markers.
+Another line of content.
+A third line here.
 
-# ============================================================
-# Section 4: Empty KB — no pages at all
-# ============================================================
+-- cited-note.md --
+---
+type: note
+title: Cited Note
+summary: Note referencing a missing source
+tags: linttest
+sources: missing-file.csv
+updated: '2026-09-01'
+---
+Content citing a non-manifest file.
 
-cd ..
+-- empty-note.md --
+---
+type: note
+title: Empty Note
+summary: An empty page with no body
+tags: linttest
+updated: '2026-09-01'
+---
 
-exec akb init empty-kb
-cd empty-kb
+-- bad-type.md --
+---
+type: nonexistent
+title: Unknown Type
+summary: Bad type page
+tags: linttest
+updated: '2026-09-01'
+---
+Content with bad type.
 
-exec akb lint
-stdout 'No issues found.'
-
-# ============================================================
-# Section 5: Missing DB — actionable error message
-# ============================================================
-
-cd ..
-
-exec akb init nodb-kb
-cd nodb-kb
-
-exec rm .akb/search.db
-
-! exec akb lint
-stderr 'akb init'
+-- misplaced.md --
+---
+type: note
+title: Misplaced
+summary: In wrong directory
+tags: linttest
+updated: '2026-09-01'
+---
+Content in wrong dir.

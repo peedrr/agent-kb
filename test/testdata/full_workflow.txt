@@ -1,40 +1,25 @@
 # Full Workflow — init → write → read → append → search → lint → approve → delete
 
--- note-input.md --
----
-type: note
-title: Full Workflow Note
-summary: Testing the complete workflow
-tags: workflow
----
-This is a draft note with annotations.
-<!-- olw-auto: action=review -->
-^[inferred] This is an inferred claim.
-More content here.
--- note-input.md --
-
--- append-input.md --
-Appended content for the workflow test.
--- append-input.md --
-
 # === INIT ===
 exec akb init workflow-kb
 cd workflow-kb
 
 # === WRITE ===
-exec akb write workflow-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write workflow-note.md
 stdout 'Written to kb/notes/workflow-note.md'
 exists kb/notes/workflow-note.md
 
 # === READ ===
-exec akb read workflow-note.md
+exec akb read notes/workflow-note.md
 stdout 'Full Workflow Note'
 stdout 'This is a draft note'
 stdout 'olw-auto'
-stdout '^[inferred]'
+stdout '\^\[inferred\]'
 
 # === APPEND ===
-exec akb append notes/workflow-note.md <../append-input.md
+stdin ../append-input.md
+exec akb append notes/workflow-note.md
 stdout 'Appended to kb/notes/workflow-note.md'
 
 # === READ AFTER APPEND ===
@@ -47,19 +32,19 @@ stdout 'notes/workflow-note.md'
 
 # === LINT ===
 # Single page will have orphans, but lint should run successfully
-! exec akb lint
+exec akb lint
 stdout 'orphans'
-stdout 'issue(s) found'
+stdout 'issue\(s\) found'
 
 # === APPROVE ===
 exec akb approve notes/workflow-note.md
-stdout "Approved 'notes/workflow-note.md'"
+stdout 'Approved ''notes/workflow-note.md'''
 
 # === READ AFTER APPROVE ===
 exec akb read notes/workflow-note.md
 stdout 'is_draft: false'
 ! stdout 'olw-auto'
-! stdout '^[inferred]'
+! stdout '\^\[inferred\]'
 
 # === DELETE ===
 exec akb delete notes/workflow-note.md
@@ -81,3 +66,19 @@ stdout 'akb: approve notes/workflow-note.md'
 stdout 'akb: append kb/notes/workflow-note.md'
 stdout 'akb: write kb/notes/workflow-note.md'
 stdout 'akb: init workflow-kb'
+
+-- note-input.md --
+---
+type: note
+title: Full Workflow Note
+summary: Testing the complete workflow
+tags: workflow
+updated: '2026-09-01'
+---
+This is a draft note with annotations.
+<!-- olw-auto: action=review -->
+^[inferred] This is an inferred claim.
+More content here.
+
+-- append-input.md --
+Appended content for the workflow test.

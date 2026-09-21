@@ -1,66 +1,29 @@
 # Link Graph Round Trip — write with wikilinks → links/backlinks/orphans round-trip
 
--- source-input.md --
----
-type: note
-title: Source Note
-summary: Note that links to other pages
-tags: linkgraph
----
-This note references [[target-note]] and [[decisions/graph-decision]].
-It also has a broken link to [[missing-page]].
--- source-input.md --
-
--- target-input.md --
----
-type: note
-title: Target Note
-summary: Note that is linked to
-tags: linkgraph
----
-This is the target note. It links back to [[source-note]].
--- target-input.md --
-
--- adr-input.md --
----
-type: adr
-title: Graph Decision
-status: proposed
-deciders: team
-summary: Decision for link graph testing
-tags: linkgraph
-created: '2026-01-01'
-updated: '2026-01-01'
----
-We decided based on [[source-note]] and [[target-note]].
--- adr-input.md --
-
--- orphan-input.md --
----
-type: note
-title: Orphan Note
-summary: Note with no inbound links
-tags: linkgraph
----
-This note stands alone with no links to or from other pages.
--- orphan-input.md --
-
 # --- Setup: initialize KB and write pages ---
 
 exec akb init test-kb
 cd test-kb
 
-exec akb write source-note.md <../source-input.md
+stdin ../source-input.md
+exec akb write source-note.md
 stdout 'Written to kb/notes/source-note.md'
 
-exec akb write target-note.md <../target-input.md
+stdin ../target-input.md
+exec akb write target-note.md
 stdout 'Written to kb/notes/target-note.md'
 
-exec akb write graph-decision.md <../adr-input.md
+stdin ../adr-input.md
+exec akb write graph-decision.md
 stdout 'Written to kb/decisions/graph-decision.md'
 
-exec akb write orphan-note.md <../orphan-input.md
+stdin ../orphan-input.md
+exec akb write orphan-note.md
 stdout 'Written to kb/notes/orphan-note.md'
+
+# Rebuild re-resolves links written before their target pages existed
+exec akb index rebuild
+stdout 'Index rebuilt'
 
 # --- links show: outbound links from source ---
 
@@ -133,3 +96,54 @@ exec akb orphans
 
 exec akb status
 stdout 'Pages: 0'
+
+-- source-input.md --
+---
+type: note
+title: Source Note
+summary: Note that links to other pages
+tags: linkgraph
+---
+This note references [[target-note]] and [[decisions/graph-decision]].
+It also has a broken link to [[missing-page]].
+
+-- target-input.md --
+---
+type: note
+title: Target Note
+summary: Note that is linked to
+tags: linkgraph
+---
+This is the target note. It links back to [[source-note]].
+
+-- adr-input.md --
+---
+type: adr
+title: Graph Decision
+status: proposed
+deciders: team
+summary: Decision for link graph testing
+tags: linkgraph
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+## Context
+
+We decided based on [[source-note]] and [[target-note]].
+
+## Decision
+
+Decided.
+
+## Consequences
+
+Recorded.
+
+-- orphan-input.md --
+---
+type: note
+title: Orphan Note
+summary: Note with no inbound links
+tags: linkgraph
+---
+This note stands alone with no links to or from other pages.

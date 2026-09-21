@@ -1,51 +1,20 @@
 # Index Rebuild Tests — verify index regeneration from filesystem
 
--- note-input.md --
----
-type: note
-title: Rebuild Note
-summary: Note for rebuild test
-tags: test
----
-Note content for rebuild.
--- note-input.md --
-
--- note2-input.md --
----
-type: note
-title: Another Note
-summary: Second note for rebuild
-tags: test
----
-Second note content.
--- note2-input.md --
-
--- adr-input.md --
----
-type: adr
-title: Rebuild Decision
-status: proposed
-deciders: team
-summary: Decision for rebuild test
-tags: test
-created: '2026-01-01'
-updated: '2026-01-01'
----
-ADR content for rebuild.
--- adr-input.md --
-
 # --- Setup: initialize KB and write pages ---
 
 exec akb init test-kb
 cd test-kb
 
-exec akb write rebuild-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write rebuild-note.md
 stdout 'Written to kb/notes/rebuild-note.md'
 
-exec akb write another-note.md <../note2-input.md
+stdin ../note2-input.md
+exec akb write another-note.md
 stdout 'Written to kb/notes/another-note.md'
 
-exec akb write rebuild-decision.md <../adr-input.md
+stdin ../adr-input.md
+exec akb write rebuild-decision.md
 stdout 'Written to kb/decisions/rebuild-decision.md'
 
 # --- Rebuild index from filesystem ---
@@ -57,7 +26,7 @@ stdout 'Index rebuilt'
 
 exec akb index show
 stdout '## Notes'
-stdout '## Decisions'
+stdout '## Adrs'
 stdout 'Rebuild Note'
 stdout 'Another Note'
 stdout 'Rebuild Decision'
@@ -71,7 +40,7 @@ stdout 'rebuild-decision.md'
 
 # --- Rebuild after manual index add preserves all entries ---
 
-exec akb index add kb/notes/rebuild-note.md "Manual summary"
+exec akb index add kb/notes/rebuild-note.md 'Manual summary'
 stdout 'Added kb/notes/rebuild-note.md to index'
 
 # Rebuild regenerates from filesystem, replacing manual entry
@@ -102,3 +71,44 @@ stdout '# Index'
 ! stdout 'rebuild-note'
 ! stdout 'another-note'
 ! stdout 'rebuild-decision'
+
+-- note-input.md --
+---
+type: note
+title: Rebuild Note
+summary: Note for rebuild test
+tags: test
+---
+Note content for rebuild.
+
+-- note2-input.md --
+---
+type: note
+title: Another Note
+summary: Second note for rebuild
+tags: test
+---
+Second note content.
+
+-- adr-input.md --
+---
+type: adr
+title: Rebuild Decision
+status: proposed
+deciders: team
+summary: Decision for rebuild test
+tags: test
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+## Context
+
+ADR content for rebuild.
+
+## Decision
+
+Decided.
+
+## Consequences
+
+Recorded.

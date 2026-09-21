@@ -1,43 +1,5 @@
 # Content Management Verification — verify complete list, index, log, enhanced delete contract
 
--- note-input.md --
----
-type: note
-title: Gate Note
-summary: Note for content management verification
-tags: test
----
-Gate note content.
--- note-input.md --
-
--- note2-input.md --
----
-type: note
-title: Second Gate Note
-summary: Another note for verification
-tags: test
----
-Second gate note content.
--- note2-input.md --
-
--- adr-input.md --
----
-type: adr
-title: Gate Decision
-status: proposed
-deciders: team
-summary: Decision for content management verification
-tags: test
-created: '2026-01-01'
-updated: '2026-01-01'
----
-Gate ADR content.
--- adr-input.md --
-
--- append-input.md --
-Appended content line.
--- append-input.md --
-
 # === SETUP ===
 
 exec akb init test-kb
@@ -45,13 +7,16 @@ cd test-kb
 
 # === WRITE AND LIST ===
 
-exec akb write gate-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write gate-note.md
 stdout 'Written to kb/notes/gate-note.md'
 
-exec akb write second-note.md <../note2-input.md
+stdin ../note2-input.md
+exec akb write second-note.md
 stdout 'Written to kb/notes/second-note.md'
 
-exec akb write gate-decision.md <../adr-input.md
+stdin ../adr-input.md
+exec akb write gate-decision.md
 stdout 'Written to kb/decisions/gate-decision.md'
 
 # List shows all pages alphabetically
@@ -71,7 +36,7 @@ exec akb list
 
 # === INDEX ADD AND SHOW ===
 
-exec akb index add kb/notes/gate-note.md "Gate note summary"
+exec akb index add kb/notes/gate-note.md 'Gate note summary'
 stdout 'Added kb/notes/gate-note.md to index'
 
 exec akb index show
@@ -81,7 +46,7 @@ stdout 'gate-note.md'
 
 # === INDEX ADD UPDATES EXISTING ===
 
-exec akb index add kb/notes/gate-note.md "Updated gate summary"
+exec akb index add kb/notes/gate-note.md 'Updated gate summary'
 stdout 'Added kb/notes/gate-note.md to index'
 
 exec akb index show
@@ -98,9 +63,9 @@ exec akb index show
 
 # === INDEX REBUILD ===
 
-exec akb index add kb/notes/gate-note.md "Rebuild test"
-exec akb index add kb/notes/second-note.md "Second note"
-exec akb index add kb/decisions/gate-decision.md "Gate decision"
+exec akb index add kb/notes/gate-note.md 'Rebuild test'
+exec akb index add kb/notes/second-note.md 'Second note'
+exec akb index add kb/decisions/gate-decision.md 'Gate decision'
 
 exec akb index rebuild
 stdout 'Index rebuilt'
@@ -112,7 +77,7 @@ stdout 'Gate Decision'
 
 # === LOG APPEND AND SHOW ===
 
-exec akb log append ingest "Ingested all pages" --title "Initial Ingest"
+exec akb log append ingest 'Ingested all pages' --title 'Initial Ingest'
 
 exec akb log show
 stdout 'ingest'
@@ -121,7 +86,7 @@ stdout 'Ingested all pages'
 
 # === LOG SHOW --LAST ===
 
-exec akb log append update "Updated a page"
+exec akb log append update 'Updated a page'
 
 exec akb log show --last 1
 stdout 'Updated a page'
@@ -135,13 +100,13 @@ stdout 'Ingested all pages'
 
 # === LOG INVALID OPERATION ===
 
-! exec akb log append invalid "Bad operation"
+! exec akb log append invalid 'Bad operation'
 stderr 'invalid operation'
 
 # === DELETE WITH INDEX AND LOG ===
 
 # Re-add to index for delete test
-exec akb index add kb/notes/gate-note.md "Before delete"
+exec akb index add kb/notes/gate-note.md 'Before delete'
 
 exec akb delete notes/gate-note.md
 stdout 'Deleted kb/notes/gate-note.md'
@@ -159,7 +124,8 @@ stdout 'delete'
 
 # === DELETE PAGE NOT IN INDEX ===
 
-exec akb write unindexed.md <../note-input.md
+stdin ../note-input.md
+exec akb write unindexed.md
 stdout 'Written to kb/notes/unindexed.md'
 
 # Delete succeeds even without index entry
@@ -197,18 +163,20 @@ stdout 'Pages: 1'
 # === CORE I/O STILL WORKS ===
 
 # Write still works
-exec akb write verify-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write verify-note.md
 stdout 'Written to kb/notes/verify-note.md'
 
 # Read still works
-exec akb read verify-note.md
+exec akb read notes/verify-note.md
 stdout 'Gate Note'
 
 # Append still works
-exec akb append notes/verify-note.md <../append-input.md
+stdin ../append-input.md
+exec akb append notes/verify-note.md
 stdout 'Appended to kb/notes/verify-note.md'
 
-exec akb read verify-note.md
+exec akb read notes/verify-note.md
 stdout 'Appended content line.'
 
 # Basic delete still works
@@ -216,3 +184,47 @@ exec akb delete notes/verify-note.md
 stdout 'Deleted kb/notes/verify-note.md'
 
 ! exists kb/notes/verify-note.md
+
+-- note-input.md --
+---
+type: note
+title: Gate Note
+summary: Note for content management verification
+tags: test
+---
+Gate note content.
+
+-- note2-input.md --
+---
+type: note
+title: Second Gate Note
+summary: Another note for verification
+tags: test
+---
+Second gate note content.
+
+-- adr-input.md --
+---
+type: adr
+title: Gate Decision
+status: proposed
+deciders: team
+summary: Decision for content management verification
+tags: test
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+## Context
+
+Gate ADR content.
+
+## Decision
+
+Decided.
+
+## Consequences
+
+Recorded.
+
+-- append-input.md --
+Appended content line.

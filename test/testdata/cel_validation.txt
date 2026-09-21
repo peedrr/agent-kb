@@ -2,146 +2,6 @@
 
 # --- Input files ---
 
--- valid-adr.md --
----
-type: adr
-title: Use SQLite
-summary: We decided to use SQLite
-tags: [database]
-status: proposed
-deciders: team
-created: "2026-01-01T00:00:00Z"
-updated: "2026-04-21T00:00:00Z"
----
-
-# Use SQLite
-
-## Context
-
-We need a search solution.
-
-## Decision
-
-Use SQLite with FTS5.
-
-## Consequences
-
-Fast full-text search.
--- valid-adr.md --
-
--- invalid-adr.md --
-type: adr
-title: Missing Context
-summary: ADR without context section
-tags: [test]
-status: proposed
-deciders: team
-created: "2026-01-01T00:00:00Z"
-updated: "2026-04-21T00:00:00Z"
----
-
-# Missing Context
-
-## Decision
-
-We decided something.
--- invalid-adr.md --
-
--- append-content.md --
-## Consequences
-
-This was appended.
--- append-content.md --
-
--- custom-template.yaml --
-name: custom
-description: Custom template for testing
-dir: custom
-schema:
-  frontmatter:
-    title:
-      type: string
-      required: true
-    type:
-      type: string
-      required: true
-    status:
-      type: string
-      required: true
-      enum:
-        - active
-        - inactive
-validations:
-  - id: has_heading
-    rule: 'page.ast.headings.exists(h, h.level == 1)'
-    requirement: Must have an H1 heading
-    expect: page must have an H1 heading
-lint_rules:
-  - id: custom_stale
-    rule: 'now > timestamp("2000-01-01T00:00:00Z")'
-    severity: warning
-    expect: Clock is working
--- custom-template.yaml --
-
--- custom-pass.md --
----
-type: custom
-title: Valid Custom
-status: active
----
-
-# Heading
-
-Content here.
--- custom-pass.md --
-
--- custom-fail.md --
----
-type: custom
-title: Invalid Custom
-status: active
----
-
-No heading here, just plain text.
--- custom-fail.md --
-
--- unsatisfiable-template.yaml --
-name: bad
-description: Template with unsatisfiable rule
-dir: bad
-schema:
-  frontmatter:
-    title:
-      type: string
-      required: true
-    type:
-      type: string
-      required: true
-validations:
-  - id: always_fails
-    rule: 'page.frontmatter.title == ""'
-    requirement: Title must be empty
-    expect: title must be empty
--- unsatisfiable-template.yaml --
-
--- unsatisfiable-pass.md --
----
-type: bad
-title: Has Title
----
-
-# Heading
--- unsatisfiable-pass.md --
-
--- unsatisfiable-fail.md --
----
-type: bad
-title: Also Has Title
----
-
-# Heading
--- unsatisfiable-fail.md --
-
 # ============================================================
 # Section 1: Write validation success
 # ============================================================
@@ -149,14 +9,16 @@ title: Also Has Title
 exec akb init cel-kb
 cd cel-kb
 
-exec akb write adr/use-sqlite.md <../valid-adr.md
-stdout 'Written to kb/decisions/use-sqlite.md'
+stdin ../valid-adr.md
+exec akb write adr/use-sqlite.md
+stdout 'Written to kb/decisions/adr/use-sqlite.md'
 
 # ============================================================
 # Section 2: Write validation failure (missing Context heading)
 # ============================================================
 
-! exec akb write adr/missing-context.md <../invalid-adr.md
+stdin ../invalid-adr.md
+! exec akb write adr/missing-context.md
 stderr 'require_context'
 stderr 'page must have a .## Context. heading'
 
@@ -164,14 +26,15 @@ stderr 'page must have a .## Context. heading'
 # Section 3: --append validation (append to valid page)
 # ============================================================
 
-exec akb write adr/use-sqlite.md --append <../append-content.md
-stdout 'Appended to kb/decisions/use-sqlite.md'
+stdin ../append-content.md
+exec akb write decisions/adr/use-sqlite.md --append
+stdout 'Appended to kb/decisions/adr/use-sqlite.md'
 
 # ============================================================
 # Section 4: --frontmatter validation with old_page
 # ============================================================
 
-! exec akb write --frontmatter status=invalid decisions/use-sqlite.md
+! exec akb write --frontmatter status=invalid decisions/adr/use-sqlite.md
 stderr 'valid_status'
 stderr 'status must be one of proposed, accepted, deprecated, superseded'
 
@@ -221,5 +84,136 @@ exists .akb/templates/custom_fail.md
 # ============================================================
 
 ! exec akb template write bad --template ../unsatisfiable-template.yaml --pass ../unsatisfiable-pass.md --fail ../unsatisfiable-fail.md
-stderr 'pass mockup: validation\(s\) failed'
+stderr 'Provide updated mockup'
 
+-- valid-adr.md --
+---
+type: adr
+title: Use SQLite
+summary: We decided to use SQLite
+tags: [database]
+status: proposed
+deciders: team
+created: "2026-01-01T00:00:00Z"
+updated: "2026-09-01T00:00:00Z"
+---
+
+# Use SQLite
+
+## Context
+
+We need a search solution.
+
+## Decision
+
+Use SQLite with FTS5.
+
+## Consequences
+
+Fast full-text search.
+
+-- invalid-adr.md --
+---
+type: adr
+title: Missing Context
+summary: ADR without context section
+tags: [test]
+status: proposed
+deciders: team
+created: "2026-01-01T00:00:00Z"
+updated: "2026-09-01T00:00:00Z"
+---
+
+# Missing Context
+
+## Decision
+
+We decided something.
+
+-- append-content.md --
+## Consequences
+
+This was appended.
+
+-- custom-template.yaml --
+name: custom
+description: Custom template for testing
+dir: custom
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    type:
+      type: string
+      required: true
+    status:
+      type: string
+      required: true
+      enum:
+        - active
+        - inactive
+validations:
+  - id: has_heading
+    rule: 'page.ast.headings.exists(h, h.level == 1)'
+    requirement: Must have an H1 heading
+    expect: page must have an H1 heading
+lint_rules:
+  - id: custom_stale
+    rule: 'now > timestamp("2000-01-01T00:00:00Z")'
+    severity: warning
+    expect: Clock is working
+
+-- custom-pass.md --
+---
+type: custom
+title: Valid Custom
+status: active
+---
+
+# Heading
+
+Content here.
+
+-- custom-fail.md --
+---
+type: custom
+title: Invalid Custom
+status: active
+---
+
+No heading here, just plain text.
+
+-- unsatisfiable-template.yaml --
+name: bad
+description: Template with unsatisfiable rule
+dir: bad
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    type:
+      type: string
+      required: true
+validations:
+  - id: always_fails
+    rule: 'page.frontmatter.title == ""'
+    requirement: Title must be empty
+    expect: title must be empty
+
+-- unsatisfiable-pass.md --
+---
+type: bad
+title: Has Title
+---
+
+# Heading
+
+-- unsatisfiable-fail.md --
+---
+type: bad
+title: Also Has Title
+---
+
+# Heading

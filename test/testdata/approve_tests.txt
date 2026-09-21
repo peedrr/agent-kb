@@ -1,55 +1,17 @@
 # Approve Tests — verify approve command behavior
 
--- draft-note.md --
----
-type: note
-title: Draft Note
-summary: A draft
- tags: test
----
-Some content.
-<!-- olw-auto: action=review -->
-^[inferred] A claim.
-^[ambiguous] Another claim.
-^[extracted] Data.
-More content.
--- draft-note.md --
-
--- code-block-note.md --
----
-type: note
-title: Code Note
-summary: Has code blocks
- tags: test
----
-^[inferred] Outside code.
-```
-^[inferred] Inside code.
-```
--- code-block-note.md --
-
--- approved-note.md --
----
-type: note
-title: Already Approved
-summary: Pre-approved
- tags: test
-is_draft: false
----
-Content here.
--- approved-note.md --
-
 # Setup: initialize a KB
 exec akb init test-kb
 cd test-kb
 
 # --- Write draft note ---
-exec akb write draft-note.md <../draft-note.md
+stdin ../draft-note.md
+exec akb write draft-note.md
 stdout 'Written to kb/notes/draft-note.md'
 
 # --- Approve draft note ---
 exec akb approve notes/draft-note.md
-stdout "Approved 'notes/draft-note.md'"
+stdout 'Approved ''notes/draft-note.md'''
 
 # --- Verify annotations stripped ---
 exec akb read notes/draft-note.md
@@ -57,9 +19,9 @@ exec akb read notes/draft-note.md
 
 # --- Verify provenance markers stripped ---
 exec akb read notes/draft-note.md
-! stdout '^[inferred]'
-! stdout '^[ambiguous]'
-! stdout '^[extracted]'
+! stdout '\^\[inferred\]'
+! stdout '\^\[ambiguous\]'
+! stdout '\^\[extracted\]'
 
 # --- Verify regular content preserved ---
 exec akb read notes/draft-note.md
@@ -67,25 +29,63 @@ stdout 'Some content.'
 stdout 'More content.'
 
 # --- Write note with code blocks ---
-exec akb write code-block-note.md <../code-block-note.md
+stdin ../code-block-note.md
+exec akb write code-block-note.md
 stdout 'Written to kb/notes/code-block-note.md'
 
 # --- Approve code block note ---
 exec akb approve notes/code-block-note.md
-stdout "Approved 'notes/code-block-note.md'"
+stdout 'Approved ''notes/code-block-note.md'''
 
 # --- Verify marker inside code block preserved ---
 exec akb read notes/code-block-note.md
-stdout '^[inferred] Inside code.'
+stdout '\^\[inferred\] Inside code.'
 
 # --- Verify marker outside code block stripped ---
 exec akb read notes/code-block-note.md
-! stdout '^[inferred] Outside code.'
+! stdout '\^\[inferred\] Outside code.'
 
 # --- Write already-approved note ---
-exec akb write approved-note.md <../approved-note.md
+stdin ../approved-note.md
+exec akb write approved-note.md
 stdout 'Written to kb/notes/approved-note.md'
 
 # --- Approve already-approved note is no-op ---
 exec akb approve notes/approved-note.md
-stdout "Page 'notes/approved-note.md' is already approved"
+stdout 'Page ''notes/approved-note.md'' is already approved'
+
+-- draft-note.md --
+---
+type: note
+title: Draft Note
+summary: A draft
+tags: test
+---
+Some content.
+<!-- olw-auto: action=review -->
+^[inferred] A claim.
+^[ambiguous] Another claim.
+^[extracted] Data.
+More content.
+
+-- code-block-note.md --
+---
+type: note
+title: Code Note
+summary: Has code blocks
+tags: test
+---
+^[inferred] Outside code.
+```
+^[inferred] Inside code.
+```
+
+-- approved-note.md --
+---
+type: note
+title: Already Approved
+summary: Pre-approved
+tags: test
+is_draft: false
+---
+Content here.

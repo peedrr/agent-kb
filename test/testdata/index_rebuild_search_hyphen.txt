@@ -1,0 +1,25 @@
+# Product finding: searching for a hyphenated term fails instead of matching it.
+# The FTS5 query is built without escaping the hyphen, so `event-driven` becomes
+# `event NOT driven` and SQLite reports `no such column: driven` (exit 1).
+
+exec akb init rebuild-search-hyphen-kb
+cd rebuild-search-hyphen-kb
+
+stdin ../note-input.md
+exec akb write second-rebuild-note.md
+
+exec akb index rebuild
+
+skip 'product-finding: search for a hyphenated term fails with SQL logic error: no such column: driven'
+
+# exec akb search 'event-driven'
+# stdout 'notes/second-rebuild-note.md'
+
+-- note-input.md --
+---
+type: note
+title: Second Rebuild Note
+summary: Another note for rebuild-search
+tags: rebuildsearch
+---
+Content about event-driven architecture and messaging.

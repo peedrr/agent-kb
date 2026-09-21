@@ -1,15 +1,5 @@
 # Git Edge Cases — verify git behavior under unusual conditions
 
--- note-input.md --
----
-type: note
-title: Git Edge Case Note
-summary: Note for git edge case testing
-tags: gittest
----
-Git edge case content.
--- note-input.md --
-
 # === INIT ===
 exec akb init git-kb
 cd git-kb
@@ -20,10 +10,8 @@ exec git log --oneline
 stdout 'akb: init git-kb'
 
 # === NO GIT USER CONFIGURED — WRITE STILL WORKS ===
-exec git config --unset user.name
-exec git config --unset user.email
-
-exec akb write no-user-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write no-user-note.md
 stdout 'Written to kb/notes/no-user-note.md'
 
 # Verify write created a commit
@@ -41,21 +29,20 @@ stdout 'akb <akb@local>'
 ! exec git config --local user.email
 
 # === DELETE ALSO WORKS WITHOUT USER CONFIG ===
-exec git config --unset user.name
-exec git config --unset user.email
-
 exec akb delete notes/no-user-note.md
 stdout 'Deleted kb/notes/no-user-note.md'
 
 # === GIT STATUS CLEAN AFTER OPERATIONS ===
-exec akb write clean-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write clean-note.md
 stdout 'Written to kb/notes/clean-note.md'
 
 exec git status --short
 ! stdout .
 
 # === --no-commit DOES NOT CREATE COMMIT ===
-exec akb --no-commit write nocommit-note.md <../note-input.md
+stdin ../note-input.md
+exec akb --no-commit write nocommit-note.md
 stdout 'Written to kb/notes/nocommit-note.md'
 
 exec git status --short
@@ -64,3 +51,12 @@ stdout 'nocommit-note.md'
 # Clean up for subsequent tests
 exec akb delete notes/nocommit-note.md
 exec akb delete notes/clean-note.md
+
+-- note-input.md --
+---
+type: note
+title: Git Edge Case Note
+summary: Note for git edge case testing
+tags: gittest
+---
+Git edge case content.

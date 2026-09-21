@@ -1,15 +1,5 @@
 # Log Show and Append Tests — verify log entry management
 
--- note-input.md --
----
-type: note
-title: Log Test Note
-summary: Note for log testing
-tags: test
----
-Note content for log test.
--- note-input.md --
-
 # --- Setup: initialize KB ---
 
 exec akb init test-kb
@@ -22,7 +12,7 @@ exec akb log show
 
 # --- Append a log entry with title ---
 
-exec akb log append ingest "Ingested notes" --title "Note One"
+exec akb log append ingest 'Ingested notes' --title 'Note One'
 
 # --- Show log contains the entry ---
 
@@ -33,7 +23,7 @@ stdout 'Ingested notes'
 
 # --- Append another entry without title ---
 
-exec akb log append delete "Removed page"
+exec akb log append delete 'Removed page'
 
 exec akb log show
 stdout 'delete'
@@ -58,30 +48,39 @@ exec akb log show --type nonexistent
 
 # --- Invalid operation type is rejected ---
 
-! exec akb log append invalid "Bad operation"
+! exec akb log append invalid 'Bad operation'
 stderr 'invalid operation'
 stderr 'ingest, delete, update, lint, query'
 
 # --- All valid operation types work ---
 
-exec akb log append update "Updated content"
+exec akb log append update 'Updated content'
 
 exec akb log show --type update
 stdout 'Updated content'
 
-exec akb log append lint "Linted files"
+exec akb log append lint 'Linted files'
 
 exec akb log show --type lint
 stdout 'Linted files'
 
-exec akb log append query "Searched content"
+exec akb log append query 'Searched content'
 
 exec akb log show --type query
 stdout 'Searched content'
 
 # --- Log entry with title renders title ---
 
-exec akb log append ingest "Another ingest" --title "Title Entry"
+exec akb log append ingest 'Another ingest' --title 'Title Entry'
 
 exec akb log show --last 1
 stdout 'Title Entry'
+
+-- note-input.md --
+---
+type: note
+title: Log Test Note
+summary: Note for log testing
+tags: test
+---
+Note content for log test.

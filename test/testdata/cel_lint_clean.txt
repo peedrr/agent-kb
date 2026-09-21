@@ -1,0 +1,30 @@
+# CEL Lint — clean KB whose only page is fresh
+
+# Create a clean KB
+exec akb init clean-cel-kb
+cd clean-cel-kb
+
+stdin ../fresh-note.md
+exec akb write notes/fresh.md
+stdout 'Written to kb/notes/fresh.md'
+
+exec akb index add kb/notes/fresh.md 'Fresh note'
+
+# In a clean KB with only fresh pages, the orphan warning is the only
+# issue and lint still exits 0.
+exec akb lint
+stdout 'orphans'
+! stdout 'note_stale'
+
+# A successful exec already asserts exit code 0
+
+-- fresh-note.md --
+---
+type: note
+title: Fresh Note
+summary: A recently updated note
+tags: [linttest]
+created: "2026-01-01T00:00:00Z"
+updated: "2026-09-01T00:00:00Z"
+---
+This note is fresh.

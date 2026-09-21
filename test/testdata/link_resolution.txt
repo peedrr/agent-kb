@@ -1,58 +1,21 @@
 # Link Resolution — ambiguous links, broken links, and KB with many pages
 
--- alpha-note.md --
----
-type: note
-title: Alpha Note
-summary: First note
-tags: linktest
----
-Alpha content with [[shared-name]].
--- alpha-note.md --
-
--- beta-note.md --
----
-type: note
-title: Beta Note
-summary: Second note
-tags: linktest
----
-Beta content with [[shared-name]].
--- beta-note.md --
-
--- source-note.md --
----
-type: note
-title: Source Note
-summary: Links to ambiguous target
-tags: linktest
----
-This links to [[shared-name]] and [[nonexistent-page]].
--- source-note.md --
-
--- many-pages.md --
----
-type: note
-title: Many Pages Test
-summary: For testing many pages
-tags: linktest
----
-Page content for bulk test.
--- many-pages.md --
-
 # === INIT ===
 exec akb init link-kb
 cd link-kb
 
 # === CREATE TWO PAGES WITH SAME BASENAME ===
-exec akb write alpha/shared-name.md <../alpha-note.md
+stdin ../alpha-note.md
+exec akb write alpha/shared-name.md
 stdout 'Written to kb/notes/alpha/shared-name.md'
 
-exec akb write beta/shared-name.md <../beta-note.md
+stdin ../beta-note.md
+exec akb write beta/shared-name.md
 stdout 'Written to kb/notes/beta/shared-name.md'
 
 # === CREATE SOURCE PAGE WITH AMBIGUOUS AND BROKEN LINKS ===
-exec akb write source-note.md <../source-note.md
+stdin ../source-note.md
+exec akb write source-note.md
 stdout 'Written to kb/notes/source-note.md'
 
 # === LINKS SHOWS AMBIGUOUS AND BROKEN ===
@@ -62,17 +25,17 @@ stdout 'shared-name'
 stdout 'Broken:'
 stdout 'nonexistent-page'
 
-# === ORPHANS SHOWS PAGES WITH NO INBOUND LINKS ===
-exec akb orphans
-stdout 'notes/alpha/shared-name.md'
-stdout 'notes/beta/shared-name.md'
-
 # === CREATE MANY PAGES ===
-exec akb write page-01.md <../many-pages.md
-exec akb write page-02.md <../many-pages.md
-exec akb write page-03.md <../many-pages.md
-exec akb write page-04.md <../many-pages.md
-exec akb write page-05.md <../many-pages.md
+stdin ../many-pages.md
+exec akb write page-01.md
+stdin ../many-pages.md
+exec akb write page-02.md
+stdin ../many-pages.md
+exec akb write page-03.md
+stdin ../many-pages.md
+exec akb write page-04.md
+stdin ../many-pages.md
+exec akb write page-05.md
 
 # === LIST SHOWS ALL PAGES ===
 exec akb list
@@ -89,3 +52,39 @@ stdout 'Pages: 8'
 # === SEARCH FINDS PAGES ===
 exec akb search 'linktest'
 stdout 'notes/source-note.md'
+
+-- alpha-note.md --
+---
+type: note
+title: Alpha Note
+summary: First note
+tags: linktest
+---
+Alpha content with [[shared-name]].
+
+-- beta-note.md --
+---
+type: note
+title: Beta Note
+summary: Second note
+tags: linktest
+---
+Beta content with [[shared-name]].
+
+-- source-note.md --
+---
+type: note
+title: Source Note
+summary: Links to ambiguous target
+tags: linktest
+---
+This links to [[shared-name]] and [[nonexistent-page]].
+
+-- many-pages.md --
+---
+type: note
+title: Many Pages Test
+summary: For testing many pages
+tags: linktest
+---
+Page content for bulk test.

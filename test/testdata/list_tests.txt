@@ -1,39 +1,5 @@
 # List Command Tests — verify list output format and filtering
 
--- note-input.md --
----
-type: note
-title: Alpha Note
-summary: First test note
-tags: test
----
-Alpha note content.
--- note-input.md --
-
--- note2-input.md --
----
-type: note
-title: Beta Note
-summary: Second test note
-tags: test
----
-Beta note content.
--- note2-input.md --
-
--- adr-input.md --
----
-type: adr
-title: Decision One
-status: proposed
-deciders: team
-summary: A test decision
-tags: test
-created: '2026-01-01'
-updated: '2026-01-01'
----
-ADR content here.
--- adr-input.md --
-
 # --- Empty KB produces no output ---
 
 exec akb init test-kb
@@ -44,13 +10,16 @@ exec akb list
 
 # --- List shows pages after writing ---
 
-exec akb write alpha-note.md <../note-input.md
+stdin ../note-input.md
+exec akb write alpha-note.md
 stdout 'Written to kb/notes/alpha-note.md'
 
-exec akb write beta-note.md <../note2-input.md
+stdin ../note2-input.md
+exec akb write beta-note.md
 stdout 'Written to kb/notes/beta-note.md'
 
-exec akb write decision-one.md <../adr-input.md
+stdin ../adr-input.md
+exec akb write decision-one.md
 stdout 'Written to kb/decisions/decision-one.md'
 
 # List output contains page paths
@@ -83,3 +52,44 @@ exec akb list
 ! stdout 'alpha-note'
 stdout 'notes/beta-note.md'
 stdout 'decisions/decision-one.md'
+
+-- note-input.md --
+---
+type: note
+title: Alpha Note
+summary: First test note
+tags: test
+---
+Alpha note content.
+
+-- note2-input.md --
+---
+type: note
+title: Beta Note
+summary: Second test note
+tags: test
+---
+Beta note content.
+
+-- adr-input.md --
+---
+type: adr
+title: Decision One
+status: proposed
+deciders: team
+summary: A test decision
+tags: test
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+## Context
+
+ADR content here.
+
+## Decision
+
+Decided.
+
+## Consequences
+
+Recorded.
