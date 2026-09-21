@@ -2,14 +2,39 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+
+	"github.com/peedrr/agent-kb/internal/config"
+	"github.com/peedrr/agent-kb/internal/path"
 )
 
 var (
 	noCommit bool
 	kbFlag   string
 )
+
+// mutatingCommands lists the commands that write to the knowledge base, keyed
+// by command path. Read-only commands and commands that work outside a
+// knowledge base (init, skill install) are absent, so they neither resolve a
+// base nor report one.
+var mutatingCommands = map[string]bool{
+	"akb write":           true,
+	"akb append":          true,
+	"akb delete":          true,
+	"akb approve":         true,
+	"akb index add":       true,
+	"akb index remove":    true,
+	"akb index rebuild":   true,
+	"akb log append":      true,
+	"akb raw write":       true,
+	"akb raw delete":      true,
+	"akb raw sync":        true,
+	"akb template write":  true,
+	"akb template delete": true,
+}
 
 // usageClassificationInstalled reports whether the cobra error conversions
 // were installed, so Execute installs them once per process.
@@ -28,6 +53,7 @@ var RootCmd = &cobra.Command{
 func init() {
 	RootCmd.PersistentFlags().BoolVar(&noCommit, "no-commit", false, "skip git commit")
 	RootCmd.PersistentFlags().StringVar(&kbFlag, "kb", "", "knowledge base path (defaults to the AKB_KB environment variable)")
+	RootCmd.PersistentPreRunE = reportKBIdentity
 	RootCmd.AddCommand(initCmd)
 	RootCmd.AddCommand(statusCmd)
 	RootCmd.AddCommand(writeCmd)
@@ -46,6 +72,37 @@ func init() {
 	RootCmd.AddCommand(approveCmd)
 	RootCmd.AddCommand(skillCmd)
 	RootCmd.AddCommand(templateCmd)
+}
+
+// reportKBIdentity names the knowledge base a mutating command acts on, once,
+// on stderr, after the base was resolved and before the command acts. Commands
+// outside mutatingCommands report nothing and resolve nothing.
+func reportKBIdentity(cmd *cobra.Command, _ []string) error {
+	if !mutatingCommands[cmd.CommandPath()] {
+		return nil
+	}
+
+	kbRoot, err := path.ResolveKB(kbFlag)
+	if err != nil {
+		return fmt.Errorf("resolve knowledge base: %w", err)
+	}
+
+	line, err := kbIdentityLine(kbRoot)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stderr, line)
+	return nil
+}
+
+// kbIdentityLine renders the identity line of a knowledge base: the name from
+// its .akb.yaml and its absolute path.
+func kbIdentityLine(kbRoot string) (string, error) {
+	cfg, err := config.Load(filepath.Join(kbRoot, ".akb", ".akb.yaml"))
+	if err != nil {
+		return "", fmt.Errorf("load config: %w", err)
+	}
+	return fmt.Sprintf("kb: %s (%s)", cfg.Name, kbRoot), nil
 }
 
 // Execute runs the CLI and returns the failure of the command it ran, wrapped
