@@ -713,3 +713,41 @@ func TestDiscoverLeavesTheTreeUnchanged(t *testing.T) {
 		t.Errorf("Discover changed the tree:\nbefore: %v\nafter:  %v", before, after)
 	}
 }
+
+func TestResolveKBNoSelectionListsNearbyBases(t *testing.T) {
+	_, work := scanEnvironment(t)
+	t.Setenv(KBEnvVar, "")
+
+	makeKBFixture(t, filepath.Join(work, "nearby"), "name: nearby\ndescription: nearby base\n")
+
+	_, err := ResolveKB("")
+	if !errors.Is(err, ErrNoKB) {
+		t.Fatalf("expected ErrNoKB, got %v", err)
+	}
+
+	message := err.Error()
+	for _, want := range []string{
+		"nearby",
+		filepath.Join(work, "nearby"),
+		"nearby base",
+		"--kb <path>",
+		"AKB_KB=<path>",
+	} {
+		if !strings.Contains(message, want) {
+			t.Errorf("error %q does not contain %q", message, want)
+		}
+	}
+}
+
+func TestResolveKBNoSelectionWithoutNearbyBasesKeepsTheRuleText(t *testing.T) {
+	scanEnvironment(t)
+	t.Setenv(KBEnvVar, "")
+
+	_, err := ResolveKB("")
+	if err == nil {
+		t.Fatal("expected ErrNoKB")
+	}
+	if err.Error() != ErrNoKB.Error() {
+		t.Errorf("error = %q, want the bare rule text %q", err.Error(), ErrNoKB.Error())
+	}
+}

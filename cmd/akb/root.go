@@ -55,6 +55,7 @@ func init() {
 	RootCmd.PersistentFlags().StringVar(&kbFlag, "kb", "", "knowledge base path (defaults to the AKB_KB environment variable)")
 	RootCmd.PersistentPreRunE = reportKBIdentity
 	RootCmd.AddCommand(initCmd)
+	RootCmd.AddCommand(discoverCmd)
 	RootCmd.AddCommand(statusCmd)
 	RootCmd.AddCommand(writeCmd)
 	RootCmd.AddCommand(readCmd)

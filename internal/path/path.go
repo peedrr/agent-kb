@@ -135,7 +135,7 @@ func ResolveKB(flagKB string) (string, error) {
 		if note := DeprecatedRegistryNote(); note != "" {
 			fmt.Fprintln(os.Stderr, note)
 		}
-		return "", &GuardError{rule: ErrNoKB}
+		return "", &GuardError{rule: noKBError()}
 	}
 
 	expanded, err := expandHome(selected)
@@ -437,4 +437,20 @@ func FormatDiscovered(discovered []DiscoveredKB) string {
 	}
 	b.WriteString("\n\nselect one with --kb <path> or AKB_KB=<path>")
 	return b.String()
+}
+
+// noKBError reports the missing knowledge base selection, listing the bases
+// the neighborhood scan found so the next invocation can select one of them.
+// The error still wraps ErrNoKB.
+func noKBError() error {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ErrNoKB
+	}
+
+	discovered := Discover(cwd)
+	if len(discovered) == 0 {
+		return ErrNoKB
+	}
+	return fmt.Errorf("%w\n\n%s", ErrNoKB, FormatDiscovered(discovered))
 }
