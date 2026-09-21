@@ -67,6 +67,17 @@ func init() {
 	writeCmd.Flags().StringArrayVar(&writeFrontmatter, "frontmatter", nil, "update frontmatter field(s) as key=value")
 }
 
+// pageWriteState describes what the write step left behind when a database
+// step after it fails: the git provider commits the page before the search and
+// link-graph updates run, so the page is already on its branch, unless
+// --no-commit left it staged.
+func pageWriteState() string {
+	if noCommit {
+		return "page file written and staged but not committed (--no-commit)"
+	}
+	return "page file committed to git"
+}
+
 func runWrite(_ *cobra.Command, args []string) error {
 	inputPath := args[0]
 
@@ -549,12 +560,12 @@ func runWrite(_ *cobra.Command, args []string) error {
 
 	searcher := search.NewSQLiteFTS5Searcher(dbConn)
 	if err := searcher.IndexPage(ctx, relPath, fm.Title, string(body), tags, summary, fm.Type); err != nil {
-		return fmt.Errorf("index page: %w", err)
+		return fmt.Errorf("index page: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState())
 	}
 
 	updater := linkgraph.NewSQLiteLinkGraph(dbConn)
 	if err := updater.UpdatePageLinks(ctx, relPath, string(writeContent)); err != nil {
-		return fmt.Errorf("update links: %w", err)
+		return fmt.Errorf("update links: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState())
 	}
 
 	// Output
