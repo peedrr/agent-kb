@@ -25,6 +25,8 @@ type SQLiteLinkGraph struct {
 	db *sql.DB
 }
 
+var _ TxUpdater = (*SQLiteLinkGraph)(nil)
+
 // NewSQLiteLinkGraph creates a new SQLiteLinkGraph backed by the given database.
 func NewSQLiteLinkGraph(db *sql.DB) *SQLiteLinkGraph {
 	return &SQLiteLinkGraph{db: db}
@@ -54,7 +56,7 @@ func (g *SQLiteLinkGraph) UpdatePageLinks(ctx context.Context, path string, cont
 	}
 	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
 
-	if err := updatePageLinksTx(ctx, tx, path, content); err != nil {
+	if err := g.UpdatePageLinksTx(ctx, tx, path, content); err != nil {
 		return err
 	}
 
@@ -64,8 +66,11 @@ func (g *SQLiteLinkGraph) UpdatePageLinks(ctx context.Context, path string, cont
 	return nil
 }
 
-// updatePageLinksTx replaces the outgoing links of one page using the given transaction.
-func updatePageLinksTx(ctx context.Context, tx *sql.Tx, path string, content string) error {
+// UpdatePageLinksTx replaces the outgoing links of one page using tx, a
+// transaction on the link graph's database. The caller decides whether the
+// write commits, so the link-graph step can be grouped with other index steps in
+// one transaction.
+func (g *SQLiteLinkGraph) UpdatePageLinksTx(ctx context.Context, tx *sql.Tx, path string, content string) error {
 	wikilinks := dedupeWikilinksByTarget(markdown.ParseWikilinks(content))
 
 	if _, err := tx.ExecContext(ctx,
@@ -116,6 +121,21 @@ func (g *SQLiteLinkGraph) RemovePage(ctx context.Context, path string) error {
 	}
 	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
 
+	if err := g.RemovePageTx(ctx, tx, path); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
+// RemovePageTx deletes the page row and every link that starts at or resolves to
+// path using tx, a transaction on the link graph's database. The caller decides
+// whether the deletion commits, so the removal can be grouped with other index
+// steps in one transaction.
+func (g *SQLiteLinkGraph) RemovePageTx(ctx context.Context, tx *sql.Tx, path string) error {
 	if _, err := tx.ExecContext(ctx,
 		"DELETE FROM pages WHERE path = ?",
 		path,
@@ -130,9 +150,6 @@ func (g *SQLiteLinkGraph) RemovePage(ctx context.Context, path string) error {
 		return fmt.Errorf("delete links: %w", err)
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
-	}
 	return nil
 }
 
@@ -179,7 +196,7 @@ func (g *SQLiteLinkGraph) RebuildLinks(ctx context.Context, kbRoot string) error
 		}
 		relPath = filepath.ToSlash(relPath)
 
-		if err := updatePageLinksTx(ctx, tx, relPath, string(content)); err != nil {
+		if err := g.UpdatePageLinksTx(ctx, tx, relPath, string(content)); err != nil {
 			return fmt.Errorf("update links for %s: %w", relPath, err)
 		}
 

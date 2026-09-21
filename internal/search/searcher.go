@@ -1,6 +1,9 @@
 package search
 
-import "context"
+import (
+	"context"
+	"database/sql"
+)
 
 // SearchResult represents a search result from the index.
 //
@@ -24,6 +27,9 @@ type SearchOptions struct {
 }
 
 // Searcher provides full-text search over the knowledge base.
+//
+// Every method runs in a transaction of its own. TxSearcher offers the two
+// index writes on a transaction owned by the caller instead.
 type Searcher interface {
 	// IndexPage adds or updates a page in the search index.
 	// The path is relative to KB root (e.g., "notes/my-note.md").
@@ -38,4 +44,18 @@ type Searcher interface {
 
 	// RebuildIndex rebuilds the entire search index from scratch.
 	RebuildIndex(ctx context.Context, kbRoot string) error
+}
+
+// TxSearcher provides the search-index writes on a transaction owned by the
+// caller, so the search-index step can commit or roll back together with other
+// index steps. The transaction must belong to the same database as the
+// implementation.
+type TxSearcher interface {
+	// IndexPageTx adds or updates a page in the search index using tx.
+	// The path is relative to KB root (e.g., "notes/my-note.md").
+	IndexPageTx(ctx context.Context, tx *sql.Tx, path, title, content, tags, summary, pageType string) error
+
+	// RemovePageTx removes a page from the search index using tx.
+	// The path is relative to KB root (e.g., "notes/my-note.md").
+	RemovePageTx(ctx context.Context, tx *sql.Tx, path string) error
 }

@@ -19,6 +19,8 @@ type SQLiteFTS5Searcher struct {
 	db *sql.DB
 }
 
+var _ TxSearcher = (*SQLiteFTS5Searcher)(nil)
+
 // NewSQLiteFTS5Searcher creates a new SQLiteFTS5Searcher with the given database connection.
 func NewSQLiteFTS5Searcher(db *sql.DB) *SQLiteFTS5Searcher {
 	return &SQLiteFTS5Searcher{db: db}
@@ -33,7 +35,7 @@ func (s *SQLiteFTS5Searcher) IndexPage(ctx context.Context, path, title, content
 	}
 	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
 
-	if err := indexPageTx(ctx, tx, path, title, content, tags, summary, pageType); err != nil {
+	if err := s.IndexPageTx(ctx, tx, path, title, content, tags, summary, pageType); err != nil {
 		return err
 	}
 
@@ -43,9 +45,11 @@ func (s *SQLiteFTS5Searcher) IndexPage(ctx context.Context, path, title, content
 	return nil
 }
 
-// indexPageTx writes the documents, pages_fts, and pages rows for one page
-// using the given transaction.
-func indexPageTx(ctx context.Context, tx *sql.Tx, path, title, content, tags, summary, pageType string) error {
+// IndexPageTx writes the documents, pages_fts, and pages rows for one page
+// using tx, a transaction on the searcher's database. The caller decides
+// whether the write commits, so the search-index step can be grouped with other
+// index steps in one transaction.
+func (s *SQLiteFTS5Searcher) IndexPageTx(ctx context.Context, tx *sql.Tx, path, title, content, tags, summary, pageType string) error {
 	_, _ = tx.ExecContext(ctx, "DELETE FROM pages_fts WHERE rowid = (SELECT id FROM documents WHERE path = ?)", path)
 
 	_, err := tx.ExecContext(ctx,
@@ -80,6 +84,21 @@ func (s *SQLiteFTS5Searcher) RemovePage(ctx context.Context, path string) error 
 	}
 	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
 
+	if err := s.RemovePageTx(ctx, tx, path); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
+// RemovePageTx deletes the documents, pages_fts, and pages rows for one page
+// using tx, a transaction on the searcher's database. The caller decides
+// whether the deletion commits, so the removal can be grouped with other index
+// steps in one transaction.
+func (s *SQLiteFTS5Searcher) RemovePageTx(ctx context.Context, tx *sql.Tx, path string) error {
 	// Delete from FTS first — requires document id which is deleted next
 	if _, err := tx.ExecContext(ctx, "DELETE FROM pages_fts WHERE rowid = (SELECT id FROM documents WHERE path = ?)", path); err != nil {
 		return fmt.Errorf("delete fts: %w", err)
@@ -93,9 +112,6 @@ func (s *SQLiteFTS5Searcher) RemovePage(ctx context.Context, path string) error 
 		return fmt.Errorf("delete page: %w", err)
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
-	}
 	return nil
 }
 
@@ -249,7 +265,7 @@ func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) er
 		tags := ExtractTags(fm.Fields)
 		summary := ExtractSummary(fm.Fields)
 
-		if err := indexPageTx(ctx, tx, relPath, fm.Title, string(body), tags, summary, fm.Type); err != nil {
+		if err := s.IndexPageTx(ctx, tx, relPath, fm.Title, string(body), tags, summary, fm.Type); err != nil {
 			return fmt.Errorf("index page %s: %w", relPath, err)
 		}
 
