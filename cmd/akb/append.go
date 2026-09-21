@@ -2,14 +2,15 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	yaml "github.com/goccy/go-yaml"
 	"github.com/spf13/cobra"
 
 	"github.com/peedrr/agent-kb/internal/config"
@@ -127,25 +128,23 @@ func runAppend(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("parse frontmatter: %w", err)
 	}
 
-	closingLF := []byte("\n---\n")
-	closingCRLF := []byte("\r\n---\r\n")
+	// The page content changes, so stamp the update time.
+	fm.Fields["updated"] = time.Now().UTC().Format(time.RFC3339)
 
-	var frontmatterEnd int
-	closingIdx := bytes.Index(existingContent, closingLF)
-	if closingIdx != -1 {
-		frontmatterEnd = closingIdx + len(closingLF)
-	} else {
-		closingIdx = bytes.Index(existingContent, closingCRLF)
-		if closingIdx != -1 {
-			frontmatterEnd = closingIdx + len(closingCRLF)
-		} else {
-			return fmt.Errorf("invalid frontmatter format: closing delimiter not found")
-		}
-	}
-
-	frontmatterPortion := existingContent[:frontmatterEnd]
 	newBody := string(body) + "\n" + string(stdinContent)
-	fullContent := string(frontmatterPortion) + newBody
+
+	allFields := map[string]any{
+		"type":  fm.Type,
+		"title": fm.Title,
+	}
+	for k, v := range fm.Fields {
+		allFields[k] = v
+	}
+	yamlBytes, err := yaml.Marshal(allFields)
+	if err != nil {
+		return fmt.Errorf("re-serialize frontmatter: %w", err)
+	}
+	fullContent := "---\n" + string(yamlBytes) + "---\n" + newBody
 
 	relPath := filepath.ToSlash(filepath.Join("kb", cleanPath))
 	commitMsg := fmt.Sprintf("akb: append %s", relPath)
