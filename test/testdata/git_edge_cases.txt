@@ -10,6 +10,14 @@ exec git log --oneline
 stdout 'akb: init git-kb'
 
 # === NO GIT USER CONFIGURED — WRITE STILL WORKS ===
+
+# The environment supplies an empty user.name, so the merged git config has no
+# usable identity even when the machine sets one in its system or global
+# config.
+env GIT_CONFIG_COUNT=1
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=
+
 stdin ../note-input.md
 exec akb write no-user-note.md
 stdout 'Written to kb/notes/no-user-note.md'
