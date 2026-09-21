@@ -821,6 +821,43 @@ validations:
 	assertRecentTimestamp(t, frontmatterString(t, fm, "updated"))
 }
 
+// TestWriteFrontmatterCELOldPageSeesPreBumpUpdated pins that on the
+// --frontmatter branch a CEL rule comparing old_page against page still sees
+// the on-disk `updated` value from before the frontmatter update bumped it.
+func TestWriteFrontmatterCELOldPageSeesPreBumpUpdated(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	tmplData := `name: oldpage
+description: old_page freshness probe
+dir: probes
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: old_updated_visible
+    rule: 'old_page != null && old_page.frontmatter.updated == timestamp("2020-01-01T00:00:00Z") && page.frontmatter.updated > old_page.frontmatter.updated'
+    expect: old_page must carry the pre-write updated timestamp
+`
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "oldpage.yaml"), []byte(tmplData), 0600); err != nil {
+		t.Fatalf("write probe template: %v", err)
+	}
+
+	const stale = "2020-01-01T00:00:00Z"
+	writeRawPage(t, kbRoot, "kb/probes/probe.md",
+		"---\ntype: oldpage\ntitle: Probe\nsummary: before\nupdated: "+stale+"\n---\nOriginal body.")
+
+	out, err := writeRun(kbRoot, "probes/probe.md", "", "--frontmatter", "summary=changed")
+	if err != nil {
+		t.Fatalf("akb write --frontmatter failed under the old_page probe rule: %s: %v", out, err)
+	}
+
+	fm := pageFrontmatter(t, filepath.Join(kbRoot, "kb", "probes", "probe.md"))
+	assertRecentTimestamp(t, frontmatterString(t, fm, "updated"))
+}
+
 func TestApproveDoesNotBumpUpdated(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)
