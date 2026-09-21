@@ -193,14 +193,27 @@ func deletePage(ctx context.Context, kbRoot string, dbConn *sql.DB, relPath, ful
 	}
 	defer repoLock.Release()
 
+	// The search index and the link graph describe the same deleted page, so
+	// both removals share one transaction: a failure in either leaves both
+	// records in place instead of one index ahead of the other.
+	tx, err := dbConn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin index transaction: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
+
 	searcher := search.NewSQLiteFTS5Searcher(dbConn)
-	if err := searcher.RemovePage(ctx, relPath); err != nil {
+	if err := searcher.RemovePageTx(ctx, tx, relPath); err != nil {
 		return fmt.Errorf("remove from search index: %w", err)
 	}
 
 	updater := linkgraph.NewSQLiteLinkGraph(dbConn)
-	if err := updater.RemovePage(ctx, relPath); err != nil {
+	if err := updater.RemovePageTx(ctx, tx, relPath); err != nil {
 		return fmt.Errorf("remove from link graph: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit index transaction: %w", err)
 	}
 
 	if err := index.RemoveEntry(kbRoot, relPath); err != nil {

@@ -144,16 +144,30 @@ func approvePage(ctx context.Context, dbConn *sql.DB, kbRoot, fullPath, inputPat
 	}
 	relPath = filepath.ToSlash(relPath)
 
-	searcher := search.NewSQLiteFTS5Searcher(dbConn)
 	tags := search.ExtractTags(fm.Fields)
 	summary := search.ExtractSummary(fm.Fields)
-	if err := searcher.IndexPage(ctx, relPath, fm.Title, bodyStr, tags, summary, fm.Type); err != nil {
+
+	// The search index and the link graph describe the same approved page, so
+	// both steps share one transaction: a failure in either leaves both at
+	// their pre-approval state instead of one step behind the other.
+	tx, err := dbConn.BeginTx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("begin index transaction: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
+
+	searcher := search.NewSQLiteFTS5Searcher(dbConn)
+	if err := searcher.IndexPageTx(ctx, tx, relPath, fm.Title, bodyStr, tags, summary, fm.Type); err != nil {
 		return false, fmt.Errorf("index page: %w", err)
 	}
 
 	updater := linkgraph.NewSQLiteLinkGraph(dbConn)
-	if err := updater.UpdatePageLinks(ctx, relPath, string(finalContent)); err != nil {
+	if err := updater.UpdatePageLinksTx(ctx, tx, relPath, string(finalContent)); err != nil {
 		return false, fmt.Errorf("update links: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("commit index transaction: %w", err)
 	}
 
 	return true, nil
