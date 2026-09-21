@@ -558,14 +558,27 @@ func runWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("write page: %w", err)
 	}
 
+	// The search index and the link graph describe the same committed page, so
+	// both steps share one transaction: a failure in either leaves both at
+	// their pre-write state instead of one step behind the other.
+	tx, err := dbConn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin index transaction: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
+
 	searcher := search.NewSQLiteFTS5Searcher(dbConn)
-	if err := searcher.IndexPage(ctx, relPath, fm.Title, string(body), tags, summary, fm.Type); err != nil {
+	if err := searcher.IndexPageTx(ctx, tx, relPath, fm.Title, string(body), tags, summary, fm.Type); err != nil {
 		return fmt.Errorf("index page: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState())
 	}
 
 	updater := linkgraph.NewSQLiteLinkGraph(dbConn)
-	if err := updater.UpdatePageLinks(ctx, relPath, string(writeContent)); err != nil {
+	if err := updater.UpdatePageLinksTx(ctx, tx, relPath, string(writeContent)); err != nil {
 		return fmt.Errorf("update links: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState())
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit index transaction: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState())
 	}
 
 	// Output

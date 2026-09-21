@@ -172,16 +172,30 @@ func runAppend(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("write page: %w", err)
 	}
 
-	searcher := search.NewSQLiteFTS5Searcher(dbConn)
 	tags := search.ExtractTags(fm.Fields)
 	summary := search.ExtractSummary(fm.Fields)
-	if err := searcher.IndexPage(ctx, relPath, fm.Title, newBody, tags, summary, fm.Type); err != nil {
+
+	// The search index and the link graph describe the same committed page, so
+	// both steps share one transaction: a failure in either leaves both at
+	// their pre-append state instead of one step behind the other.
+	tx, err := dbConn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin index transaction: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
+
+	searcher := search.NewSQLiteFTS5Searcher(dbConn)
+	if err := searcher.IndexPageTx(ctx, tx, relPath, fm.Title, newBody, tags, summary, fm.Type); err != nil {
 		return fmt.Errorf("index page: %w", err)
 	}
 
 	updater := linkgraph.NewSQLiteLinkGraph(dbConn)
-	if err := updater.UpdatePageLinks(ctx, relPath, fullContent); err != nil {
+	if err := updater.UpdatePageLinksTx(ctx, tx, relPath, fullContent); err != nil {
 		return fmt.Errorf("update links: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit index transaction: %w", err)
 	}
 
 	fmt.Printf("Appended to %s\n", relPath)
