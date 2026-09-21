@@ -14,7 +14,7 @@ import (
 	"github.com/peedrr/agent-kb/internal/storage"
 )
 
-var validOperations = []string{"ingest", "delete", "update", "lint", "query"}
+var validOperations = []string{"ingest", "delete", "update", "lint", "query", "distill", "approve", "plan"}
 
 var logCmd = &cobra.Command{
 	Use:   "log",
@@ -49,12 +49,21 @@ var logShowCmd = &cobra.Command{
 var logAppendCmd = &cobra.Command{
 	Use:   "append <operation> <description>",
 	Short: "Append a log entry",
-	Long:  `Add a new entry to the KB log. Operation must be one of: ingest, delete, update, lint, query.`,
+	Long:  `Add a new entry to the KB log. Operation must be one of: ingest, delete, update, lint, query, distill, approve, plan.`,
 	Example: `  # Log an ingestion operation
   akb log append ingest "Imported 50 pages from old wiki"
 
   # Log with optional title
-  akb log append update "Updated configuration structure" --title "Config refactor"`,
+  akb log append update "Updated configuration structure" --title "Config refactor"
+
+  # Log a distillation operation
+  akb log append distill "Compacted 12 pages into 3 summaries"
+
+  # Log an approval operation
+  akb log append approve "Approved 5 draft pages"
+
+  # Log a planning operation
+  akb log append plan "Planned the next ingest batch"`,
 	Args: cobra.ExactArgs(2),
 	RunE: runLogAppend,
 }
