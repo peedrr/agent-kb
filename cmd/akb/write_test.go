@@ -879,3 +879,127 @@ func TestApproveDoesNotBumpUpdated(t *testing.T) {
 		t.Error("page is still a draft after approve")
 	}
 }
+
+// abortDocumentInsertSQL and abortLinkInsertSQL arm one database step of the
+// write path to fail: the first aborts the document insert of the search index,
+// the second aborts the link insert of the link graph.
+const (
+	abortDocumentInsertSQL = `CREATE TRIGGER injected_document_insert_failure
+		BEFORE INSERT ON documents
+		BEGIN SELECT RAISE(ABORT, 'injected document insert failure'); END`
+	abortLinkInsertSQL = `CREATE TRIGGER injected_link_insert_failure
+		BEFORE INSERT ON links
+		BEGIN SELECT RAISE(ABORT, 'injected link insert failure'); END`
+)
+
+// installSearchDBStatement runs one statement against the search database of a
+// test KB, so a test can arm a failure before running the command under test.
+func installSearchDBStatement(t *testing.T, kbRoot, statement string) {
+	t.Helper()
+
+	conn, err := db.OpenKB(kbRoot)
+	if err != nil {
+		t.Fatalf("open search database: %v", err)
+	}
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
+
+	if _, err := conn.Exec(statement); err != nil {
+		t.Fatalf("run search database statement: %v", err)
+	}
+}
+
+// TestWriteIndexFailureAfterCommitReportsRemediation pins that a search-index
+// failure after the page commit reports the committed page and the rebuild
+// remediation, while the same write succeeds before the failure is armed.
+func TestWriteIndexFailureAfterCommitReportsRemediation(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	controlContent := "---\ntype: note\ntitle: Index Control\nsummary: test\ntags: test\n---\nBody."
+	controlOut, err := writeRun(kbRoot, "index-control.md", controlContent)
+	if err != nil {
+		t.Fatalf("akb write failed: %s: %v", controlOut, err)
+	}
+	if strings.Contains(controlOut, "akb index rebuild") {
+		t.Errorf("a successful write must not carry rebuild remediation, got: %s", controlOut)
+	}
+
+	installSearchDBStatement(t, kbRoot, abortDocumentInsertSQL)
+
+	failedContent := "---\ntype: note\ntitle: Index Failure\nsummary: test\ntags: test\n---\nBody."
+	out, err := writeRun(kbRoot, "index-failure.md", failedContent)
+	if err == nil {
+		t.Fatalf("expected akb write to fail when the document insert is aborted, got: %s", out)
+	}
+	if !strings.Contains(out, "committed to git") {
+		t.Errorf("expected the error to state the page is committed to git, got: %s", out)
+	}
+	if !strings.Contains(out, "akb index rebuild") {
+		t.Errorf("expected the error to carry the rebuild remediation, got: %s", out)
+	}
+	if _, statErr := os.Stat(filepath.Join(kbRoot, "kb", "notes", "index-failure.md")); statErr != nil {
+		t.Errorf("the page should stay on disk after the failed index step, stat error: %v", statErr)
+	}
+	committed := mustGitInDir(t, kbRoot, "log", "--oneline", "-1", "--", "kb/notes/index-failure.md")
+	if !strings.Contains(committed, "akb: write kb/notes/index-failure.md") {
+		t.Errorf("commit after the failed index step = %q, want the write commit", committed)
+	}
+}
+
+// TestWriteLinkFailureAfterCommitReportsRemediation pins the same contract for
+// a link-graph failure after the page commit.
+func TestWriteLinkFailureAfterCommitReportsRemediation(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	controlContent := "---\ntype: note\ntitle: Link Control\nsummary: test\ntags: test\n---\nSee [[other-note]] for details."
+	controlOut, err := writeRun(kbRoot, "link-control.md", controlContent)
+	if err != nil {
+		t.Fatalf("akb write failed: %s: %v", controlOut, err)
+	}
+	if strings.Contains(controlOut, "akb index rebuild") {
+		t.Errorf("a successful write must not carry rebuild remediation, got: %s", controlOut)
+	}
+
+	installSearchDBStatement(t, kbRoot, abortLinkInsertSQL)
+
+	failedContent := "---\ntype: note\ntitle: Link Failure\nsummary: test\ntags: test\n---\nSee [[other-note]] for details."
+	out, err := writeRun(kbRoot, "link-failure.md", failedContent)
+	if err == nil {
+		t.Fatalf("expected akb write to fail when the link insert is aborted, got: %s", out)
+	}
+	if !strings.Contains(out, "committed to git") {
+		t.Errorf("expected the error to state the page is committed to git, got: %s", out)
+	}
+	if !strings.Contains(out, "akb index rebuild") {
+		t.Errorf("expected the error to carry the rebuild remediation, got: %s", out)
+	}
+	committed := mustGitInDir(t, kbRoot, "log", "--oneline", "-1", "--", "kb/notes/link-failure.md")
+	if !strings.Contains(committed, "akb: write kb/notes/link-failure.md") {
+		t.Errorf("commit after the failed link step = %q, want the write commit", committed)
+	}
+}
+
+// TestWriteNoCommitIndexFailureReportsStagedState pins that a database failure
+// after --no-commit reports the page as staged instead of claiming a commit.
+func TestWriteNoCommitIndexFailureReportsStagedState(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	installSearchDBStatement(t, kbRoot, abortDocumentInsertSQL)
+
+	content := "---\ntype: note\ntitle: Staged Failure\nsummary: test\ntags: test\n---\nBody."
+	out, err := writeRun(kbRoot, "staged-failure.md", content, "--no-commit")
+	if err == nil {
+		t.Fatalf("expected akb write --no-commit to fail when the document insert is aborted, got: %s", out)
+	}
+	if strings.Contains(out, "committed to git") {
+		t.Errorf("--no-commit must not claim the page is committed to git, got: %s", out)
+	}
+	if !strings.Contains(out, "staged but not committed") {
+		t.Errorf("expected the error to report the staged page, got: %s", out)
+	}
+	if !strings.Contains(out, "akb index rebuild") {
+		t.Errorf("expected the error to carry the rebuild remediation, got: %s", out)
+	}
+}

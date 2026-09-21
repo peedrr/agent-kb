@@ -362,3 +362,71 @@ func commitInitial(kbRoot string) {
 	cmd.Dir = kbRoot
 	_, _ = cmd.CombinedOutput() //nolint:errcheck,gosec // best-effort git commit in test helper
 }
+
+// TestDeleteFileStepFailureAfterIndexRemovalReportsRemediation pins that a file
+// step failure after the search index, link graph, and index.md steps reports
+// the divergent state and the rebuild remediation, while a successful delete
+// reports neither.
+func TestDeleteFileStepFailureAfterIndexRemovalReportsRemediation(t *testing.T) {
+	kbRoot := t.TempDir()
+	setupTestKBWithGit(t, kbRoot)
+
+	origNoCommit := noCommit
+	noCommit = false
+	t.Cleanup(func() { noCommit = origNoCommit })
+
+	mustGitInDir(t, kbRoot, "commit", "-m", "initial")
+
+	// Control: the same command succeeds and reports no remediation while the
+	// file step can run.
+	controlRel := "kb/notes/delete-control.md"
+	controlFull := filepath.Join(kbRoot, filepath.FromSlash(controlRel))
+	if err := os.MkdirAll(filepath.Dir(controlFull), 0750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(controlFull, []byte("---\ntype: note\ntitle: Delete Control\n---\nBody.\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := addToGit(kbRoot, controlRel); err != nil {
+		t.Fatal(err)
+	}
+
+	controlOut, err := captureOutput(func() error {
+		return runDeleteCmd(&cobra.Command{}, []string{"notes/delete-control.md"})
+	})
+	if err != nil {
+		t.Fatalf("control delete failed: %s: %v", controlOut, err)
+	}
+	if strings.Contains(controlOut, "akb index rebuild") {
+		t.Errorf("a successful delete must not carry rebuild remediation, got: %s", controlOut)
+	}
+	if _, err := os.Stat(controlFull); !os.IsNotExist(err) {
+		t.Errorf("control page should be gone after delete, stat error: %v", err)
+	}
+
+	// The page path is a non-empty directory, so os.Remove fails in the file
+	// step of the delete after the search index, link graph, and index.md
+	// steps ran.
+	failedRel := "kb/notes/delete-failure.md"
+	failedFull := filepath.Join(kbRoot, filepath.FromSlash(failedRel))
+	if err := os.MkdirAll(failedFull, 0750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(failedFull, "blocker"), []byte("blocker"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	err = runDeleteCmd(&cobra.Command{}, []string{"notes/delete-failure.md"})
+	if err == nil {
+		t.Fatal("expected the delete to fail at the file step")
+	}
+	if !strings.Contains(err.Error(), "already removed from the search index and link graph") {
+		t.Errorf("expected the delete error to surface the removed derived records, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "akb index rebuild") {
+		t.Errorf("expected the delete error to carry the rebuild remediation, got: %v", err)
+	}
+	if _, statErr := os.Stat(failedFull); statErr != nil {
+		t.Errorf("the page path should still exist after the failed file step, stat error: %v", statErr)
+	}
+}
