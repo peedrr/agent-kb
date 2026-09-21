@@ -115,7 +115,7 @@ agent-kb/
 
 ## CONVENTIONS (THIS PROJECT)
 
-- **KB root**: Resolved from the registry default (`~/.config/agent-kb/registry.yaml`, written by `akb init` / `akb use`) — commands do NOT walk up looking for a `.akb/` marker (`internal/path.KBRoot()` is currently unused). The path-addressing docs are being rewritten separately.
+- **KB root**: Selected per invocation by the `--kb <path>` flag, falling back to the `AKB_KB` environment variable; with neither, commands fail with a usage error that lists the bases discovered nearby. No registry and no stored default (`akb use`/`akb registry` are removed; `akb discover` only reports). A relative path resolves against the working directory and `~` expands to the home directory (`internal/path.ResolveKB()`).
 - **Paths**: Always relative to KB root; `kb/` prefix stripped
 - **Managed files**: `index.md`, `log.md` cannot be written directly
 - **Raw access**: `raw/` prefix → separate storage; use `akb raw` commands
