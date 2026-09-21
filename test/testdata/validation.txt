@@ -6,14 +6,17 @@ stderr 'must not contain'
 ! exec akb init -- -test
 stderr 'must not start'
 
+# No knowledge base selected: status is a usage mistake.
+env AKB_KB=
+
 ! exec akb status
-stderr 'no default KB set'
+stderr 'usage: resolve knowledge base: no knowledge base selected'
 
 exec akb init mykb
 ! exec akb init mykb
 stderr 'already initialized'
 
-exec akb status
+exec akb --kb mykb status
 stdout 'Name: mykb'
 
 exec akb --version

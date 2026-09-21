@@ -39,7 +39,7 @@ This is the content of my note.`
 	defer os.Chdir(origDir) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	// Run the read command
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		t.Fatalf("KBRoot failed: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestReadCmd_NonExistentPage(t *testing.T) {
 	os.Chdir(tmpDir)        //nolint:errcheck,gosec // test setup — failure is non-fatal
 	defer os.Chdir(origDir) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-	kbRoot, _ := path.ResolveKB()
+	kbRoot, _ := path.ResolveKB(kbFlag)
 	provider := storage.NewGitProvider(kbRoot, true)
 
 	cleanPath := strings.TrimPrefix("notes/non-existent.md", "kb/")
@@ -102,7 +102,7 @@ func TestReadCmd_RawPrefix(t *testing.T) {
 	os.Chdir(tmpDir)        //nolint:errcheck,gosec // test setup — failure is non-fatal
 	defer os.Chdir(origDir) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-	kbRoot, _ := path.ResolveKB()
+	kbRoot, _ := path.ResolveKB(kbFlag)
 
 	_, err := path.ResolveKBPath(kbRoot, "raw/some-file.md")
 
@@ -120,7 +120,7 @@ func TestReadCmd_ParentDir(t *testing.T) {
 	os.Chdir(tmpDir)        //nolint:errcheck,gosec // test setup — failure is non-fatal
 	defer os.Chdir(origDir) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-	kbRoot, _ := path.ResolveKB()
+	kbRoot, _ := path.ResolveKB(kbFlag)
 
 	_, err := path.ResolveKBPath(kbRoot, "../some-file.md")
 
@@ -150,7 +150,7 @@ title: Test
 	os.Chdir(tmpDir)        //nolint:errcheck,gosec // test setup — failure is non-fatal
 	defer os.Chdir(origDir) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-	kbRoot, _ := path.ResolveKB()
+	kbRoot, _ := path.ResolveKB(kbFlag)
 	provider := storage.NewGitProvider(kbRoot, true)
 
 	cleanPath := strings.TrimPrefix("test.md", "kb/")
@@ -198,17 +198,5 @@ created: "2024-01-01T00:00:00Z"`
 	os.Setenv("HOME", tmpDir)                         //nolint:errcheck,gosec // test setup — failure is non-fatal
 	t.Cleanup(func() { os.Setenv("HOME", origHome) }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-	regPath := filepath.Join(tmpDir, ".config", "agent-kb", "registry.yaml")
-	if err := os.MkdirAll(filepath.Dir(regPath), 0750); err != nil {
-		t.Fatal(err)
-	}
-	regContent := `default: test-kb
-entries:
-  - name: test-kb
-    path: ` + tmpDir + `
-    created: "2024-01-01T00:00:00Z"
-`
-	if err := os.WriteFile(regPath, []byte(regContent), 0600); err != nil {
-		t.Fatal(err)
-	}
+	useTestKBSelection(t, tmpDir)
 }

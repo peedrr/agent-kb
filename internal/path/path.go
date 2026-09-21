@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/peedrr/agent-kb/internal/registry"
 )
+
+// KBEnvVar is the environment variable that selects the knowledge base when
+// the --kb flag is not given.
+const KBEnvVar = "AKB_KB"
 
 // Common error messages
 var (
@@ -18,13 +20,15 @@ var (
 	ErrParentDir      = errors.New("path must not contain '..'")
 	ErrUseAKBWrite    = errors.New("use `akb write` or `akb read`")
 	ErrUseAKBRawWrite = errors.New("use `akb raw write` or `akb raw read`")
+	ErrNoKB           = errors.New("no knowledge base selected: pass --kb <path> or set the AKB_KB environment variable")
 )
 
-// GuardError reports an input path that violates the path rules: an absolute
-// path, a '..' escape, or a path that belongs to the other command family.
-// The path resolvers return it so callers can tell a rejected input apart from
-// a fault, and the CLI maps it to the usage exit code. It wraps the rule's
-// sentinel error, so errors.Is keeps matching the specific rule.
+// GuardError reports a rejected invocation: an input path that violates the
+// path rules (an absolute path, a '..' escape, or a path that belongs to the
+// other command family) or a command that ran without a knowledge base
+// selected. The resolvers return it so callers can tell a rejected invocation
+// apart from a fault, and the CLI maps it to the usage exit code. It wraps the
+// rule's sentinel error, so errors.Is keeps matching the specific rule.
 type GuardError struct {
 	rule error
 }
@@ -111,28 +115,66 @@ func ResolveRawPath(kbRoot, inputPath string) (string, error) {
 	return filepath.Join(kbRoot, "raw", cleanPath), nil
 }
 
-// ResolveKB returns the path of the default KB from the registry.
-func ResolveKB() (string, error) {
-	regPath, err := registry.Path()
+// ResolveKB returns the absolute path of the knowledge base selected for an
+// invocation: the --kb flag when given, otherwise the AKB_KB environment
+// variable. A leading ~ is expanded to the home directory and a relative path
+// is resolved against the working directory. With neither set, the command has
+// no base to act on and ResolveKB reports a usage error, noting the removed
+// registry file when it is still on disk.
+func ResolveKB(flagKB string) (string, error) {
+	selected := strings.TrimSpace(flagKB)
+	if selected == "" {
+		selected = strings.TrimSpace(os.Getenv(KBEnvVar))
+	}
+	if selected == "" {
+		if note := deprecatedRegistryNote(); note != "" {
+			fmt.Fprintln(os.Stderr, note)
+		}
+		return "", &GuardError{rule: ErrNoKB}
+	}
+
+	expanded, err := expandHome(selected)
 	if err != nil {
-		return "", fmt.Errorf("get registry path: %w", err)
+		return "", err
 	}
 
-	reg, err := registry.Load(regPath)
+	absPath, err := filepath.Abs(expanded)
 	if err != nil {
-		return "", fmt.Errorf("load registry: %w", err)
+		return "", fmt.Errorf("resolve knowledge base path %q: %w", selected, err)
+	}
+	return absPath, nil
+}
+
+// expandHome expands a leading ~ in p to the user's home directory.
+func expandHome(p string) (string, error) {
+	if p != "~" && !strings.HasPrefix(p, "~"+string(filepath.Separator)) {
+		return p, nil
 	}
 
-	if reg.Default == "" {
-		return "", errors.New("no default KB set. Run 'akb init <name>' or 'akb use <name>'")
-	}
-
-	entry, err := registry.GetDefault()
+	home, err := os.UserHomeDir()
 	if err != nil {
-		return "", fmt.Errorf("get default registry entry: %w", err)
+		return "", fmt.Errorf("expand ~: %w", err)
 	}
+	if p == "~" {
+		return home, nil
+	}
+	return filepath.Join(home, p[2:]), nil
+}
 
-	return entry.Path, nil
+// deprecatedRegistryNote returns the one-line notice printed when a command ran
+// without a knowledge base selected while the removed registry file is still
+// on disk. The file is never read for resolution; its presence only triggers
+// the notice. It returns "" when there is nothing to note.
+func deprecatedRegistryNote() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	registryPath := filepath.Join(home, ".config", "agent-kb", "registry.yaml")
+	if _, err := os.Stat(registryPath); err != nil {
+		return ""
+	}
+	return fmt.Sprintf("note: %s is no longer used; select a knowledge base with --kb or the %s environment variable", registryPath, KBEnvVar)
 }
 
 // KBRoot finds the KB root by walking up from cwd looking for .akb directory.

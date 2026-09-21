@@ -321,19 +321,7 @@ created: "2024-01-01T00:00:00Z"
 	os.Setenv("HOME", kbRoot)                         //nolint:errcheck,gosec // test setup — failure is non-fatal
 	t.Cleanup(func() { os.Setenv("HOME", origHome) }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
-	regPath := filepath.Join(kbRoot, ".config", "agent-kb", "registry.yaml")
-	if err := os.MkdirAll(filepath.Dir(regPath), 0750); err != nil {
-		t.Fatal(err)
-	}
-	regContent := `default: test-kb
-entries:
-  - name: test-kb
-    path: ` + kbRoot + `
-    created: "2024-01-01T00:00:00Z"
-`
-	if err := os.WriteFile(regPath, []byte(regContent), 0600); err != nil {
-		t.Fatal(err)
-	}
+	useTestKBSelection(t, kbRoot)
 }
 
 func initGitRepo(kbRoot string) error {

@@ -56,7 +56,7 @@ func runTemplateDelete(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid template name %q: must contain only letters, numbers, hyphens, and underscores", name)
 	}
 
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}

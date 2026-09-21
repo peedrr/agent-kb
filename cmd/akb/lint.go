@@ -46,7 +46,7 @@ func init() {
 // rebuild link graph → walk pages → build KB struct → create engine →
 // add all 8 checkers → run → return report.
 func RunLint(ctx context.Context) (*lint.LintReport, error) {
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return nil, fmt.Errorf("resolve knowledge base: %w", err)
 	}

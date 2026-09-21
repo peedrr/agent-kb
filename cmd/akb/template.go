@@ -47,7 +47,7 @@ func init() {
 }
 
 func runTemplateGet(_ *cobra.Command, args []string) error {
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
@@ -146,7 +146,7 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 }
 
 func runTemplateList(_ *cobra.Command, _ []string) error {
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}

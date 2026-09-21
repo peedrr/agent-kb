@@ -55,7 +55,7 @@ func init() {
 func runDeleteCmd(_ *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}

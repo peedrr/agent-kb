@@ -49,7 +49,7 @@ func init() {
 }
 
 func runApprove(_ *cobra.Command, args []string) error {
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}

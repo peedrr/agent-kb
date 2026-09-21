@@ -74,7 +74,7 @@ func init() {
 }
 
 func runLogShow(cmd *cobra.Command, _ []string) error {
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
@@ -112,7 +112,7 @@ func runLogAppend(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid operation %q; must be one of: %s", operation, strings.Join(validOperations, ", "))
 	}
 
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}

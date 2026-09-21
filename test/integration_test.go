@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/rogpeppe/go-internal/testscript"
+
+	"github.com/peedrr/agent-kb/internal/path"
 )
 
 var akbBin string
@@ -49,13 +51,17 @@ func Test(t *testing.T) {
 					break
 				}
 			}
-			// Create a unique HOME directory per test to isolate the KB
-			// registry file and avoid parallel test conflicts
+			// Create a unique HOME directory per test so the scenarios cannot
+			// read the developer's configuration
 			testHome := filepath.Join(env.WorkDir, "home")
 			if err := os.MkdirAll(testHome, 0750); err != nil {
 				return err
 			}
 			env.Vars = append(env.Vars, "HOME="+testHome)
+			// Every scenario runs its commands from the root of the KB it
+			// created, so a relative selection resolves against that working
+			// directory. Scenarios that need no KB clear the variable.
+			env.Vars = append(env.Vars, path.KBEnvVar+"=.")
 			return nil
 		},
 	})

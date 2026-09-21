@@ -88,7 +88,7 @@ func init() {
 }
 
 func runIndexShow(_ *cobra.Command, _ []string) error {
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
@@ -113,7 +113,7 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 		return &usageError{msg: fmt.Sprintf("cannot add %s to index", base)}
 	}
 
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
@@ -216,7 +216,7 @@ func runIndexRemove(_ *cobra.Command, args []string) error {
 		return &usageError{msg: fmt.Sprintf("cannot remove %s from index", base)}
 	}
 
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
@@ -269,7 +269,7 @@ func runIndexRemove(_ *cobra.Command, args []string) error {
 }
 
 func runIndexRebuild(_ *cobra.Command, _ []string) error {
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}

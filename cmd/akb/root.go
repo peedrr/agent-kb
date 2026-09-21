@@ -6,7 +6,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var noCommit bool
+var (
+	noCommit bool
+	kbFlag   string
+)
 
 // usageClassificationInstalled reports whether the cobra error conversions
 // were installed, so Execute installs them once per process.
@@ -24,6 +27,7 @@ var RootCmd = &cobra.Command{
 
 func init() {
 	RootCmd.PersistentFlags().BoolVar(&noCommit, "no-commit", false, "skip git commit")
+	RootCmd.PersistentFlags().StringVar(&kbFlag, "kb", "", "knowledge base path (defaults to the AKB_KB environment variable)")
 	RootCmd.AddCommand(initCmd)
 	RootCmd.AddCommand(statusCmd)
 	RootCmd.AddCommand(writeCmd)

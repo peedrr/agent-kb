@@ -2,6 +2,7 @@ package path
 
 import (
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -401,75 +402,174 @@ func TestKBRoot(t *testing.T) {
 }
 
 func TestResolveKB(t *testing.T) {
-	t.Run("returns default KB path from registry", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", tmpDir)         //nolint:errcheck,gosec // test setup — failure is non-fatal
-		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
+	t.Run("flag wins over environment", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv(KBEnvVar, filepath.Join(home, "from-env"))
+		flagPath := filepath.Join(home, "from-flag")
 
-		regPath := filepath.Join(tmpDir, ".config", "agent-kb", "registry.yaml")
-		if err := os.MkdirAll(filepath.Dir(regPath), 0750); err != nil {
-			t.Fatal(err)
-		}
-		regContent := `default: my-kb
-entries:
-  - name: my-kb
-    path: /path/to/my-kb
-    created: "2024-01-01T00:00:00Z"
-`
-		if err := os.WriteFile(regPath, []byte(regContent), 0600); err != nil {
-			t.Fatal(err)
-		}
-
-		path, err := ResolveKB()
+		got, err := ResolveKB(flagPath)
 		if err != nil {
 			t.Fatalf("ResolveKB failed: %v", err)
 		}
-		if path != "/path/to/my-kb" {
-			t.Fatalf("expected '/path/to/my-kb', got %q", path)
+		if got != flagPath {
+			t.Fatalf("expected %q, got %q", flagPath, got)
 		}
 	})
 
-	t.Run("returns error when no default set", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", tmpDir)         //nolint:errcheck,gosec // test setup — failure is non-fatal
-		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
+	t.Run("environment used when flag is empty", func(t *testing.T) {
+		home := t.TempDir()
+		envPath := filepath.Join(home, "from-env")
+		t.Setenv(KBEnvVar, envPath)
 
-		regPath := filepath.Join(tmpDir, ".config", "agent-kb", "registry.yaml")
-		if err := os.MkdirAll(filepath.Dir(regPath), 0750); err != nil {
+		got, err := ResolveKB("")
+		if err != nil {
+			t.Fatalf("ResolveKB failed: %v", err)
+		}
+		if got != envPath {
+			t.Fatalf("expected %q, got %q", envPath, got)
+		}
+	})
+
+	t.Run("empty environment counts as unset", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv(KBEnvVar, "")
+
+		_, err := ResolveKB("")
+		if !errors.Is(err, ErrNoKB) {
+			t.Fatalf("expected ErrNoKB, got %v", err)
+		}
+	})
+
+	t.Run("relative path resolves against the working directory", func(t *testing.T) {
+		dir := t.TempDir()
+		t.Chdir(dir)
+
+		cwd, err := os.Getwd()
+		if err != nil {
+			t.Fatalf("get working directory: %v", err)
+		}
+
+		got, err := ResolveKB("kb")
+		if err != nil {
+			t.Fatalf("ResolveKB failed: %v", err)
+		}
+		if want := filepath.Join(cwd, "kb"); got != want {
+			t.Fatalf("expected %q, got %q", want, got)
+		}
+	})
+
+	t.Run("tilde expands to the home directory", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+
+		got, err := ResolveKB("~/kb")
+		if err != nil {
+			t.Fatalf("ResolveKB failed: %v", err)
+		}
+		if want := filepath.Join(home, "kb"); got != want {
+			t.Fatalf("expected %q, got %q", want, got)
+		}
+
+		got, err = ResolveKB("~")
+		if err != nil {
+			t.Fatalf("ResolveKB failed: %v", err)
+		}
+		if got != home {
+			t.Fatalf("expected %q, got %q", home, got)
+		}
+	})
+
+	t.Run("absolute path is normalized", func(t *testing.T) {
+		home := t.TempDir()
+
+		got, err := ResolveKB(filepath.Join(home, "kb", "..", "other"))
+		if err != nil {
+			t.Fatalf("ResolveKB failed: %v", err)
+		}
+		if want := filepath.Join(home, "other"); got != want {
+			t.Fatalf("expected %q, got %q", want, got)
+		}
+	})
+
+	t.Run("missing selection reports the usage rule", func(t *testing.T) {
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv(KBEnvVar, "")
+
+		_, err := ResolveKB("")
+		if err == nil {
+			t.Fatal("expected error when no knowledge base is selected")
+		}
+		var guardErr *GuardError
+		if !errors.As(err, &guardErr) {
+			t.Fatalf("expected a GuardError, got %T", err)
+		}
+		if !errors.Is(err, ErrNoKB) {
+			t.Fatalf("expected ErrNoKB, got %v", err)
+		}
+	})
+
+	t.Run("removed registry file notes deprecation on the usage-error path", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv(KBEnvVar, "")
+
+		registryPath := filepath.Join(home, ".config", "agent-kb", "registry.yaml")
+		if err := os.MkdirAll(filepath.Dir(registryPath), 0750); err != nil {
 			t.Fatal(err)
 		}
-		regContent := `entries:
-  - name: my-kb
-    path: /path/to/my-kb
-    created: "2024-01-01T00:00:00Z"
-`
-		if err := os.WriteFile(regPath, []byte(regContent), 0600); err != nil {
+		if err := os.WriteFile(registryPath, []byte("default: elsewhere\n"), 0600); err != nil {
 			t.Fatal(err)
 		}
 
-		_, err := ResolveKB()
-		if err == nil {
-			t.Fatal("expected error when no default set")
+		stderr := captureStderr(t, func() {
+			_, err := ResolveKB("")
+			if !errors.Is(err, ErrNoKB) {
+				t.Errorf("expected ErrNoKB, got %v", err)
+			}
+		})
+		if !strings.Contains(stderr, registryPath) {
+			t.Errorf("note %q does not name %q", stderr, registryPath)
 		}
-		if !strings.Contains(err.Error(), "no default KB set") {
-			t.Fatalf("expected 'no default KB set' error, got: %v", err)
+		if !strings.Contains(stderr, "no longer used") {
+			t.Errorf("note %q does not say the registry is unused", stderr)
 		}
 	})
 
-	t.Run("returns error when registry does not exist", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		origHome := os.Getenv("HOME")
-		os.Setenv("HOME", tmpDir)         //nolint:errcheck,gosec // test setup — failure is non-fatal
-		defer os.Setenv("HOME", origHome) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
+	t.Run("no note when the registry file is absent", func(t *testing.T) {
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv(KBEnvVar, "")
 
-		_, err := ResolveKB()
-		if err == nil {
-			t.Fatal("expected error when registry does not exist")
-		}
-		if !strings.Contains(err.Error(), "no default KB set") {
-			t.Fatalf("expected 'no default KB set' error, got: %v", err)
+		stderr := captureStderr(t, func() {
+			_, _ = ResolveKB("") //nolint:errcheck // only the stderr note is under test
+		})
+		if stderr != "" {
+			t.Errorf("expected no note, got %q", stderr)
 		}
 	})
+}
+
+// captureStderr runs fn with os.Stderr redirected to a pipe and returns the
+// text fn wrote.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	old := os.Stderr
+	os.Stderr = w
+	fn()
+	os.Stderr = old
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("close stderr pipe: %v", err)
+	}
+	data, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read stderr pipe: %v", err)
+	}
+	return string(data)
 }

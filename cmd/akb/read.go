@@ -31,7 +31,7 @@ var readCmd = &cobra.Command{
 func runRead(_ *cobra.Command, args []string) error {
 	inputPath := args[0]
 
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}

@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/peedrr/agent-kb/internal/path"
 )
 
 var akbBinPath, akbTestBinPath string
@@ -167,6 +169,23 @@ func withWriteFlags(t *testing.T, frontmatter []string, appendMode bool) {
 	origFrontmatter, origAppend := writeFrontmatter, writeAppend
 	writeFrontmatter, writeAppend = frontmatter, appendMode
 	t.Cleanup(func() { writeFrontmatter, writeAppend = origFrontmatter, origAppend })
+}
+
+// useTestKBSelection points knowledge base resolution at kbRoot for the
+// duration of the test. In-process commands read the AKB_KB variable and the
+// binary the tests spawn inherits it.
+func useTestKBSelection(t *testing.T, kbRoot string) {
+	t.Helper()
+
+	origKb, hadKb := os.LookupEnv(path.KBEnvVar)
+	os.Setenv(path.KBEnvVar, kbRoot) //nolint:errcheck,gosec // test setup — failure is non-fatal
+	t.Cleanup(func() {
+		if hadKb {
+			os.Setenv(path.KBEnvVar, origKb) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
+			return
+		}
+		os.Unsetenv(path.KBEnvVar) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
+	})
 }
 
 func TestExecuteClassifiesUnknownFlagAsUsage(t *testing.T) {

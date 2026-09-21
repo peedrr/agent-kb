@@ -43,7 +43,7 @@ func runRawWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("read stdin: %w", err)
 	}
 
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}

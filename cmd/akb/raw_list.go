@@ -22,7 +22,7 @@ var rawListCmd = &cobra.Command{
 }
 
 func runRawList(_ *cobra.Command, _ []string) error {
-	kbRoot, err := path.ResolveKB()
+	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
