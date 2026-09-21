@@ -24,8 +24,10 @@ func NewEnv() (*cel.Env, error) {
 	)
 }
 
-// CompileRule parses and compiles a CEL expression into an executable program.
-// Compiled programs are cached in a thread-safe sync.Map to avoid re-compilation.
+// CompileRule parses and compiles a CEL expression into an executable program
+// with a runtime cost budget, so evaluating a pathological rule aborts instead
+// of running unbounded. Compiled programs are cached in a thread-safe sync.Map
+// to avoid re-compilation.
 func CompileRule(env *cel.Env, expr string) (cel.Program, error) {
 	if cached, ok := programCache.Load(expr); ok {
 		return cached.(cel.Program), nil
@@ -36,7 +38,7 @@ func CompileRule(env *cel.Env, expr string) (cel.Program, error) {
 		return nil, issues.Err()
 	}
 
-	prg, err := env.Program(ast, cel.CostTracking(nil))
+	prg, err := env.Program(ast, cel.CostLimit(100000))
 	if err != nil {
 		return nil, err
 	}
@@ -46,6 +48,8 @@ func CompileRule(env *cel.Env, expr string) (cel.Program, error) {
 }
 
 // Evaluate runs a compiled CEL program with the given variables and context.
+// The cost budget is enforced by the program options applied in CompileRule, so
+// costLimit states the budget the caller expects that program to run under.
 // It recovers from panics during evaluation, translating cost-limit-exceeded
 // errors into a structured "exceeded compute budget" error.
 func Evaluate(ctx context.Context, prg cel.Program, vars map[string]any, costLimit uint64) (ref.Val, error) {
