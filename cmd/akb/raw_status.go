@@ -141,6 +141,13 @@ func runRawStatus(_ *cobra.Command, args []string) error {
 		}
 		targetRel = filepath.ToSlash(targetRel)
 
+		// A filter target that names neither a file under raw/ nor a manifest
+		// entry covers no raw file, so an empty drift list would misreport it as
+		// an undrifted one.
+		if _, inManifest := manifestMap[targetRel]; !inManifest && !diskFiles[targetRel] {
+			return &usageError{msg: fmt.Sprintf("no raw file or manifest entry matches %s", inputPath)}
+		}
+
 		filtered := make([]driftFile, 0, len(drifted))
 		for _, f := range drifted {
 			if f.Path == targetRel {

@@ -1,9 +1,7 @@
 package main
 
 import (
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -32,6 +30,17 @@ func assertEmptyFilesArray(t *testing.T, out string) {
 	}
 }
 
+// writeTrackedRaw records one raw file in the manifest through akb itself, so
+// the file starts out undrifted.
+func writeTrackedRaw(t *testing.T, kbRoot, inputPath, content string) {
+	t.Helper()
+
+	out, err := rawWriteRun(t, kbRoot, inputPath, content)
+	if err != nil {
+		t.Fatalf("akb raw write %s failed: %s: %v", inputPath, out, err)
+	}
+}
+
 func TestRawStatusJSONReportsEmptyDriftAsArray(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)
@@ -43,20 +52,18 @@ func TestRawStatusJSONReportsEmptyDriftAsArray(t *testing.T) {
 	assertEmptyFilesArray(t, out)
 }
 
-func TestRawStatusJSONReportsFilteredDriftAsEmptyArray(t *testing.T) {
+// TestRawStatusJSONReportsUndriftedFilterAsEmptyArray pins the filtered JSON
+// envelope for a path that names a tracked raw file: the file exists, so the
+// filter is valid, and it has not drifted, so the file list stays an array.
+func TestRawStatusJSONReportsUndriftedFilterAsEmptyArray(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)
 
-	// A raw file missing from the manifest drifts, but the path argument
-	// filters the drifted list down to nothing.
-	rawFile := filepath.Join(kbRoot, "raw", "data.csv")
-	if err := os.WriteFile(rawFile, []byte("content\n"), 0600); err != nil { //nolint:gosec // test writing into its temp KB
-		t.Fatal(err)
-	}
+	writeTrackedRaw(t, kbRoot, "data.csv", "content\n")
 
-	out, err := rawStatusRun(t, kbRoot, "other.csv", "--json")
+	out, err := rawStatusRun(t, kbRoot, "data.csv", "--json")
 	if err != nil {
-		t.Fatalf("akb raw status other.csv --json failed: %s: %v", out, err)
+		t.Fatalf("akb raw status data.csv --json failed: %s: %v", out, err)
 	}
 	assertEmptyFilesArray(t, out)
 }
