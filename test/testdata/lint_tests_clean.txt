@@ -9,13 +9,12 @@ stdout 'Written to kb/notes/good-note.md'
 
 exec akb index add kb/notes/good-note.md 'A well-formed note'
 
-# Lint will still exit 1 due to orphans, but must NOT have
-# broken_links, missing_frontmatter, type_exists, or frontmatter_schema
+# Lint exits 0 (orphans are warning-severity), but must NOT have
+# broken_links, missing_frontmatter, or type_orphan
 exec akb lint
 ! stdout 'broken_links'
 ! stdout 'missing_frontmatter'
-! stdout 'type_exists'
-! stdout 'frontmatter_schema'
+! stdout 'type_orphan'
 
 -- good-note.md --
 ---

@@ -19,7 +19,7 @@ stdout 'Written to kb/decisions/search-decision.md'
 
 # --- Search finds page by content ---
 
-exec akb search "distributed"
+exec akb search 'distributed'
 stdout 'notes/search-note.md'
 
 # --- Search finds page by title ---
@@ -29,7 +29,7 @@ stdout 'notes/search-note.md'
 
 # --- Search finds page by tags ---
 
-exec akb search "searchtest"
+exec akb search 'searchtest'
 stdout 'notes/search-note.md'
 stdout 'notes/another-note.md'
 
@@ -40,29 +40,29 @@ stdout 'notes/search-note.md'
 
 # --- Search returns results in BM25 rank order ---
 
-exec akb search "distributed"
+exec akb search 'distributed'
 stdout 'Search Test Note'
 
 # --- Search with no matches produces no output ---
 
-exec akb search "xyznonexistent"
+exec akb search 'xyznonexistent'
 ! stdout .
 
 # --- Search with --json flag produces JSON output ---
 
-exec akb search --json "distributed"
+exec akb search --json 'distributed'
 stdout '"path"'
 stdout '"title"'
 stdout '"rank"'
 
 # --- Search with empty query returns error ---
 
-! exec akb search ""
+! exec akb search ''
 stderr 'search query must not be empty'
 
 # --- Search with special characters (stripped by FTS5 escaping) ---
 
-exec akb search "distributed*"
+exec akb search 'distributed*'
 stdout 'notes/search-note.md'
 
 # --- Search with FTS5 operators (OR, AND, NOT stripped) ---
@@ -72,7 +72,7 @@ stdout 'notes/search-note.md'
 
 # --- Search finds ADR content ---
 
-exec akb search "architecture"
+exec akb search 'architecture'
 stdout 'decisions/search-decision.md'
 
 # --- Search snippet contains match context ---
@@ -85,7 +85,7 @@ stdout '→Search←'
 # Remove search.db to simulate missing database
 exec rm .akb/search.db
 
-! exec akb search "distributed"
+! exec akb search 'distributed'
 stderr 'akb index rebuild'
 
 # --- Rebuild restores search functionality ---
@@ -93,7 +93,7 @@ stderr 'akb index rebuild'
 exec akb index rebuild
 stdout 'Index rebuilt'
 
-exec akb search "distributed"
+exec akb search 'distributed'
 stdout 'notes/search-note.md'
 
 -- note-input.md --
