@@ -14,9 +14,18 @@ type DB struct {
 	*sql.DB
 }
 
+// sqliteDSN builds the DSN used for every SQLite connection of a knowledge
+// base. The 5s busy timeout makes a second process wait for a write lock
+// instead of failing immediately with SQLITE_BUSY, and immediate transactions
+// acquire the write lock at BEGIN so a deferred transaction cannot fail on a
+// read-to-write upgrade that SQLite refuses to retry.
+func sqliteDSN(dbPath string) string {
+	return dbPath + "?_pragma=busy_timeout(5000)&_txlock=immediate"
+}
+
 // InitDB opens a new SQLite database, creating it if necessary.
 func InitDB(dbPath string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", sqliteDSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
@@ -121,7 +130,7 @@ func CreateSchema(db *sql.DB) error {
 // OpenKB opens the search database for a knowledge base.
 func OpenKB(kbRoot string) (*sql.DB, error) {
 	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
-	db, err := sql.Open("sqlite", dbPath)
+	db, err := sql.Open("sqlite", sqliteDSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
