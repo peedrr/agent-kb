@@ -33,9 +33,22 @@ func (s *SQLiteFTS5Searcher) IndexPage(ctx context.Context, path, title, content
 	}
 	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
 
+	if err := indexPageTx(ctx, tx, path, title, content, tags, summary, pageType); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
+// indexPageTx writes the documents, pages_fts, and pages rows for one page
+// using the given transaction.
+func indexPageTx(ctx context.Context, tx *sql.Tx, path, title, content, tags, summary, pageType string) error {
 	_, _ = tx.ExecContext(ctx, "DELETE FROM pages_fts WHERE rowid = (SELECT id FROM documents WHERE path = ?)", path)
 
-	_, err = tx.ExecContext(ctx,
+	_, err := tx.ExecContext(ctx,
 		"INSERT OR REPLACE INTO documents (path, title, content, tags, summary, created, updated, type) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?)",
 		path, title, content, tags, summary, pageType)
 	if err != nil {
@@ -55,9 +68,6 @@ func (s *SQLiteFTS5Searcher) IndexPage(ctx context.Context, path, title, content
 		return fmt.Errorf("insert page: %w", err)
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
-	}
 	return nil
 }
 
@@ -171,6 +181,8 @@ func (s *SQLiteFTS5Searcher) Search(ctx context.Context, query string, opts Sear
 // RebuildIndex rebuilds the entire search index from the filesystem.
 // It walks the kb/ directory, parses frontmatter from each .md file,
 // clears all tables, and re-inserts all pages.
+// The clear and re-insert steps run in one transaction, so a walk failure
+// leaves the previously indexed content untouched.
 func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) error {
 	kbDir := filepath.Join(kbRoot, "kb")
 
@@ -178,31 +190,28 @@ func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) er
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
+
 	if _, err := tx.ExecContext(ctx, "DELETE FROM pages"); err != nil {
-		_ = tx.Rollback() //nolint:errcheck // rollback error secondary to exec error
 		return fmt.Errorf("delete pages: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM documents"); err != nil {
-		_ = tx.Rollback() //nolint:errcheck // rollback error secondary to exec error
 		return fmt.Errorf("delete documents: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
 	}
 
 	// Ensure type column exists (migration for existing databases)
 	var typeColCount int
-	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM pragma_table_info('documents') WHERE name = 'type'").Scan(&typeColCount); err == nil && typeColCount == 0 {
-		_, _ = s.db.ExecContext(ctx, "ALTER TABLE documents ADD COLUMN type TEXT NOT NULL DEFAULT ''")
+	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM pragma_table_info('documents') WHERE name = 'type'").Scan(&typeColCount); err == nil && typeColCount == 0 {
+		_, _ = tx.ExecContext(ctx, "ALTER TABLE documents ADD COLUMN type TEXT NOT NULL DEFAULT ''")
 	}
 
 	// Drop and recreate FTS5 table to handle schema migration (adding summary column)
-	if _, err := s.db.ExecContext(ctx, "DROP TABLE IF EXISTS pages_fts"); err != nil {
+	if _, err := tx.ExecContext(ctx, "DROP TABLE IF EXISTS pages_fts"); err != nil {
 		return fmt.Errorf("drop fts5 table: %w", err)
 	}
 
 	// Recreate FTS5 table with current schema
-	if _, err := s.db.ExecContext(ctx, `CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(title, content, tags, summary, content=documents, content_rowid=id)`); err != nil {
+	if _, err := tx.ExecContext(ctx, `CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(title, content, tags, summary, content=documents, content_rowid=id)`); err != nil {
 		return fmt.Errorf("create fts5 table: %w", err)
 	}
 
@@ -240,7 +249,7 @@ func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) er
 		tags := ExtractTags(fm.Fields)
 		summary := ExtractSummary(fm.Fields)
 
-		if err := s.IndexPage(ctx, relPath, fm.Title, string(body), tags, summary, fm.Type); err != nil {
+		if err := indexPageTx(ctx, tx, relPath, fm.Title, string(body), tags, summary, fm.Type); err != nil {
 			return fmt.Errorf("index page %s: %w", relPath, err)
 		}
 
@@ -248,6 +257,10 @@ func (s *SQLiteFTS5Searcher) RebuildIndex(ctx context.Context, kbRoot string) er
 	})
 	if err != nil {
 		return fmt.Errorf("walk kb directory: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
 	}
 
 	if err := index.RebuildIndex(kbRoot); err != nil {
