@@ -48,13 +48,25 @@ func dedupeWikilinksByTarget(wikilinks []markdown.Wikilink) []markdown.Wikilink 
 
 // UpdatePageLinks implements Updater.UpdatePageLinks.
 func (g *SQLiteLinkGraph) UpdatePageLinks(ctx context.Context, path string, content string) error {
-	wikilinks := dedupeWikilinksByTarget(markdown.ParseWikilinks(content))
-
 	tx, err := g.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
+
+	if err := updatePageLinksTx(ctx, tx, path, content); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+	return nil
+}
+
+// updatePageLinksTx replaces the outgoing links of one page using the given transaction.
+func updatePageLinksTx(ctx context.Context, tx *sql.Tx, path string, content string) error {
+	wikilinks := dedupeWikilinksByTarget(markdown.ParseWikilinks(content))
 
 	if _, err := tx.ExecContext(ctx,
 		"INSERT OR IGNORE INTO pages (path, title, summary) VALUES (?, '', '')",
@@ -93,9 +105,6 @@ func (g *SQLiteLinkGraph) UpdatePageLinks(ctx context.Context, path string, cont
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
-	}
 	return nil
 }
 
@@ -129,14 +138,22 @@ func (g *SQLiteLinkGraph) RemovePage(ctx context.Context, path string) error {
 
 // RebuildLinks rebuilds the entire link graph from the filesystem.
 // It deletes all existing links and re-resolves wikilinks for every page.
+// The delete and re-resolution steps run in one transaction, so a walk failure
+// leaves the previously resolved links untouched.
 func (g *SQLiteLinkGraph) RebuildLinks(ctx context.Context, kbRoot string) error {
 	kbDir := filepath.Join(kbRoot, "kb")
 
-	if _, err := g.db.ExecContext(ctx, "DELETE FROM links"); err != nil {
+	tx, err := g.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM links"); err != nil {
 		return fmt.Errorf("delete links: %w", err)
 	}
 
-	err := filepath.WalkDir(kbDir, func(path string, d os.DirEntry, err error) error {
+	err = filepath.WalkDir(kbDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -162,7 +179,7 @@ func (g *SQLiteLinkGraph) RebuildLinks(ctx context.Context, kbRoot string) error
 		}
 		relPath = filepath.ToSlash(relPath)
 
-		if err := g.UpdatePageLinks(ctx, relPath, string(content)); err != nil {
+		if err := updatePageLinksTx(ctx, tx, relPath, string(content)); err != nil {
 			return fmt.Errorf("update links for %s: %w", relPath, err)
 		}
 
@@ -170,6 +187,10 @@ func (g *SQLiteLinkGraph) RebuildLinks(ctx context.Context, kbRoot string) error
 	})
 	if err != nil {
 		return fmt.Errorf("walk kb directory: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
 	}
 
 	return nil
