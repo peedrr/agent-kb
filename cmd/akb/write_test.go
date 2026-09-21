@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/peedrr/agent-kb/internal/db"
+	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/template"
 )
 
@@ -126,6 +127,62 @@ func writeRun(kbRoot, inputPath, stdinContent string, extraArgs ...string) (stri
 	cmd.Stdin = strings.NewReader(stdinContent)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
+}
+
+// writeRawPage places a page on disk without going through akb write, so a test
+// controls the frontmatter the command reads and rewrites.
+func writeRawPage(t *testing.T, kbRoot, relPath, content string) {
+	t.Helper()
+	fullPath := filepath.Join(kbRoot, filepath.FromSlash(relPath))
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0750); err != nil {
+		t.Fatalf("create page directory: %v", err)
+	}
+	if err := os.WriteFile(fullPath, []byte(content), 0600); err != nil {
+		t.Fatalf("write raw page: %v", err)
+	}
+}
+
+// pageFrontmatter parses the frontmatter of a written page.
+func pageFrontmatter(t *testing.T, path string) *frontmatter.ParsedFrontmatter {
+	t.Helper()
+	data, err := os.ReadFile(path) //nolint:gosec // test reading known temp file
+	if err != nil {
+		t.Fatalf("read page %s: %v", path, err)
+	}
+	fm, _, err := frontmatter.Parse(data)
+	if err != nil {
+		t.Fatalf("parse page %s: %v", path, err)
+	}
+	return fm
+}
+
+// frontmatterString returns one frontmatter field of a parsed page as a string.
+func frontmatterString(t *testing.T, fm *frontmatter.ParsedFrontmatter, key string) string {
+	t.Helper()
+	raw, ok := fm.Fields[key]
+	if !ok {
+		t.Fatalf("frontmatter field %q is missing", key)
+	}
+	value, ok := raw.(string)
+	if !ok {
+		t.Fatalf("frontmatter field %q = %T (%v), want string", key, raw, raw)
+	}
+	return value
+}
+
+// assertRecentTimestamp fails unless value is an RFC3339 UTC stamp from now.
+func assertRecentTimestamp(t *testing.T, value string) {
+	t.Helper()
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		t.Fatalf("timestamp %q is not RFC3339: %v", value, err)
+	}
+	if !strings.HasSuffix(value, "Z") {
+		t.Errorf("timestamp %q does not carry the UTC Z suffix", value)
+	}
+	if delta := time.Since(parsed); delta < 0 || delta > 2*time.Minute {
+		t.Errorf("timestamp %q is not current (delta %v)", value, delta)
+	}
 }
 
 func TestWriteNoteToTypeDir(t *testing.T) {
@@ -597,5 +654,191 @@ func TestConcurrentWriteAppendsSerializeWithoutLostUpdates(t *testing.T) {
 		if len(line) > 3 && strings.HasPrefix(line[3:], "kb/") {
 			t.Errorf("page left dirty after the concurrent write --append runs: %q", line)
 		}
+	}
+}
+
+func TestWriteNewPageStampsCreatedAndUpdated(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	content := "---\ntype: note\ntitle: Stamped Note\nsummary: test\ntags: test\n---\nBody."
+	if out, err := writeRun(kbRoot, "stamped.md", content); err != nil {
+		t.Fatalf("akb write failed: %s: %v", out, err)
+	}
+
+	fm := pageFrontmatter(t, filepath.Join(kbRoot, "kb", "notes", "stamped.md"))
+	created := frontmatterString(t, fm, "created")
+	updated := frontmatterString(t, fm, "updated")
+	assertRecentTimestamp(t, created)
+	assertRecentTimestamp(t, updated)
+	if created > updated {
+		t.Errorf("created = %q is after updated = %q", created, updated)
+	}
+}
+
+func TestWriteNewPageKeepsExplicitUpdated(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const explicit = "2020-01-01T00:00:00Z"
+	content := "---\ntype: note\ntitle: Explicit Updated\nsummary: test\ntags: test\nupdated: " + explicit + "\n---\nBody."
+	if out, err := writeRun(kbRoot, "explicit-updated.md", content); err != nil {
+		t.Fatalf("akb write failed: %s: %v", out, err)
+	}
+
+	fm := pageFrontmatter(t, filepath.Join(kbRoot, "kb", "notes", "explicit-updated.md"))
+	if got := frontmatterString(t, fm, "updated"); got != explicit {
+		t.Errorf("updated = %q, want the explicit %q preserved on a new page", got, explicit)
+	}
+}
+
+func TestWriteOverwriteBumpsUpdated(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const stale = "2020-01-01T00:00:00Z"
+	writeRawPage(t, kbRoot, "kb/notes/overwrite-updated.md",
+		"---\ntype: note\ntitle: Overwrite Updated\nsummary: test\ntags: test\ncreated: "+stale+"\nupdated: "+stale+"\n---\nOriginal body.")
+
+	replacement := "---\ntype: note\ntitle: Overwrite Updated\nsummary: test\ntags: test\ncreated: " + stale + "\nupdated: " + stale + "\n---\nReplacement body."
+	if out, err := writeRun(kbRoot, "overwrite-updated.md", replacement); err != nil {
+		t.Fatalf("akb write overwrite failed: %s: %v", out, err)
+	}
+
+	fm := pageFrontmatter(t, filepath.Join(kbRoot, "kb", "notes", "overwrite-updated.md"))
+	updated := frontmatterString(t, fm, "updated")
+	if updated == stale {
+		t.Errorf("updated = %q, want the overwrite to move the update time on", updated)
+	}
+	assertRecentTimestamp(t, updated)
+	if got := frontmatterString(t, fm, "created"); got != stale {
+		t.Errorf("created = %q, want %q preserved", got, stale)
+	}
+}
+
+func TestWriteAppendBumpsUpdated(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const stale = "2020-01-01T00:00:00Z"
+	writeRawPage(t, kbRoot, "kb/notes/append-updated.md",
+		"---\ntype: note\ntitle: Append Updated\nsummary: test\ntags: test\ncreated: "+stale+"\nupdated: "+stale+"\n---\nOriginal body.")
+
+	out, err := writeRun(kbRoot, "notes/append-updated.md", "Appended body.", "--append")
+	if err != nil {
+		t.Fatalf("akb write --append failed: %s: %v", out, err)
+	}
+
+	fm := pageFrontmatter(t, filepath.Join(kbRoot, "kb", "notes", "append-updated.md"))
+	updated := frontmatterString(t, fm, "updated")
+	if updated == stale {
+		t.Errorf("updated = %q, want the append to move the update time on", updated)
+	}
+	assertRecentTimestamp(t, updated)
+	if got := frontmatterString(t, fm, "created"); got != stale {
+		t.Errorf("created = %q, want %q preserved", got, stale)
+	}
+}
+
+func TestWriteFrontmatterBumpsUpdated(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const stale = "2020-01-01T00:00:00Z"
+	writeRawPage(t, kbRoot, "kb/notes/frontmatter-updated.md",
+		"---\ntype: note\ntitle: Frontmatter Updated\nsummary: test\ntags: test\ncreated: "+stale+"\nupdated: "+stale+"\n---\nBody.")
+
+	out, err := writeRun(kbRoot, "notes/frontmatter-updated.md", "", "--frontmatter", "summary=changed")
+	if err != nil {
+		t.Fatalf("akb write --frontmatter failed: %s: %v", out, err)
+	}
+
+	fm := pageFrontmatter(t, filepath.Join(kbRoot, "kb", "notes", "frontmatter-updated.md"))
+	updated := frontmatterString(t, fm, "updated")
+	if updated == stale {
+		t.Errorf("updated = %q, want the frontmatter update to move the update time on", updated)
+	}
+	assertRecentTimestamp(t, updated)
+	if got := frontmatterString(t, fm, "summary"); got != "changed" {
+		t.Errorf("summary = %q, want the requested update", got)
+	}
+}
+
+func TestWriteFrontmatterExplicitUpdatedHonored(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const stale = "2020-01-01T00:00:00Z"
+	const explicit = "2030-01-01T00:00:00Z"
+	writeRawPage(t, kbRoot, "kb/notes/frontmatter-explicit.md",
+		"---\ntype: note\ntitle: Frontmatter Explicit\nsummary: test\ntags: test\ncreated: "+stale+"\nupdated: "+stale+"\n---\nBody.")
+
+	out, err := writeRun(kbRoot, "notes/frontmatter-explicit.md", "", "--frontmatter", "updated="+explicit, "--frontmatter", "summary=changed")
+	if err != nil {
+		t.Fatalf("akb write --frontmatter failed: %s: %v", out, err)
+	}
+
+	fm := pageFrontmatter(t, filepath.Join(kbRoot, "kb", "notes", "frontmatter-explicit.md"))
+	if got := frontmatterString(t, fm, "updated"); got != explicit {
+		t.Errorf("updated = %q, want the explicit %q honored", got, explicit)
+	}
+}
+
+// TestWriteAppendCELOldPageSeesPreBumpUpdated pins that a CEL rule comparing
+// old_page against page still sees the on-disk `updated` value from before the
+// append bumped it.
+func TestWriteAppendCELOldPageSeesPreBumpUpdated(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	tmplData := `name: oldpage
+description: old_page freshness probe
+dir: probes
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: old_updated_visible
+    rule: 'old_page != null && old_page.frontmatter.updated == timestamp("2020-01-01T00:00:00Z") && page.frontmatter.updated > old_page.frontmatter.updated'
+    expect: old_page must carry the pre-write updated timestamp
+`
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "oldpage.yaml"), []byte(tmplData), 0600); err != nil {
+		t.Fatalf("write probe template: %v", err)
+	}
+
+	const stale = "2020-01-01T00:00:00Z"
+	writeRawPage(t, kbRoot, "kb/probes/probe.md",
+		"---\ntype: oldpage\ntitle: Probe\nupdated: "+stale+"\n---\nOriginal body.")
+
+	out, err := writeRun(kbRoot, "probes/probe.md", "Appended body.", "--append")
+	if err != nil {
+		t.Fatalf("akb write --append failed under the old_page probe rule: %s: %v", out, err)
+	}
+
+	fm := pageFrontmatter(t, filepath.Join(kbRoot, "kb", "probes", "probe.md"))
+	assertRecentTimestamp(t, frontmatterString(t, fm, "updated"))
+}
+
+func TestApproveDoesNotBumpUpdated(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const stale = "2020-01-01T00:00:00Z"
+	writeRawPage(t, kbRoot, "kb/notes/approve-no-bump.md",
+		"---\ntype: note\ntitle: Approve No Bump\nsummary: test\ntags: test\nis_draft: true\nupdated: "+stale+"\n---\nDraft body.")
+
+	out, err := approveRun(kbRoot, "notes/approve-no-bump.md")
+	if err != nil {
+		t.Fatalf("akb approve failed: %s: %v", out, err)
+	}
+
+	fm := pageFrontmatter(t, filepath.Join(kbRoot, "kb", "notes", "approve-no-bump.md"))
+	if got := frontmatterString(t, fm, "updated"); got != stale {
+		t.Errorf("updated = %q, want %q unchanged by approve", got, stale)
+	}
+	if frontmatter.IsDraft(fm.Fields) {
+		t.Error("page is still a draft after approve")
 	}
 }

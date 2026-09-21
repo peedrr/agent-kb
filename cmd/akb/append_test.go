@@ -389,3 +389,27 @@ func TestConcurrentAppendsSerializeWithoutLostUpdates(t *testing.T) {
 		}
 	}
 }
+
+func TestAppendBumpsUpdated(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	const stale = "2020-01-01T00:00:00Z"
+	writeRawPage(t, kbRoot, "kb/notes/append-updated.md",
+		"---\ntype: note\ntitle: Append Updated\nsummary: test\ntags: test\ncreated: "+stale+"\nupdated: "+stale+"\n---\nOriginal body.")
+
+	out, err := appendRun(kbRoot, "notes/append-updated.md", "Appended body.")
+	if err != nil {
+		t.Fatalf("akb append failed: %s: %v", out, err)
+	}
+
+	fm := pageFrontmatter(t, filepath.Join(kbRoot, "kb", "notes", "append-updated.md"))
+	updated := frontmatterString(t, fm, "updated")
+	if updated == stale {
+		t.Errorf("updated = %q, want the append to move the update time on", updated)
+	}
+	assertRecentTimestamp(t, updated)
+	if got := frontmatterString(t, fm, "created"); got != stale {
+		t.Errorf("created = %q, want %q preserved", got, stale)
+	}
+}
