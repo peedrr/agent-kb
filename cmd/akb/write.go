@@ -472,7 +472,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 			"page":     page,
 			"old_page": oldPageAny,
 			"now":      time.Now(),
-		}, 100000)
+		}, cel.MaxCostLimit)
 		if err != nil {
 			return &internalError{err: fmt.Errorf("CEL engine error: evaluate rule %s: %w", rule.ID, err)}
 		}

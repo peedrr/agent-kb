@@ -89,7 +89,7 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 						"page":     passPage,
 						"old_page": nil,
 						"now":      time.Now(),
-					}, 100000)
+					}, cel.MaxCostLimit)
 					if evalErr != nil {
 						fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: CEL evaluate error in rule '%s': %v\n", rule.ID, evalErr)
 						continue

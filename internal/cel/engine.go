@@ -11,6 +11,10 @@ import (
 	"sync"
 )
 
+// MaxCostLimit is the evaluation cost budget applied to every rule program
+// compiled by CompileRule; evaluation aborts once the tracked cost exceeds it.
+const MaxCostLimit = 100000
+
 var programCache = sync.Map{}
 
 // NewEnv creates a CEL environment pre-configured with variables for page
@@ -38,7 +42,7 @@ func CompileRule(env *cel.Env, expr string) (cel.Program, error) {
 		return nil, issues.Err()
 	}
 
-	prg, err := env.Program(ast, cel.CostLimit(100000))
+	prg, err := env.Program(ast, cel.CostLimit(MaxCostLimit))
 	if err != nil {
 		return nil, err
 	}
