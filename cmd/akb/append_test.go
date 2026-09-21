@@ -498,3 +498,48 @@ func TestWriteDatedRequiresAppend(t *testing.T) {
 		t.Errorf("expected no page to be written, stat error = %v", statErr)
 	}
 }
+
+// TestAppendLinkFailureRollsBackSearchIndex pins that the append path indexes
+// the appended body and its links in one transaction: when the second step, the
+// link-graph update, fails, the first step, the search-index write, does not
+// persist and the search index keeps the pre-append body.
+func TestAppendLinkFailureRollsBackSearchIndex(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	const relPath = "kb/notes/rollback-append.md"
+	seed := "---\ntype: note\ntitle: Rollback Append\nsummary: test\ntags: test\n---\nOriginal body. See [[seed-target]]."
+	if out, err := writeRun(kbRoot, "rollback-append.md", seed); err != nil {
+		t.Fatalf("seed write failed: %s: %v", out, err)
+	}
+
+	preBody, ok := searchDBDocumentBody(t, kbRoot, relPath)
+	if !ok {
+		t.Fatalf("expected the seed page indexed at %s", relPath)
+	}
+
+	installSearchDBStatement(t, kbRoot, abortLinkInsertSQL)
+
+	out, err := appendRun(kbRoot, "notes/rollback-append.md", "Appended body. See [[appended-target]].")
+	if err == nil {
+		t.Fatalf("expected akb append to fail when the link insert is aborted, got: %s", out)
+	}
+	if !strings.Contains(out, "update links:") {
+		t.Fatalf("expected the link-graph step to fail, got: %s", out)
+	}
+
+	postBody, ok := searchDBDocumentBody(t, kbRoot, relPath)
+	if !ok {
+		t.Fatalf("expected %s to stay in the search index after the failed link step", relPath)
+	}
+	if postBody != preBody {
+		t.Errorf("indexed body after the failed link step = %q, want the pre-append body %q — the search-index step did not roll back", postBody, preBody)
+	}
+
+	if got := searchDBRowCount(t, kbRoot, "SELECT COUNT(*) FROM links WHERE source_page = ? AND raw_target = ?", relPath, "seed-target"); got != 1 {
+		t.Errorf("seed link rows after the failed link step = %d, want 1", got)
+	}
+	if got := searchDBRowCount(t, kbRoot, "SELECT COUNT(*) FROM links WHERE source_page = ? AND raw_target = ?", relPath, "appended-target"); got != 0 {
+		t.Errorf("appended link rows after the failed link step = %d, want 0", got)
+	}
+}

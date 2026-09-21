@@ -352,3 +352,76 @@ func TestApproveGitCommitMessage(t *testing.T) {
 		t.Errorf("expected commit message 'akb: approve notes/draft.md', got: %s", string(gitOut))
 	}
 }
+
+// TestApproveLinkFailureRollsBackSearchIndex pins that approve reindexes the
+// approved body and its links in one transaction: when the second step, the
+// link-graph update, fails, the first step, the search-index write, does not
+// persist and the search index keeps the pre-approval body.
+func TestApproveLinkFailureRollsBackSearchIndex(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	approveReindexFixture(t, kbRoot)
+
+	const draftRel = "kb/notes/draft.md"
+	preBody, ok := searchDBDocumentBody(t, kbRoot, draftRel)
+	if !ok {
+		t.Fatalf("expected the draft indexed at %s before approval", draftRel)
+	}
+	if !strings.Contains(preBody, "review") {
+		t.Fatalf("pre-approval indexed body %q does not carry the annotation text", preBody)
+	}
+
+	installSearchDBStatement(t, kbRoot, abortLinkInsertSQL)
+
+	out, err := approveRun(kbRoot, "notes/draft.md")
+	if err == nil {
+		t.Fatalf("expected akb approve to fail when the link insert is aborted, got: %s", out)
+	}
+	if !strings.Contains(out, "update links:") {
+		t.Fatalf("expected the link-graph step to fail, got: %s", out)
+	}
+
+	postBody, ok := searchDBDocumentBody(t, kbRoot, draftRel)
+	if !ok {
+		t.Fatalf("expected %s to stay in the search index after the failed link step", draftRel)
+	}
+	if postBody != preBody {
+		t.Errorf("indexed body after the failed link step = %q, want the pre-approval body %q — the search-index step did not roll back", postBody, preBody)
+	}
+
+	if got := searchDBRowCount(t, kbRoot, "SELECT COUNT(*) FROM links WHERE source_page = ? AND raw_target = ? AND resolved_to IS NULL", draftRel, "target"); got != 1 {
+		t.Errorf("pre-approval link rows after the failed link step = %d, want 1", got)
+	}
+}
+
+// TestApproveAllDraftsLinkFailureRollsBackSearchIndex pins the same rollback on
+// the batch path, which approves each draft through the same per-page
+// transaction.
+func TestApproveAllDraftsLinkFailureRollsBackSearchIndex(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	approveReindexFixture(t, kbRoot)
+
+	const draftRel = "kb/notes/draft.md"
+	preBody, ok := searchDBDocumentBody(t, kbRoot, draftRel)
+	if !ok {
+		t.Fatalf("expected the draft indexed at %s before approval", draftRel)
+	}
+
+	installSearchDBStatement(t, kbRoot, abortLinkInsertSQL)
+
+	out, err := approveAllDraftsRun(kbRoot)
+	if err == nil {
+		t.Fatalf("expected approve --all-drafts to fail when the link insert is aborted, got: %s", out)
+	}
+
+	postBody, ok := searchDBDocumentBody(t, kbRoot, draftRel)
+	if !ok {
+		t.Fatalf("expected %s to stay in the search index after the failed link step", draftRel)
+	}
+	if postBody != preBody {
+		t.Errorf("indexed body after the failed link step = %q, want the pre-approval body %q — the search-index step did not roll back", postBody, preBody)
+	}
+}

@@ -433,3 +433,60 @@ func TestDeleteFileStepFailureAfterIndexRemovalReportsRemediation(t *testing.T) 
 		t.Errorf("the page path should still exist after the failed file step, stat error: %v", statErr)
 	}
 }
+
+// TestDeleteLinkFailureRollsBackSearchRemoval pins that the delete path removes
+// the page from the search index and the link graph in one transaction: when
+// the second step, the link-graph removal, fails, the first step, the
+// search-index removal, does not persist and both indexes keep the page.
+func TestDeleteLinkFailureRollsBackSearchRemoval(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	origNoCommit := noCommit
+	noCommit = false
+	t.Cleanup(func() { noCommit = origNoCommit })
+
+	target := "---\ntype: note\ntitle: Rollback Target\nsummary: test\ntags: test\n---\nTarget body."
+	if out, err := writeRun(kbRoot, "rollback-target.md", target); err != nil {
+		t.Fatalf("write target: %s: %v", out, err)
+	}
+	source := "---\ntype: note\ntitle: Rollback Source\nsummary: test\ntags: test\n---\nSource body. See [[rollback-target]]."
+	if out, err := writeRun(kbRoot, "rollback-source.md", source); err != nil {
+		t.Fatalf("write source: %s: %v", out, err)
+	}
+
+	const sourceRel = "kb/notes/rollback-source.md"
+	preBody, ok := searchDBDocumentBody(t, kbRoot, sourceRel)
+	if !ok {
+		t.Fatalf("expected the source page indexed at %s", sourceRel)
+	}
+	if got := searchDBRowCount(t, kbRoot, "SELECT COUNT(*) FROM links WHERE source_page = ? AND resolved_to = ?", sourceRel, "kb/notes/rollback-target.md"); got != 1 {
+		t.Fatalf("pre-command resolved link rows = %d, want 1", got)
+	}
+
+	installSearchDBStatement(t, kbRoot, abortLinkDeleteSQL)
+
+	err := runDeleteCmd(&cobra.Command{}, []string{"notes/rollback-source.md"})
+	if err == nil {
+		t.Fatal("expected the delete to fail when the link removal is aborted")
+	}
+	if !strings.Contains(err.Error(), "remove from link graph") {
+		t.Fatalf("expected the link-graph removal to fail, got: %v", err)
+	}
+
+	postBody, ok := searchDBDocumentBody(t, kbRoot, sourceRel)
+	if !ok {
+		t.Errorf("expected %s to stay in the search index after the failed link removal — the search-index removal did not roll back", sourceRel)
+	} else if postBody != preBody {
+		t.Errorf("indexed body after the failed link removal = %q, want the pre-command body %q", postBody, preBody)
+	}
+	if got := searchDBRowCount(t, kbRoot, "SELECT COUNT(*) FROM pages WHERE path = ?", sourceRel); got != 1 {
+		t.Errorf("pages rows for %s = %d after the failed link removal, want 1", sourceRel, got)
+	}
+	if got := searchDBRowCount(t, kbRoot, "SELECT COUNT(*) FROM links WHERE source_page = ? AND resolved_to = ?", sourceRel, "kb/notes/rollback-target.md"); got != 1 {
+		t.Errorf("resolved link rows after the failed link removal = %d, want 1", got)
+	}
+	if _, statErr := os.Stat(filepath.Join(kbRoot, "kb", "notes", "rollback-source.md")); statErr != nil {
+		t.Errorf("the page file should stay on disk after the failed index removal, stat error: %v", statErr)
+	}
+}

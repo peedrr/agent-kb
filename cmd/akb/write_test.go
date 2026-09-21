@@ -1,6 +1,8 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -880,9 +882,10 @@ func TestApproveDoesNotBumpUpdated(t *testing.T) {
 	}
 }
 
-// abortDocumentInsertSQL and abortLinkInsertSQL arm one database step of the
-// write path to fail: the first aborts the document insert of the search index,
-// the second aborts the link insert of the link graph.
+// abortDocumentInsertSQL, abortLinkInsertSQL, and abortLinkDeleteSQL arm one
+// database step of a command path to fail: the first aborts the document insert
+// of the search index, the second aborts the link insert of the link graph, and
+// the third aborts the link removal of the link graph.
 const (
 	abortDocumentInsertSQL = `CREATE TRIGGER injected_document_insert_failure
 		BEFORE INSERT ON documents
@@ -890,6 +893,9 @@ const (
 	abortLinkInsertSQL = `CREATE TRIGGER injected_link_insert_failure
 		BEFORE INSERT ON links
 		BEGIN SELECT RAISE(ABORT, 'injected link insert failure'); END`
+	abortLinkDeleteSQL = `CREATE TRIGGER injected_link_delete_failure
+		BEFORE DELETE ON links
+		BEGIN SELECT RAISE(ABORT, 'injected link delete failure'); END`
 )
 
 // installSearchDBStatement runs one statement against the search database of a
@@ -906,6 +912,46 @@ func installSearchDBStatement(t *testing.T, kbRoot, statement string) {
 	if _, err := conn.Exec(statement); err != nil {
 		t.Fatalf("run search database statement: %v", err)
 	}
+}
+
+// searchDBDocumentBody returns the body the search index holds for relPath and
+// whether the index has a row for the page at all.
+func searchDBDocumentBody(t *testing.T, kbRoot, relPath string) (string, bool) {
+	t.Helper()
+
+	conn, err := db.OpenKB(kbRoot)
+	if err != nil {
+		t.Fatalf("open search database: %v", err)
+	}
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
+
+	var body string
+	err = conn.QueryRow("SELECT content FROM documents WHERE path = ?", relPath).Scan(&body)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false
+	}
+	if err != nil {
+		t.Fatalf("query indexed body of %s: %v", relPath, err)
+	}
+	return body, true
+}
+
+// searchDBRowCount returns how many rows one query counts against the search
+// database of a test KB.
+func searchDBRowCount(t *testing.T, kbRoot, query string, args ...any) int {
+	t.Helper()
+
+	conn, err := db.OpenKB(kbRoot)
+	if err != nil {
+		t.Fatalf("open search database: %v", err)
+	}
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
+
+	var count int
+	if err := conn.QueryRow(query, args...).Scan(&count); err != nil {
+		t.Fatalf("query %q: %v", query, err)
+	}
+	return count
 }
 
 // TestWriteIndexFailureAfterCommitReportsRemediation pins that a search-index
@@ -1001,5 +1047,44 @@ func TestWriteNoCommitIndexFailureReportsStagedState(t *testing.T) {
 	}
 	if !strings.Contains(out, "akb index rebuild") {
 		t.Errorf("expected the error to carry the rebuild remediation, got: %s", out)
+	}
+}
+
+// TestWriteLinkFailureRollsBackSearchIndex pins that the write path indexes the
+// page and its links in one transaction: when the second step, the link-graph
+// update, fails, the first step, the search-index write, does not persist.
+func TestWriteLinkFailureRollsBackSearchIndex(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	controlContent := "---\ntype: note\ntitle: Rollback Control\nsummary: test\ntags: test\n---\nSee [[other-note]] for details."
+	if out, err := writeRun(kbRoot, "rollback-control.md", controlContent); err != nil {
+		t.Fatalf("control write failed: %s: %v", out, err)
+	}
+	const controlRel = "kb/notes/rollback-control.md"
+	if got := searchDBRowCount(t, kbRoot, "SELECT COUNT(*) FROM documents WHERE path = ?", controlRel); got != 1 {
+		t.Fatalf("control page rows in documents = %d, want 1 — the write path did not index the control page", got)
+	}
+
+	installSearchDBStatement(t, kbRoot, abortLinkInsertSQL)
+
+	failedContent := "---\ntype: note\ntitle: Rollback Failure\nsummary: test\ntags: test\n---\nSee [[other-note]] for details."
+	out, err := writeRun(kbRoot, "rollback-failure.md", failedContent)
+	if err == nil {
+		t.Fatalf("expected akb write to fail when the link insert is aborted, got: %s", out)
+	}
+	if !strings.Contains(out, "update links:") {
+		t.Fatalf("expected the link-graph step to fail, got: %s", out)
+	}
+
+	const failedRel = "kb/notes/rollback-failure.md"
+	if got := searchDBRowCount(t, kbRoot, "SELECT COUNT(*) FROM documents WHERE path = ?", failedRel); got != 0 {
+		t.Errorf("documents rows for %s = %d after the failed link step, want 0 — the search-index step did not roll back", failedRel, got)
+	}
+	if got := searchDBRowCount(t, kbRoot, "SELECT COUNT(*) FROM pages WHERE path = ?", failedRel); got != 0 {
+		t.Errorf("pages rows for %s = %d after the failed link step, want 0 — the search-index step did not roll back", failedRel, got)
+	}
+	if got := searchDBRowCount(t, kbRoot, "SELECT COUNT(*) FROM links WHERE source_page = ?", failedRel); got != 0 {
+		t.Errorf("links rows for %s = %d after the failed link step, want 0", failedRel, got)
 	}
 }
