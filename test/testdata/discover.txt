@@ -52,14 +52,6 @@ stdout '{"name":"project","path":"[^"]*/project","description":"project knowledg
 stdout '{"name":"project-kb","path":"[^"]*/project-kb"}'
 stdout '{"name":"kb","path":"[^"]*/docs/kb"}'
 
-# A neighborhood without a knowledge base reports none, in text and JSON.
-mkdir $WORK/home/empty
-cd $WORK/home/empty
-exec akb discover
-stdout 'no knowledge bases found near .*empty'
-exec akb discover --json
-stdout '^\[\]$'
-
 -- described.yaml --
 name: project
 description: project knowledge base

@@ -51,13 +51,11 @@ func Test(t *testing.T) {
 					break
 				}
 			}
-			// Create a unique HOME directory per test so the scenarios cannot
-			// read the developer's configuration
-			testHome := filepath.Join(env.WorkDir, "home")
-			if err := os.MkdirAll(testHome, 0750); err != nil {
-				return err
-			}
-			env.Vars = append(env.Vars, "HOME="+testHome)
+			// HOME is the scenario work dir itself: the scenarios cannot read
+			// the developer's configuration, and a neighborhood walk from any
+			// directory inside the scenario is bounded there instead of
+			// climbing past it to the filesystem root.
+			env.Vars = append(env.Vars, "HOME="+env.WorkDir)
 			// Every scenario runs its commands from the root of the KB it
 			// created, so a relative selection resolves against that working
 			// directory. Scenarios that need no KB clear the variable.

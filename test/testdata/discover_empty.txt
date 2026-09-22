@@ -1,0 +1,11 @@
+# Discover Empty — a neighborhood without a knowledge base reports none, in
+# text and JSON. The scenario creates no knowledge base; the home-anchored
+# walk is bounded by the scenario work dir, so the empty subdirectory sees
+# nothing even though sibling scenarios may live nearby.
+
+mkdir $WORK/empty
+cd $WORK/empty
+exec akb discover
+stdout 'no knowledge bases found near .*empty'
+exec akb discover --json
+stdout '^\[\]$'
