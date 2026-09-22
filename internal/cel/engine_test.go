@@ -80,7 +80,7 @@ func TestEvaluate(t *testing.T) {
 		},
 	}
 
-	result, err := Evaluate(context.Background(), prg, vars, 1000)
+	result, err := Evaluate(context.Background(), prg, vars)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestEvaluateFalse(t *testing.T) {
 		},
 	}
 
-	result, err := Evaluate(context.Background(), prg, vars, 1000)
+	result, err := Evaluate(context.Background(), prg, vars)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestCostLimit(t *testing.T) {
 		t.Fatalf("Program: %v", err)
 	}
 
-	_, err = Evaluate(context.Background(), prg, map[string]any{}, 0)
+	_, err = Evaluate(context.Background(), prg, map[string]any{})
 	if err == nil {
 		t.Fatal("expected error for cost limit exceeded")
 	}
@@ -173,7 +173,7 @@ func TestCompileRuleCostLimit(t *testing.T) {
 
 		evaluated := make(chan error, 1)
 		go func() {
-			_, err := Evaluate(context.Background(), prg, tripleHeadingsVars(2048), MaxCostLimit)
+			_, err := Evaluate(context.Background(), prg, tripleHeadingsVars(2048))
 			evaluated <- err
 		}()
 
@@ -202,7 +202,7 @@ func TestCompileRuleCostLimit(t *testing.T) {
 			t.Fatalf("Program: %v", err)
 		}
 
-		_, err = Evaluate(context.Background(), prg, tripleHeadingsVars(16), tinyCostLimit)
+		_, err = Evaluate(context.Background(), prg, tripleHeadingsVars(16))
 		if err == nil {
 			t.Fatal("expected error for cost limit exceeded")
 		}
@@ -242,7 +242,7 @@ func TestHasOnMaps(t *testing.T) {
 		},
 	}
 
-	result, err := Evaluate(context.Background(), prg, vars, 1000)
+	result, err := Evaluate(context.Background(), prg, vars)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
@@ -255,7 +255,7 @@ func TestHasOnMaps(t *testing.T) {
 		t.Fatalf("CompileRule: %v", err)
 	}
 
-	result2, err := Evaluate(context.Background(), prg2, vars, 1000)
+	result2, err := Evaluate(context.Background(), prg2, vars)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
@@ -292,7 +292,7 @@ func TestNowVariable(t *testing.T) {
 
 	result, err := Evaluate(context.Background(), prg, map[string]any{
 		"now": time.Now(),
-	}, 1000)
+	})
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
@@ -307,7 +307,7 @@ func TestPanicRecovery(t *testing.T) {
 			Cause:   interpreter.CostLimitExceeded,
 			Message: "operation cancelled: actual cost limit exceeded",
 		}}
-		_, err := Evaluate(context.Background(), prg, map[string]any{}, 100)
+		_, err := Evaluate(context.Background(), prg, map[string]any{})
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -319,7 +319,7 @@ func TestPanicRecovery(t *testing.T) {
 
 	t.Run("unknown panic", func(t *testing.T) {
 		prg := panicProgram{panicWith: "something went wrong"}
-		_, err := Evaluate(context.Background(), prg, map[string]any{}, 100)
+		_, err := Evaluate(context.Background(), prg, map[string]any{})
 		if err == nil {
 			t.Fatal("expected error")
 		}

@@ -138,7 +138,7 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 			"page":     passPage,
 			"old_page": nil,
 			"now":      time.Now(),
-		}, cel.MaxCostLimit)
+		})
 		if err != nil {
 			return fmt.Errorf("pass mockup: evaluate rule %q: %w", rule.ID, err)
 		}
@@ -182,7 +182,7 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 			"page":     failPage,
 			"old_page": nil,
 			"now":      time.Now(),
-		}, cel.MaxCostLimit)
+		})
 		if err != nil {
 			return fmt.Errorf("fail mockup: evaluate rule %q: %w", rule.ID, err)
 		}

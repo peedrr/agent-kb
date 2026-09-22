@@ -64,7 +64,7 @@ func (c *CELLintChecker) Check(ctx context.Context, kb *KB) ([]LintIssue, error)
 			result, err := cel.Evaluate(ctx, prg, map[string]any{
 				"page": pageMap,
 				"now":  now,
-			}, cel.MaxCostLimit)
+			})
 			if err != nil {
 				return nil, err
 			}

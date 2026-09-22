@@ -52,11 +52,10 @@ func CompileRule(env *cel.Env, expr string) (cel.Program, error) {
 }
 
 // Evaluate runs a compiled CEL program with the given variables and context.
-// The cost budget is enforced by the program options applied in CompileRule, so
-// costLimit states the budget the caller expects that program to run under.
+// The cost budget is enforced by the program options applied in CompileRule.
 // It recovers from panics during evaluation, translating cost-limit-exceeded
 // errors into a structured "exceeded compute budget" error.
-func Evaluate(ctx context.Context, prg cel.Program, vars map[string]any, costLimit uint64) (ref.Val, error) {
+func Evaluate(ctx context.Context, prg cel.Program, vars map[string]any) (ref.Val, error) {
 	var result ref.Val
 	var evalErr error
 

@@ -301,7 +301,7 @@ Body text.
 			t.Errorf("CompileRule(%s): %v", rule.expr, err)
 			continue
 		}
-		result, err := Evaluate(context.Background(), prg, vars, 1000)
+		result, err := Evaluate(context.Background(), prg, vars)
 		if err != nil {
 			t.Errorf("Evaluate(%s): %v", rule.expr, err)
 			continue
@@ -359,7 +359,7 @@ func TestBuildPageHasOnNil(t *testing.T) {
 		"old_page": nil,
 	}
 
-	result, err := Evaluate(context.Background(), prg, vars, 1000)
+	result, err := Evaluate(context.Background(), prg, vars)
 	if err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
