@@ -17,9 +17,11 @@ lint:
 clean:
 	rm -rf bin/
 
-# Release: verify the version string agrees across Makefile, flake.nix and
-# AGENTS.md, then tag the current commit. The guard runs first, so a mismatch
-# aborts before any tag is created.
+# Release: refuse unless the repo is releasable (clean tree on the expected
+# branch), verify the version string agrees across Makefile, flake.nix and
+# AGENTS.md, then tag the current commit. Every guard runs first, so a failed
+# check aborts before any tag is created.
 release:
+	scripts/check-release-preconditions.sh
 	scripts/check-version-lockstep.sh
 	git tag -a v$(VERSION) -m "akb v$(VERSION)"
