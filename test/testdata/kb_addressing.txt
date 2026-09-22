@@ -23,7 +23,7 @@ exec akb --kb . status
 stdout 'Name: kb-one'
 
 # A tilde --kb path expands to the home directory.
-cd $WORK/home
+cd $WORK
 exec akb init kb-home
 stdout 'Initialized KB .kb-home.'
 
