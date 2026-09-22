@@ -26,6 +26,7 @@ var (
 	ErrUseAKBWrite    = errors.New("use `akb write` or `akb read`")
 	ErrUseAKBRawWrite = errors.New("use `akb raw write` or `akb raw read`")
 	ErrNoKB           = errors.New("no knowledge base selected: pass --kb <path> or set the AKB_KB environment variable")
+	ErrNotAKB         = errors.New("not a knowledge base")
 )
 
 // GuardError reports a rejected invocation: an input path that violates the
@@ -123,9 +124,11 @@ func ResolveRawPath(kbRoot, inputPath string) (string, error) {
 // ResolveKB returns the absolute path of the knowledge base selected for an
 // invocation: the --kb flag when given, otherwise the AKB_KB environment
 // variable. A leading ~ is expanded to the home directory and a relative path
-// is resolved against the working directory. With neither set, the command has
-// no base to act on and ResolveKB reports a usage error, noting the removed
-// registry file when it is still on disk.
+// is resolved against the working directory. The resolved path must hold the
+// .akb/.akb.yaml config file that marks a knowledge base; a path without it is
+// an invocation mistake, reported as a usage error. With neither selection
+// set, the command has no base to act on and ResolveKB reports a usage error,
+// noting the removed registry file when it is still on disk.
 func ResolveKB(flagKB string) (string, error) {
 	selected := strings.TrimSpace(flagKB)
 	if selected == "" {
@@ -147,7 +150,24 @@ func ResolveKB(flagKB string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve knowledge base path %q: %w", selected, err)
 	}
+
+	if err := requireKBConfig(absPath); err != nil {
+		return "", err
+	}
 	return absPath, nil
+}
+
+// requireKBConfig reports the usage error for a resolved path that is not a
+// knowledge base: the .akb/.akb.yaml config file that marks a base is missing
+// there, or is not a regular file. The error names the path and the missing
+// marker, and points at `akb discover` for listing nearby bases.
+func requireKBConfig(absPath string) error {
+	marker := filepath.Join(absPath, ".akb", ".akb.yaml")
+	info, err := os.Stat(marker) //nolint:gosec // the selected path is the user's own --kb/AKB_KB choice; the check only stats its marker
+	if err == nil && info.Mode().IsRegular() {
+		return nil
+	}
+	return &GuardError{rule: fmt.Errorf("%w: %s has no %s; run `akb discover` to list nearby knowledge bases", ErrNotAKB, absPath, filepath.Join(".akb", ".akb.yaml"))}
 }
 
 // expandHome expands a leading ~ in p to the user's home directory.

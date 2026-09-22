@@ -376,6 +376,7 @@ func TestResolveKB(t *testing.T) {
 		home := t.TempDir()
 		t.Setenv(KBEnvVar, filepath.Join(home, "from-env"))
 		flagPath := filepath.Join(home, "from-flag")
+		makeKBFixture(t, flagPath, "name: flag\n")
 
 		got, err := ResolveKB(flagPath)
 		if err != nil {
@@ -389,6 +390,7 @@ func TestResolveKB(t *testing.T) {
 	t.Run("environment used when flag is empty", func(t *testing.T) {
 		home := t.TempDir()
 		envPath := filepath.Join(home, "from-env")
+		makeKBFixture(t, envPath, "name: env\n")
 		t.Setenv(KBEnvVar, envPath)
 
 		got, err := ResolveKB("")
@@ -414,6 +416,7 @@ func TestResolveKB(t *testing.T) {
 	t.Run("relative path resolves against the working directory", func(t *testing.T) {
 		dir := t.TempDir()
 		t.Chdir(dir)
+		makeKBFixture(t, filepath.Join(dir, "kb"), "name: kb\n")
 
 		cwd, err := os.Getwd()
 		if err != nil {
@@ -432,6 +435,8 @@ func TestResolveKB(t *testing.T) {
 	t.Run("tilde expands to the home directory", func(t *testing.T) {
 		home := t.TempDir()
 		t.Setenv("HOME", home)
+		makeKBFixture(t, filepath.Join(home, "kb"), "name: kb\n")
+		makeKBFixture(t, home, "name: home\n")
 
 		got, err := ResolveKB("~/kb")
 		if err != nil {
@@ -452,6 +457,7 @@ func TestResolveKB(t *testing.T) {
 
 	t.Run("absolute path is normalized", func(t *testing.T) {
 		home := t.TempDir()
+		makeKBFixture(t, filepath.Join(home, "other"), "name: other\n")
 
 		got, err := ResolveKB(filepath.Join(home, "kb", "..", "other"))
 		if err != nil {
@@ -476,6 +482,51 @@ func TestResolveKB(t *testing.T) {
 		}
 		if !errors.Is(err, ErrNoKB) {
 			t.Fatalf("expected ErrNoKB, got %v", err)
+		}
+	})
+
+	t.Run("nonexistent directory is not a knowledge base", func(t *testing.T) {
+		missing := filepath.Join(t.TempDir(), "missing")
+
+		_, err := ResolveKB(missing)
+		assertNotAKB(t, err, missing)
+	})
+
+	t.Run("plain directory is not a knowledge base", func(t *testing.T) {
+		dir := t.TempDir()
+
+		_, err := ResolveKB(dir)
+		assertNotAKB(t, err, dir)
+	})
+
+	t.Run("directory with .akb but no config is not a knowledge base", func(t *testing.T) {
+		dir := t.TempDir()
+		makeKBFixture(t, dir, "")
+
+		_, err := ResolveKB(dir)
+		assertNotAKB(t, err, dir)
+	})
+
+	t.Run("config that is not a regular file is not a knowledge base", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, ".akb", ".akb.yaml"), 0750); err != nil {
+			t.Fatalf("create config directory: %v", err)
+		}
+
+		_, err := ResolveKB(dir)
+		assertNotAKB(t, err, dir)
+	})
+
+	t.Run("initialized knowledge base resolves", func(t *testing.T) {
+		dir := t.TempDir()
+		makeKBFixture(t, dir, "name: fixture\n")
+
+		got, err := ResolveKB(dir)
+		if err != nil {
+			t.Fatalf("ResolveKB failed: %v", err)
+		}
+		if got != dir {
+			t.Fatalf("expected %q, got %q", dir, got)
 		}
 	})
 
@@ -517,6 +568,29 @@ func TestResolveKB(t *testing.T) {
 			t.Errorf("expected no note, got %q", stderr)
 		}
 	})
+}
+
+// assertNotAKB pins the usage error for a selected path that is not a
+// knowledge base: a GuardError matching ErrNotAKB that names the path, the
+// missing .akb/.akb.yaml marker, and the `akb discover` pointer.
+func assertNotAKB(t *testing.T, err error, path string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatalf("expected a not-a-knowledge-base error for %q", path)
+	}
+	var guardErr *GuardError
+	if !errors.As(err, &guardErr) {
+		t.Fatalf("expected a GuardError, got %T", err)
+	}
+	if !errors.Is(err, ErrNotAKB) {
+		t.Fatalf("expected ErrNotAKB, got %v", err)
+	}
+	for _, want := range []string{path, filepath.Join(".akb", ".akb.yaml"), "akb discover"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err.Error(), want)
+		}
+	}
 }
 
 // captureStderr runs fn with os.Stderr redirected to a pipe and returns the
