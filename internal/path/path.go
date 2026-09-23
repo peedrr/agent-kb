@@ -27,6 +27,7 @@ var (
 	ErrUseAKBRawWrite = errors.New("use `akb raw write` or `akb raw read`")
 	ErrNoKB           = errors.New("no knowledge base selected: pass --kb <path> or set the AKB_KB environment variable")
 	ErrNotAKB         = errors.New("not a knowledge base")
+	ErrSymlinkEscape  = errors.New("path escapes the knowledge base through a symlink")
 )
 
 // GuardError reports a rejected invocation: an input path that violates the
@@ -79,7 +80,11 @@ func ResolveKBPath(kbRoot, inputPath string) (string, error) {
 	// separators cannot mask the target from callers.
 	cleanPath = filepath.Clean(cleanPath)
 
-	return filepath.Join(kbRoot, cleanPath), nil
+	resolved := filepath.Join(kbRoot, cleanPath)
+	if err := assertContained(kbRoot, resolved); err != nil {
+		return "", err
+	}
+	return resolved, nil
 }
 
 // ResolveRawPath resolves a raw path with guard rails.
@@ -118,7 +123,120 @@ func ResolveRawPath(kbRoot, inputPath string) (string, error) {
 	// separators cannot mask the target from callers.
 	cleanPath = filepath.Clean(cleanPath)
 
-	return filepath.Join(kbRoot, "raw", cleanPath), nil
+	resolved := filepath.Join(kbRoot, "raw", cleanPath)
+	if err := assertContained(kbRoot, resolved); err != nil {
+		return "", err
+	}
+	return resolved, nil
+}
+
+// assertContained verifies that resolved — the path a resolver built by
+// joining kbRoot with a lexically clean relative path — stays inside kbRoot
+// once the filesystem follows symlinks. Every existing component below kbRoot
+// is inspected in order: the first component that is a symlink is resolved
+// through its chain and must land inside the base. A component that does not
+// exist yet ends the inspection, because the resolver has already rejected
+// '..' and nothing below a missing component can be a link. A link whose
+// target does not exist yet is resolved as far as the filesystem allows, so a
+// write through it is judged by where it would land. kbRoot is resolved
+// through symlinks as well, so a base reached through a symlinked parent stays
+// accepted.
+//
+// An escaping link is reported as a GuardError wrapping ErrSymlinkEscape that
+// names the link component.
+func assertContained(kbRoot, resolved string) error {
+	absRoot, err := filepath.Abs(kbRoot)
+	if err != nil {
+		return nil
+	}
+	absTarget, err := filepath.Abs(resolved)
+	if err != nil {
+		return nil
+	}
+
+	root, err := filepath.EvalSymlinks(absRoot)
+	if err != nil {
+		// The base root does not exist yet: there is no boundary a link below
+		// it could cross.
+		return nil
+	}
+
+	rel, err := filepath.Rel(absRoot, absTarget)
+	if err != nil {
+		return nil
+	}
+
+	current := absRoot
+	for _, part := range strings.Split(rel, string(filepath.Separator)) {
+		if part == "" || part == "." {
+			continue
+		}
+
+		next := filepath.Join(current, part)
+		info, err := os.Lstat(next)
+		if err != nil {
+			break
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			current = next
+			continue
+		}
+
+		resolvedTarget, err := resolveLink(next)
+		if err != nil {
+			break
+		}
+		if !contained(root, resolvedTarget) {
+			return &GuardError{rule: fmt.Errorf("%w: %s", ErrSymlinkEscape, next)}
+		}
+		current = resolvedTarget
+	}
+	return nil
+}
+
+// resolveLink reports where the symlink at link lands, following its chain.
+// The chain may end at a target that does not exist yet — writing through a
+// dangling link creates the file there — so the deepest existing ancestor of
+// the target decides.
+func resolveLink(link string) (string, error) {
+	if resolved, err := filepath.EvalSymlinks(link); err == nil {
+		return resolved, nil
+	}
+
+	target, err := os.Readlink(link)
+	if err != nil {
+		return "", fmt.Errorf("read symlink %s: %w", link, err)
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(link), target)
+	}
+	return deepestExisting(target), nil
+}
+
+// deepestExisting resolves target as far as it exists, following the symlinks
+// on the way, and returns that resolved prefix.
+func deepestExisting(target string) string {
+	for {
+		if resolved, err := filepath.EvalSymlinks(target); err == nil {
+			return resolved
+		}
+		parent := filepath.Dir(target)
+		if parent == target {
+			return target
+		}
+		target = parent
+	}
+}
+
+// contained reports whether target is root itself or lives below it. The
+// comparison is separator-bounded, so a sibling whose name merely starts with
+// the root's name (/srv/kb2 next to /srv/kb) does not count as inside.
+func contained(root, target string) bool {
+	rel, err := filepath.Rel(root, target)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
 // ResolveKB returns the absolute path of the knowledge base selected for an
