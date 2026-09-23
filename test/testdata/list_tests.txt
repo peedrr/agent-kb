@@ -78,18 +78,18 @@ title: Decision One
 status: proposed
 deciders: team
 summary: A test decision
-tags: test
+tags: [test]
 created: '2026-01-01'
 updated: '2026-09-01'
 ---
 ## Context
 
-ADR content here.
+List coverage needs a page of the decision type. The listing walks every tracked page and prints its path, so a decision record appears exactly like a note. See [[alpha-note]] for the note that shares the listing.
 
 ## Decision
 
-Decided.
+ADR content here. The decision is listed under its type directory and sorts alphabetically with the notes.
 
 ## Consequences
 
-Recorded.
+Recorded. Deleting the page removes it from the listing on the next call.

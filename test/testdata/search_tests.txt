@@ -121,18 +121,18 @@ title: Search Decision
 status: proposed
 deciders: team
 summary: Decision for search testing
-tags: searchtest
+tags: [searchtest]
 created: '2026-01-01'
 updated: '2026-01-01'
 ---
 ## Context
 
-The architecture needs a searchable decision record.
+The architecture needs a searchable decision record. Every decision is indexed alongside the notes, so one keyword query returns both kinds of page. See [[search-note]] for the note that documents the same indexing path.
 
 ## Decision
 
-We decided to use distributed systems for our architecture.
+We decided to use distributed systems for our architecture. The decision is indexed by title, tags and body text.
 
 ## Consequences
 
-The decision is indexed alongside notes.
+The decision is indexed alongside notes. Rebuilding the index re-reads this body, so the indexed terms survive a rebuild.

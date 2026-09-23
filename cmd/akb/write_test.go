@@ -228,7 +228,7 @@ func TestWriteADRToDecisionsDir(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)
 
-	content := "---\ntype: adr\ntitle: Use Go\nsummary: We chose Go\ntags: decision\nstatus: accepted\ndeciders: team\ncreated: 2025-01-01\nupdated: 2025-01-01\n---\n## Context\n\nWe needed a language.\n\n## Decision\n\nWe decided to use Go.\n\n## Consequences\n\nEverything works better."
+	content := "---\ntype: adr\ntitle: Use Go\nsummary: We chose Go\ntags: [decision]\nstatus: accepted\ndeciders: team\ncreated: 2025-01-01\nupdated: 2025-01-01\n---\n## Context\n\nWe needed a language for the CLI. The decision records why the toolchain moved, so the record is kept beside the code it describes. See [[decisions/related-decision]] for the record this one extends.\n\n## Decision\n\nWe decided to use Go. The decision is written to the decisions directory.\n\n## Consequences\n\nEverything works better. The build stays fast and the binary ships on its own."
 	out, err := writeRun(kbRoot, "my-adr.md", content)
 	if err != nil {
 		t.Fatalf("akb write failed: %s: %v", out, err)
@@ -555,7 +555,7 @@ func TestWriteGitCommitMessageADR(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)
 
-	content := "---\ntype: adr\ntitle: Use Go\nsummary: We chose Go\ntags: decision\nstatus: accepted\ndeciders: team\ncreated: 2025-01-01\nupdated: 2025-01-01\n---\n## Context\n\nWe needed a language.\n\n## Decision\n\nWe decided to use Go.\n\n## Consequences\n\nEverything works better."
+	content := "---\ntype: adr\ntitle: Use Go\nsummary: We chose Go\ntags: [decision]\nstatus: accepted\ndeciders: team\ncreated: 2025-01-01\nupdated: 2025-01-01\n---\n## Context\n\nWe needed a language for the CLI. The decision records why the toolchain moved, so the record is kept beside the code it describes. See [[decisions/related-decision]] for the record this one extends.\n\n## Decision\n\nWe decided to use Go. The decision is written to the decisions directory.\n\n## Consequences\n\nEverything works better. The build stays fast and the binary ships on its own."
 	out, err := writeRun(kbRoot, "my-adr.md", content)
 	if err != nil {
 		t.Fatalf("akb write failed: %s: %v", out, err)

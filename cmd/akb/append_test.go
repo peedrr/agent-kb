@@ -605,7 +605,7 @@ const appendValidADR = `---
 type: adr
 title: Append Validation ADR
 summary: ADR for append validation
-tags: test
+tags: [test]
 status: proposed
 deciders: team
 created: '2020-01-01'
@@ -613,15 +613,15 @@ updated: '2020-01-01'
 ---
 ## Context
 
-Context body.
+Context body. An append is validated as the page the append leaves behind, so the report names the page's own sections. See [[decisions/related-decision]] for the record this one follows from.
 
 ## Decision
 
-Decision body.
+Decision body. The append path runs the same rules as the write path, which keeps a page that was valid from turning invalid through a later append.
 
 ## Consequences
 
-Consequences body.`
+Consequences body. A refused append leaves the file untouched and reports every failed rule at once.`
 
 // TestAppendValidationFailureReportsAllRulesAndKeepsPage pins that an append
 // runs the template's write-time rules against the page as the append leaves

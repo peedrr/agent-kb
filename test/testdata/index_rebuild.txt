@@ -97,18 +97,18 @@ title: Rebuild Decision
 status: proposed
 deciders: team
 summary: Decision for rebuild test
-tags: test
+tags: [test]
 created: '2026-01-01'
 updated: '2026-09-01'
 ---
 ## Context
 
-ADR content for rebuild.
+ADR content for rebuild. The rebuild regenerates the index from the filesystem, so the entry for this decision is derived from the page itself rather than from a manual index add. See [[rebuild-note]] for the note that goes through the same rebuild.
 
 ## Decision
 
-Decided.
+Decided. The decision keeps the sections and the body the template requires.
 
 ## Consequences
 
-Recorded.
+Recorded. Deleting the page removes its entry from the regenerated index.

@@ -71,18 +71,18 @@ title: Status Decision
 status: proposed
 deciders: team
 summary: Decision for status testing
-tags: test
+tags: [test]
 created: '2026-01-01'
 updated: '2026-01-01'
 ---
 ## Context
 
-Page counting must cover every page type.
+Page counting must cover every page type. The status command reports the number of tracked pages, so a decision record is counted exactly like a note and a deleted page leaves the count immediately. See [[status-note]] for the note side of the same count.
 
 ## Decision
 
-ADR content for status test.
+ADR content for status test. The decision lives under the decisions directory and counts toward the page total.
 
 ## Consequences
 
-The decision counts toward the status page total.
+The decision counts toward the status page total. Deleting it drops the count by one.

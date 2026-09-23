@@ -81,15 +81,15 @@ updated: "2026-09-01T00:00:00Z"
 
 ## Context
 
-Fresh context.
+Fresh context. The sweep checks how long ago a record was updated, so this decision keeps a recent updated date and is not reported as stale. See [[fresh]] for the note that shares the same window.
 
 ## Decision
 
-Fresh decision.
+Fresh decision. The decision is accepted, so the deprecated and proposed branches of the lint rules do not apply to it.
 
 ## Consequences
 
-Fresh consequences.
+Fresh consequences. The sweep reports the stale page beside this one, which keeps the rule under test.
 
 -- stale-adr.md --
 ---
@@ -107,12 +107,12 @@ updated: "2020-01-01T00:00:00Z"
 
 ## Context
 
-Old context.
+Old context. The sweep checks how long ago a record was updated, so this decision keeps an old updated date and is reported as stale. See [[stale]] for the note that shares the same window.
 
 ## Decision
 
-Old decision.
+Old decision. The decision is accepted, so the deprecated and proposed branches of the lint rules do not apply to it.
 
 ## Consequences
 
-Old consequences.
+Old consequences. The stale report names the rule and the page it fired on.

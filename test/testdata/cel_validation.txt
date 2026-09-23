@@ -102,15 +102,15 @@ updated: "2026-09-01T00:00:00Z"
 
 ## Context
 
-We need a search solution.
+We need a search solution. Every page is a markdown file on disk, so the search index has to be rebuildable from those files alone. See [[sqlite-notes]] for the background notes on the storage layer.
 
 ## Decision
 
-Use SQLite with FTS5.
+Use SQLite with FTS5. The decision keeps the index in a single database file beside the knowledge base.
 
 ## Consequences
 
-Fast full-text search.
+Fast full-text search. A rebuild re-derives the index from the page bodies without touching the pages themselves.
 
 -- invalid-adr.md --
 ---

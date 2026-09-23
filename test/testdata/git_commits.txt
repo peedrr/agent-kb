@@ -59,18 +59,18 @@ title: Commit ADR
 status: proposed
 deciders: team
 summary: Test ADR commit
-tags: test
+tags: [test]
 created: '2026-01-01'
 updated: '2026-09-01'
 ---
 ## Context
 
-ADR content.
+ADR content. Every mutating command creates a commit whose message names the operation and the page path, so the decision produces a write commit of its own. See [[decisions/related-decision]] for the record this one extends.
 
 ## Decision
 
-Decided.
+Decided. The decision is written with the same commit message format as a note.
 
 ## Consequences
 
-Recorded.
+Recorded. The commit history holds one commit per operation.

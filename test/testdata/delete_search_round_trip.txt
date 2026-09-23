@@ -105,18 +105,18 @@ title: Delete Search Decision
 status: proposed
 deciders: team
 summary: Decision for delete-search round trip
-tags: deletesearch
+tags: [deletesearch]
 created: '2026-01-01'
 updated: '2026-09-01'
 ---
 ## Context
 
-We chose distributed databases for our data layer.
+We chose distributed databases for our data layer. The delete path removes the page, its index entry and its search row, so the terms in this body disappear from the search index as soon as the page is gone. See [[keep-note]] for the note that stays.
 
 ## Decision
 
-Decided.
+Decided. The decision is searchable by the same terms as the notes while it exists.
 
 ## Consequences
 
-Recorded.
+Recorded. Deleting the decision removes its terms from the index.

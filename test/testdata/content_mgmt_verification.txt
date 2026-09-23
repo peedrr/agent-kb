@@ -210,21 +210,21 @@ title: Gate Decision
 status: proposed
 deciders: team
 summary: Decision for content management verification
-tags: test
+tags: [test]
 created: '2026-01-01'
 updated: '2026-09-01'
 ---
 ## Context
 
-Gate ADR content.
+Gate ADR content. The gate covers listing, index and log management, so the decision is listed, indexed and deleted exactly like a note. See [[gate-note]] for the note that shares the gate.
 
 ## Decision
 
-Decided.
+Decided. The decision is added to the index under the decisions heading.
 
 ## Consequences
 
-Recorded.
+Recorded. Deleting the decision removes its index entry.
 
 -- append-input.md --
 Appended content line.

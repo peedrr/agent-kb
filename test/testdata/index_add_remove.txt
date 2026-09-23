@@ -108,18 +108,18 @@ title: Test Decision
 status: proposed
 deciders: team
 summary: A test decision
-tags: test
+tags: [test]
 created: '2026-01-01'
 updated: '2026-09-01'
 ---
 ## Context
 
-ADR content.
+ADR content. The index commands track a page by path, and a decision of this type is listed under its own heading in the rendered index. See [[test-note]] for the note that shares the same index.
 
 ## Decision
 
-Decided.
+Decided. The decision is added to the index under the decisions heading.
 
 ## Consequences
 
-Recorded.
+Recorded. Removing the entry leaves the page on disk untouched.

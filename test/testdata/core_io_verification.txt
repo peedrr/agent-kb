@@ -173,21 +173,21 @@ title: Verification ADR
 status: proposed
 deciders: team
 summary: Testing core I/O verification
-tags: test
+tags: [test]
 created: '2026-01-01'
 updated: '2026-09-01'
 ---
 ## Context
 
-ADR content for verification.
+ADR content for verification. The gate covers the write, read, append and delete contract for both page types, so the decision round-trips through the same commands as a note. See [[gate-note]] for the note that shares the gate.
 
 ## Decision
 
-Decided.
+Decided. The decision is written to the decisions directory and read back unchanged.
 
 ## Consequences
 
-Recorded.
+Recorded. Deleting the decision removes the file and its entry.
 
 -- unknown-type-input.md --
 ---

@@ -43,7 +43,7 @@ cmp ../typeless-page.md kb/notes/typeless.md
 type: adr
 title: Append Validation ADR
 summary: ADR for append validation
-tags: test
+tags: [test]
 status: proposed
 deciders: team
 created: '2020-01-01'
@@ -51,15 +51,15 @@ updated: '2020-01-01'
 ---
 ## Context
 
-Context body.
+Context body. An append has to be validated as the page the append leaves behind rather than as the fragment it adds, so the report names the page's own sections. See [[decisions/related-decision]] for the record this one follows from.
 
 ## Decision
 
-Decision body.
+Decision body. The append path runs the same validation pipeline as the write path, which keeps a page that was valid from becoming invalid through a later append.
 
 ## Consequences
 
-Consequences body.
+Consequences body. A refused append leaves the file untouched and reports every failed rule at once, so the author can repair the page in a single edit.
 
 -- appendix.txt --
 Appended body line.

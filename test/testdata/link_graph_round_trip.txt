@@ -123,21 +123,21 @@ title: Graph Decision
 status: proposed
 deciders: team
 summary: Decision for link graph testing
-tags: linkgraph
+tags: [linkgraph]
 created: '2026-01-01'
 updated: '2026-09-01'
 ---
 ## Context
 
-We decided based on [[source-note]] and [[target-note]].
+We decided based on [[source-note]] and [[target-note]]. Both links are re-resolved by an index rebuild, so a decision written before its targets exist still ends up connected to the graph.
 
 ## Decision
 
-Decided.
+Decided. The decision links out to the two notes and receives no inbound link of its own.
 
 ## Consequences
 
-Recorded.
+Recorded. Deleting a target turns the decision's outbound link into a broken link, and deleting the decision removes its links from the graph.
 
 -- orphan-input.md --
 ---

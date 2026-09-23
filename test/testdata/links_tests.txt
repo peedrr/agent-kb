@@ -117,21 +117,21 @@ title: Links Decision
 status: proposed
 deciders: team
 summary: Decision for link testing
-tags: linktest
+tags: [linktest]
 created: '2026-01-01'
 updated: '2026-09-01'
 ---
 ## Context
 
-We decided based on [[links-test-note]].
+We decided based on [[links-test-note]]. The decision records the reasoning behind the note-linking scheme, so the link graph resolves the note from here as a backlink.
 
 ## Decision
 
-Decided.
+Decided. The decision keeps a single outbound link, which is enough to prove that backlinks are recorded for both page types.
 
 ## Consequences
 
-Recorded.
+Recorded. Deleting the decision removes the backlink from the note.
 
 -- broken-input.md --
 ---

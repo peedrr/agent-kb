@@ -119,18 +119,18 @@ title: Rebuild Search Decision
 status: proposed
 deciders: team
 summary: Decision for rebuild-search testing
-tags: rebuildsearch
+tags: [rebuildsearch]
 created: '2026-01-01'
 updated: '2026-09-01'
 ---
 ## Context
 
-We chose microservices for our system architecture.
+We chose microservices for our system architecture. A rebuild walks the filesystem and re-derives the index and the search database from the page bodies, so every indexed term has to come from the body itself. See [[rebuild-note]] for the note that carries the same terms.
 
 ## Decision
 
-Decided.
+Decided. The decision keeps the words microservices and architecture in its body so the rebuild finds them again.
 
 ## Consequences
 
-Recorded.
+Recorded. After a rebuild the decision is searchable by the same query as before.
