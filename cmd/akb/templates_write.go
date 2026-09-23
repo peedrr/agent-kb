@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/goccy/go-yaml"
+	gocel "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/spf13/cobra"
 	"github.com/yuin/goldmark"
@@ -139,26 +141,37 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("parse pass mockup frontmatter: %w", err)
 	}
 	passPage := buildTestPage(fmt.Sprintf("kb/%s_pass.md", name), passFM, passBody)
-	var passFailed []string
-	for _, rule := range tmpl.Validations {
-		prg, err := cel.CompileRule(celEnv, rule.Rule)
-		if err != nil {
-			return fmt.Errorf("pass mockup: compile rule %q: %w", rule.ID, err)
-		}
-		result, err := cel.Evaluate(context.Background(), prg, map[string]any{
-			"page":     passPage,
-			"old_page": nil,
-			"now":      time.Now(),
-		})
-		if err != nil {
-			return fmt.Errorf("pass mockup: evaluate rule %q: %w", rule.ID, err)
-		}
-		if result != types.True {
-			passFailed = append(passFailed, rule.ID)
-		}
+
+	passFailed, _, err := evaluateValidations(celEnv, tmpl.Validations, passPage, nil)
+	if err != nil {
+		return fmt.Errorf("pass mockup: %w", err)
 	}
 	if len(passFailed) > 0 {
 		return fmt.Errorf("pass mockup no longer validates: %v\n\n--- pass mockup ---\n%s\n\nProvide updated mockup with --pass <path>", passFailed, string(passData))
+	}
+
+	// A page that omits a schema-optional field must validate too, so the mockup
+	// is re-evaluated once per optional key it supplies, with that key removed.
+	// Keys the mockup already omits are covered by the evaluation above.
+	for _, key := range optionalKeysSuppliedByMockup(&tmpl, passFM) {
+		strippedPage := buildTestPage(fmt.Sprintf("kb/%s_pass.md", name), withoutFrontmatterKey(passFM, key), passBody)
+		failed, ruleID, err := evaluateValidations(celEnv, tmpl.Validations, strippedPage, nil)
+		if err != nil {
+			return fmt.Errorf("rule %s errored when optional key %s was absent from the pass mockup:\n%w — guard the access with has() or mark %s required: true in the schema", ruleID, key, err, key)
+		}
+		if len(failed) > 0 {
+			return fmt.Errorf("pass mockup no longer validates without optional key %s: %v\n\n--- pass mockup ---\n%s\n\nProvide updated mockup with --pass <path>", key, failed, string(passData))
+		}
+	}
+
+	// The mockup must also survive a no-op update, where the page is its own
+	// pre-modification state.
+	selfFailed, selfRuleID, err := evaluateValidations(celEnv, tmpl.Validations, passPage, passPage)
+	if err != nil {
+		return fmt.Errorf("rule %s errored when the pass mockup was evaluated against itself as old_page:\n%w — guard the access with has()", selfRuleID, err)
+	}
+	if len(selfFailed) > 0 {
+		return fmt.Errorf("pass mockup no longer validates as an update of itself: %v\n\n--- pass mockup ---\n%s\n\nProvide updated mockup with --pass <path>", selfFailed, string(passData))
 	}
 
 	var failData []byte
@@ -186,23 +199,9 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("parse fail mockup frontmatter: %w", err)
 	}
 	failPage := buildTestPage(fmt.Sprintf("kb/%s_fail.md", name), failFM, failBody)
-	var failFailed []string
-	for _, rule := range tmpl.Validations {
-		prg, err := cel.CompileRule(celEnv, rule.Rule)
-		if err != nil {
-			return fmt.Errorf("fail mockup: compile rule %q: %w", rule.ID, err)
-		}
-		result, err := cel.Evaluate(context.Background(), prg, map[string]any{
-			"page":     failPage,
-			"old_page": nil,
-			"now":      time.Now(),
-		})
-		if err != nil {
-			return fmt.Errorf("fail mockup: evaluate rule %q: %w", rule.ID, err)
-		}
-		if result != types.True {
-			failFailed = append(failFailed, rule.ID)
-		}
+	failFailed, _, err := evaluateValidations(celEnv, tmpl.Validations, failPage, nil)
+	if err != nil {
+		return fmt.Errorf("fail mockup: %w", err)
 	}
 	if len(failFailed) == 0 {
 		return fmt.Errorf("fail mockup no longer validates: expected at least one validation to fail, but all passed\n\n--- fail mockup ---\n%s\n\nProvide updated mockup with --fail <path>", string(failData))
@@ -313,6 +312,89 @@ func buildTestPage(relPath string, fm *frontmatter.ParsedFrontmatter, body []byt
 	md := goldmark.New()
 	doc := md.Parser().Parse(text.NewReader(body))
 	return cel.BuildPage(relPath, fm, body, doc, body)
+}
+
+// evaluateValidations compiles and evaluates every validation rule against
+// page, with oldPage as the pre-modification state, and returns the IDs of the
+// rules that did not evaluate to true. When a rule cannot be compiled or
+// evaluated it returns that rule's ID with the error; the ID is empty
+// otherwise.
+func evaluateValidations(env *gocel.Env, rules []template.ValidationRule, page, oldPage map[string]any) ([]string, string, error) {
+	var failed []string
+	for _, rule := range rules {
+		prg, err := cel.CompileRule(env, rule.Rule)
+		if err != nil {
+			return nil, rule.ID, fmt.Errorf("compile rule %q: %w", rule.ID, err)
+		}
+		// A nil map is not the same as an absent page: an empty map makes
+		// old_page.frontmatter a missing key instead of a null value.
+		var oldPageValue any
+		if oldPage != nil {
+			oldPageValue = oldPage
+		}
+		result, err := cel.Evaluate(context.Background(), prg, map[string]any{
+			"page":     page,
+			"old_page": oldPageValue,
+			"now":      time.Now(),
+		})
+		if err != nil {
+			return nil, rule.ID, fmt.Errorf("evaluate rule %q: %w", rule.ID, err)
+		}
+		if result != types.True {
+			failed = append(failed, rule.ID)
+		}
+	}
+	return failed, "", nil
+}
+
+// optionalKeysSuppliedByMockup returns the schema-optional frontmatter keys the
+// mockup sets, sorted for a stable evaluation order.
+func optionalKeysSuppliedByMockup(tmpl *template.Template, fm *frontmatter.ParsedFrontmatter) []string {
+	var keys []string
+	for key, field := range tmpl.Schema.Frontmatter {
+		if field.Required || !frontmatterKeyPresent(fm, key) {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// frontmatterKeyPresent reports whether the parsed frontmatter sets key. The
+// type and title fields live outside the generic field map.
+func frontmatterKeyPresent(fm *frontmatter.ParsedFrontmatter, key string) bool {
+	switch key {
+	case "type":
+		return fm.Type != ""
+	case "title":
+		return fm.Title != ""
+	default:
+		_, ok := fm.Fields[key]
+		return ok
+	}
+}
+
+// withoutFrontmatterKey returns a copy of fm with key removed, so the mockup
+// can be evaluated as a page that omits a schema-optional field.
+func withoutFrontmatterKey(fm *frontmatter.ParsedFrontmatter, key string) *frontmatter.ParsedFrontmatter {
+	stripped := &frontmatter.ParsedFrontmatter{
+		Type:   fm.Type,
+		Title:  fm.Title,
+		Fields: make(map[string]any, len(fm.Fields)),
+	}
+	for k, v := range fm.Fields {
+		if k != key {
+			stripped.Fields[k] = v
+		}
+	}
+	switch key {
+	case "type":
+		stripped.Type = ""
+	case "title":
+		stripped.Title = ""
+	}
+	return stripped
 }
 
 func detectOldFormat(raw map[string]any, filename string) error {

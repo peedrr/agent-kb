@@ -6,6 +6,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/template"
 )
 
 func setupTemplatesWriteTestKB(t *testing.T) string {
@@ -546,5 +549,405 @@ validations:
 	}
 	if string(data) != outsideContent {
 		t.Errorf("outside file = %q, want it untouched by templates write", string(data))
+	}
+}
+
+// writeTemplatesWriteFixture writes a template and its mockups beside the KB and
+// points the template write flags at them.
+func writeTemplatesWriteFixture(t *testing.T, kbRoot, name, templateBody, passBody, failBody string) {
+	t.Helper()
+
+	write := func(path, body string) {
+		if err := os.WriteFile(path, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	tmplPath := filepath.Join(kbRoot, name+".yaml")
+	passPath := filepath.Join(kbRoot, name+"_pass.md")
+	failPath := filepath.Join(kbRoot, name+"_fail.md")
+	write(tmplPath, templateBody)
+	write(passPath, passBody)
+	write(failPath, failBody)
+
+	origTemplate, origPass, origFail := twTemplate, twPass, twFail
+	twTemplate, twPass, twFail = tmplPath, passPath, failPath
+	t.Cleanup(func() { twTemplate, twPass, twFail = origTemplate, origPass, origFail })
+}
+
+// TestTemplatesWrite_RejectsUnguardedOptionalKeyRead pins that a rule reading a
+// schema-optional key without has() is rejected: the pass mockup supplies the
+// key, but a page without it must validate too.
+func TestTemplatesWrite_RejectsUnguardedOptionalKeyRead(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	writeTemplatesWriteFixture(t, kbRoot, "summary",
+		`name: summary
+description: Template with an optional summary
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    summary:
+      type: string
+      required: false
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+  - id: summary_non_empty
+    rule: 'page.frontmatter.summary != ""'
+    expect: summary must not be empty when present
+`,
+		`---
+type: summary
+title: Hello
+summary: A summary
+---
+# Hello
+`,
+		`---
+type: summary
+title: ""
+summary: A summary
+---
+# Empty
+`)
+
+	err := runTemplatesWrite(nil, []string{"summary"})
+	if err == nil {
+		t.Fatal("expected error for an unguarded optional-key read, got nil")
+	}
+	for _, want := range []string{
+		"rule summary_non_empty errored when optional key summary was absent from the pass mockup",
+		"no such key: summary",
+		"guard the access with has() or mark summary required: true in the schema",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err.Error(), want)
+		}
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"summary.yaml", "summary_pass.md", "summary_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
+			t.Errorf("expected file %s to NOT exist", f)
+		}
+	}
+}
+
+// TestTemplatesWrite_AcceptsGuardedOptionalKeyRead pins that the has()-guarded
+// equivalent of the rejected rule validates for a page that omits the key.
+func TestTemplatesWrite_AcceptsGuardedOptionalKeyRead(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	writeTemplatesWriteFixture(t, kbRoot, "guarded",
+		`name: guarded
+description: Template with a guarded optional summary
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    summary:
+      type: string
+      required: false
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+  - id: summary_non_empty
+    rule: '!has(page.frontmatter.summary) || page.frontmatter.summary != ""'
+    expect: summary must not be empty when present
+`,
+		`---
+type: guarded
+title: Hello
+summary: A summary
+---
+# Hello
+`,
+		`---
+type: guarded
+title: ""
+summary: A summary
+---
+# Empty
+`)
+
+	if err := runTemplatesWrite(nil, []string{"guarded"}); err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"guarded.yaml", "guarded_pass.md", "guarded_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); os.IsNotExist(err) {
+			t.Errorf("expected file %s to exist", f)
+		}
+	}
+}
+
+// TestTemplatesWrite_RejectsCreateOnlyOldPageRule pins that the pass mockup is
+// also evaluated as an update of itself: a rule that only holds while old_page
+// is absent is rejected.
+func TestTemplatesWrite_RejectsCreateOnlyOldPageRule(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	writeTemplatesWriteFixture(t, kbRoot, "createonly",
+		`name: createonly
+description: Template with a create-only rule
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    supersedes:
+      type: string
+      required: false
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+  - id: supersedes_stable
+    rule: '!has(old_page.frontmatter) || old_page.frontmatter.supersedes == page.frontmatter.supersedes'
+    expect: supersedes must not change
+`,
+		`---
+type: createonly
+title: Hello
+---
+# Hello
+`,
+		`---
+type: createonly
+title: ""
+---
+# Empty
+`)
+
+	err := runTemplatesWrite(nil, []string{"createonly"})
+	if err == nil {
+		t.Fatal("expected error for a create-only old_page rule, got nil")
+	}
+	for _, want := range []string{
+		"rule supersedes_stable errored when the pass mockup was evaluated against itself as old_page",
+		"no such key: supersedes",
+		"guard the access with has()",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err.Error(), want)
+		}
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"createonly.yaml", "createonly_pass.md", "createonly_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
+			t.Errorf("expected file %s to NOT exist", f)
+		}
+	}
+}
+
+// TestTemplatesWrite_ForceDoesNotBypassVariantChecks pins that --force skips
+// only the overwrite confirmation: the variant checks still reject the write.
+func TestTemplatesWrite_ForceDoesNotBypassVariantChecks(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+
+	templateBody := `name: forced
+description: Template with an unguarded optional read
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    summary:
+      type: string
+      required: false
+validations:
+  - id: summary_non_empty
+    rule: 'page.frontmatter.summary != ""'
+    expect: summary must not be empty when present
+`
+	passBody := `---
+type: forced
+title: Hello
+summary: A summary
+---
+# Hello
+`
+	failBody := `---
+type: forced
+title: Hello
+---
+# Hello
+`
+	if err := os.WriteFile(filepath.Join(templatesDir, "forced.yaml"), []byte(templateBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "forced_pass.md"), []byte(passBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "forced_fail.md"), []byte(failBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	writeTemplatesWriteFixture(t, kbRoot, "forced", templateBody, passBody, failBody)
+
+	origForce := twForce
+	twForce = true
+	t.Cleanup(func() { twForce = origForce })
+
+	err := runTemplatesWrite(nil, []string{"forced"})
+	if err == nil {
+		t.Fatal("expected the variant check to reject the write despite --force")
+	}
+	if !strings.Contains(err.Error(), "errored when optional key summary was absent from the pass mockup") {
+		t.Errorf("expected the stripped-variant error, got: %v", err)
+	}
+
+	data, readErr := os.ReadFile(filepath.Join(templatesDir, "forced.yaml")) //nolint:gosec // test reading a known temp file
+	if readErr != nil {
+		t.Fatalf("read the on-disk template: %v", readErr)
+	}
+	if string(data) != templateBody {
+		t.Errorf("template on disk = %q, want it untouched by the rejected write", string(data))
+	}
+}
+
+// TestOptionalKeysSuppliedByMockup pins that only schema-optional keys the
+// mockup actually sets get a stripped variant, in a stable order.
+func TestOptionalKeysSuppliedByMockup(t *testing.T) {
+	tmpl := template.Template{
+		Name: "unit",
+		Schema: template.Schema{Frontmatter: map[string]template.FieldSchema{
+			"title":  {Type: "string", Required: true},
+			"zeta":   {Type: "string"},
+			"alpha":  {Type: "string"},
+			"absent": {Type: "string"},
+		}},
+	}
+	fm := &frontmatter.ParsedFrontmatter{
+		Type:   "unit",
+		Title:  "Hello",
+		Fields: map[string]any{"zeta": "z", "alpha": "a"},
+	}
+
+	got := optionalKeysSuppliedByMockup(&tmpl, fm)
+	want := []string{"alpha", "zeta"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("optionalKeysSuppliedByMockup = %v, want %v", got, want)
+	}
+}
+
+// TestTemplatesWrite_RejectsRuleRequiringOptionalKey pins the false-result side
+// of the stripped variants: a rule that demands a schema-optional key is
+// rejected because pages without that key must validate.
+func TestTemplatesWrite_RejectsRuleRequiringOptionalKey(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	writeTemplatesWriteFixture(t, kbRoot, "requires",
+		`name: requires
+description: Template whose rule demands an optional key
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    summary:
+      type: string
+      required: false
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+  - id: summary_required
+    rule: 'has(page.frontmatter.summary)'
+    expect: summary must be set
+`,
+		`---
+type: requires
+title: Hello
+summary: A summary
+---
+# Hello
+`,
+		`---
+type: requires
+title: ""
+summary: A summary
+---
+# Empty
+`)
+
+	err := runTemplatesWrite(nil, []string{"requires"})
+	if err == nil {
+		t.Fatal("expected error for a rule that demands an optional key, got nil")
+	}
+	if !strings.Contains(err.Error(), "pass mockup no longer validates without optional key summary: [summary_required]") {
+		t.Errorf("expected the stripped-variant rejection, got: %v", err)
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"requires.yaml", "requires_pass.md", "requires_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
+			t.Errorf("expected file %s to NOT exist", f)
+		}
+	}
+}
+
+// TestTemplatesWrite_RejectsNoOpUpdateRule pins the false-result side of the
+// self-succession variant: a rule that demands a change on every update cannot
+// hold for the mockup evaluated against itself.
+func TestTemplatesWrite_RejectsNoOpUpdateRule(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	writeTemplatesWriteFixture(t, kbRoot, "noop",
+		`name: noop
+description: Template that demands a change on every update
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    updated:
+      type: string
+      required: false
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+  - id: updated_must_change
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.updated) || page.frontmatter.updated != old_page.frontmatter.updated'
+    expect: updated must change on every update
+`,
+		`---
+type: noop
+title: Hello
+updated: 2024-01-01
+---
+# Hello
+`,
+		`---
+type: noop
+title: ""
+updated: 2024-01-01
+---
+# Empty
+`)
+
+	err := runTemplatesWrite(nil, []string{"noop"})
+	if err == nil {
+		t.Fatal("expected error for a rule that rejects a no-op update, got nil")
+	}
+	if !strings.Contains(err.Error(), "pass mockup no longer validates as an update of itself: [updated_must_change]") {
+		t.Errorf("expected the self-succession rejection, got: %v", err)
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"noop.yaml", "noop_pass.md", "noop_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
+			t.Errorf("expected file %s to NOT exist", f)
+		}
 	}
 }
