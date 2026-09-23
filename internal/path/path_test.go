@@ -720,6 +720,19 @@ func TestDiscoverSkipsInternalAndHiddenDirs(t *testing.T) {
 	}
 }
 
+func TestDiscoverSkipsBasesWithoutConfig(t *testing.T) {
+	_, work := scanEnvironment(t)
+
+	makeKBFixture(t, filepath.Join(work, "initialized"), "name: initialized\n")
+	makeKBFixture(t, filepath.Join(work, "torn"), "")
+
+	got := Discover(work)
+	want := []DiscoveredKB{{Name: "initialized", Path: filepath.Join(work, "initialized")}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Discover = %#v, want %#v", got, want)
+	}
+}
+
 func TestDiscoverRespectsEntryBudget(t *testing.T) {
 	_, work := scanEnvironment(t)
 
@@ -758,7 +771,7 @@ func TestDiscoverReadsNameAndDescription(t *testing.T) {
 
 	makeKBFixture(t, filepath.Join(work, "named"), "name: named-kb\ndescription: a named base\n")
 	makeKBFixture(t, filepath.Join(work, "no-description"), "name: bare\n")
-	makeKBFixture(t, filepath.Join(work, "no-config"), "")
+	makeKBFixture(t, filepath.Join(work, "no-config"), "other: value\n")
 
 	got := Discover(work)
 	want := []DiscoveredKB{

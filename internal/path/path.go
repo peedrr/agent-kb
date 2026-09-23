@@ -162,12 +162,20 @@ func ResolveKB(flagKB string) (string, error) {
 // there, or is not a regular file. The error names the path and the missing
 // marker, and points at `akb discover` for listing nearby bases.
 func requireKBConfig(absPath string) error {
-	marker := filepath.Join(absPath, ".akb", ".akb.yaml")
-	info, err := os.Stat(marker) //nolint:gosec // the selected path is the user's own --kb/AKB_KB choice; the check only stats its marker
-	if err == nil && info.Mode().IsRegular() {
+	if hasKBConfig(absPath) {
 		return nil
 	}
 	return &GuardError{rule: fmt.Errorf("%w: %s has no %s; run `akb discover` to list nearby knowledge bases", ErrNotAKB, absPath, filepath.Join(".akb", ".akb.yaml"))}
+}
+
+// hasKBConfig reports whether dir holds the .akb/.akb.yaml config file that
+// makes it selectable as a knowledge base. The marker must be a regular file;
+// a directory or any other entry with that name does not count. Discovery
+// lists bases and ResolveKB selects them through this one predicate, so the
+// listing cannot offer a base the resolver rejects.
+func hasKBConfig(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, ".akb", ".akb.yaml")) //nolint:gosec // dir is a user-selected base or a scan candidate; the check only stats its marker
+	return err == nil && info.Mode().IsRegular()
 }
 
 // expandHome expands a leading ~ in p to the user's home directory.
@@ -272,8 +280,10 @@ type DiscoveredKB struct {
 //
 // Entries come nearest-first, by their distance in path components from root
 // and then by path, so the base a caller stands in is reported before the ones
-// further out. Discovery is read-only and never selects a base: callers
-// address what it finds with --kb or AKB_KB.
+// further out. Only directories a caller can select are reported: a directory
+// with a bare .akb/ marker but no .akb/.akb.yaml config is left out, because
+// selecting it would be rejected. Discovery is read-only and never selects a
+// base: callers address what it finds with --kb or AKB_KB.
 func Discover(root string) []DiscoveredKB {
 	// Distances and the home boundary compare between absolute paths, so a
 	// relative root is resolved against the working directory first.
@@ -299,9 +309,14 @@ func Discover(root string) []DiscoveredKB {
 	found := make([]ranked, 0, len(candidates))
 	for dir, distance := range candidates {
 		// A directory is a knowledge base root when it is its own KBRoot: a
-		// directory that merely lives inside a base is not reported.
+		// directory that merely lives inside a base is not reported. A root
+		// without the .akb/.akb.yaml marker is not selectable, so it stays out
+		// of the listing too.
 		kbRoot, err := KBRoot(dir)
 		if err != nil || kbRoot != dir {
+			continue
+		}
+		if !hasKBConfig(dir) {
 			continue
 		}
 
@@ -421,9 +436,9 @@ type kbMetadata struct {
 }
 
 // readKBMetadata reads the name and optional description a knowledge base
-// reports about itself. A base whose config is missing, unreadable, or without
-// a name is still reported, under its directory name: discovery informs, so a
-// torn config must not hide the base.
+// reports about itself. A base whose config is unreadable, unparseable, or
+// without a name is still reported, under its directory name: discovery
+// informs, so a torn config must not hide the base.
 func readKBMetadata(root string) (name, description string) {
 	data, err := os.ReadFile(filepath.Join(root, ".akb", ".akb.yaml")) //nolint:gosec // KB root supplied by the scan
 	if err == nil {
