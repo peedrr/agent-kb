@@ -990,6 +990,135 @@ validations:
 	}
 }
 
+// TestWriteUnevaluableRuleIsValidationFailure pins that a write-time rule that
+// compiles but cannot be evaluated is a template-authoring problem the caller
+// acts on, not an akb fault: the write fails as a validation failure (exit 1),
+// the page is not written, and the report names the rule, the evaluation error
+// and the has() guard. The template also carries a rule that evaluates to
+// false, so the report must keep carrying every failed rule next to the
+// unevaluable one.
+func TestWriteUnevaluableRuleIsValidationFailure(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	tmplData := `name: sourced
+description: probe template whose rule reads an absent optional key unguarded
+dir: sourced
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    sources:
+      type: list
+      required: false
+validations:
+  - id: sources_named
+    rule: 'page.frontmatter.sources[0] != ""'
+    requirement: sources must name at least one source
+    expect: sources must name at least one source
+  - id: title_not_probe
+    rule: 'page.frontmatter.title != "Unguarded"'
+    requirement: the title must differ from the probe title
+    expect: title must differ from the probe title
+`
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "sourced.yaml"), []byte(tmplData), 0600); err != nil {
+		t.Fatalf("write probe template: %v", err)
+	}
+
+	withWriteFlags(t, nil, false)
+	pointStdinAtTempFile(t, "---\ntype: sourced\ntitle: Unguarded\n---\nBody.")
+
+	var runErr error
+	stderr := captureStderr(t, func() {
+		runErr = runWrite(nil, []string{"sourced/probe.md"})
+	})
+	if runErr == nil {
+		t.Fatalf("expected the unevaluable rule to block the write, stderr: %s", stderr)
+	}
+
+	var internalErr *internalError
+	if errors.As(runErr, &internalErr) {
+		t.Errorf("failure %v is an akb fault; an unevaluable rule is a template-authoring problem", runErr)
+	}
+	var validationErr validationFailure
+	if !errors.As(runErr, &validationErr) {
+		t.Fatalf("failure %v is not a validation failure", runErr)
+	}
+	if code, report := classifyExit(runErr); code != exitFailure || report != "" {
+		t.Errorf("classifyExit = (%d, %q), want (%d, %q)", code, report, exitFailure, "")
+	}
+
+	if _, err := os.Stat(filepath.Join(kbRoot, "kb", "sourced", "probe.md")); !os.IsNotExist(err) {
+		t.Errorf("the page was written despite the unevaluable rule: %v", err)
+	}
+
+	for _, want := range []string{
+		"rule sources_named could not be evaluated: no such key: sources",
+		"template authoring problem",
+		"guard optional frontmatter keys with has() (see the kb-management skill's TEMPLATE.md)",
+		"title must differ from the probe title",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr = %q, want it to contain %q", stderr, want)
+		}
+	}
+}
+
+// TestWriteUncompilableRuleIsInternalFault pins that a template whose rule does
+// not compile — a template file that bypassed `akb template write`, which
+// rejects one — stays an akb fault: the write exits 2 and the page is not
+// written.
+func TestWriteUncompilableRuleIsInternalFault(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	tmplData := `name: broken
+description: probe template whose rule does not compile
+dir: broken
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: broken_rule
+    rule: 'this is not valid CEL (('
+    requirement: never satisfiable
+    expect: never reported
+`
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "broken.yaml"), []byte(tmplData), 0600); err != nil {
+		t.Fatalf("write probe template: %v", err)
+	}
+
+	withWriteFlags(t, nil, false)
+	pointStdinAtTempFile(t, "---\ntype: broken\ntitle: Broken\n---\nBody.")
+
+	var runErr error
+	stderr := captureStderr(t, func() {
+		runErr = runWrite(nil, []string{"broken/page.md"})
+	})
+	if runErr == nil {
+		t.Fatalf("expected the uncompilable rule to block the write, stderr: %s", stderr)
+	}
+
+	var internalErr *internalError
+	if !errors.As(runErr, &internalErr) {
+		t.Fatalf("failure %v is not an akb fault; an uncompilable rule means the template bypassed `akb template write`", runErr)
+	}
+	code, report := classifyExit(runErr)
+	if code != exitFault {
+		t.Errorf("exit code = %d, want %d", code, exitFault)
+	}
+	if !strings.Contains(report, "internal: ") || !strings.Contains(report, "compile rule broken_rule") {
+		t.Errorf("report = %q, want an internal report naming the rule that does not compile", report)
+	}
+
+	if _, err := os.Stat(filepath.Join(kbRoot, "kb", "broken", "page.md")); !os.IsNotExist(err) {
+		t.Errorf("the page was written despite the uncompilable rule: %v", err)
+	}
+}
+
 func TestApproveDoesNotBumpUpdated(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)

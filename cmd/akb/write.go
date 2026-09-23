@@ -566,11 +566,20 @@ func runWrite(_ *cobra.Command, args []string) error {
 }
 
 // runTemplateValidations runs the write-time CEL rules of a template against a
-// page and reports every failed rule on stderr. oldPage is the page as it was
-// before the modification, nil when the page does not exist yet. A rule that
-// fails to compile or evaluate is an akb fault; a rule that evaluates to false
-// is a validation failure whose report is the rules' own messages, so the
-// caller only has to map a returned validationFailure to a validation exit.
+// page and reports every failed and every unevaluable rule on stderr. oldPage is
+// the page as it was before the modification, nil when the page does not exist
+// yet. A rule that does not compile is an akb fault: a template whose rule
+// reaches write time uncompilable bypassed `akb template write`, which rejects
+// it. A rule that compiles but cannot be evaluated is a template-authoring
+// problem, not an akb fault, so it is collected alongside the rules that
+// evaluated to false and the caller maps the returned validationFailure to a
+// validation exit.
+//
+// Write time and lint sweeps diverge here on purpose. A write is a single-page
+// gate, where "couldn't check" must never silently become "checked fine": an
+// unevaluable rule blocks the write. A sweep must not let one broken rule hide
+// every other finding, so a lint eval error degrades to a per-page cel_lint
+// issue and the sweep carries on.
 func runTemplateValidations(celEnv *gocel.Env, tmpl template.Template, page, oldPage map[string]any) error {
 	var validationErrors []cel.ValidationError
 	for _, rule := range tmpl.Validations {
@@ -588,7 +597,15 @@ func runTemplateValidations(celEnv *gocel.Env, tmpl template.Template, page, old
 			"now":      time.Now(),
 		})
 		if err != nil {
-			return &internalError{err: fmt.Errorf("CEL engine error: evaluate rule %s: %w", rule.ID, err)}
+			validationErrors = append(validationErrors, cel.ValidationError{
+				RuleID: rule.ID,
+				Message: fmt.Sprintf("rule %s could not be evaluated: %v — template authoring problem; "+
+					"guard optional frontmatter keys with has() (see the kb-management skill's TEMPLATE.md)",
+					rule.ID, err),
+				Line:     0,
+				Severity: "error",
+			})
+			continue
 		}
 		if result != types.True {
 			validationErrors = append(validationErrors, cel.ValidationError{

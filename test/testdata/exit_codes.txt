@@ -32,6 +32,19 @@ stderr 'disallow_options'
 stderr -count=4 '^\['
 ! exists kb/decisions/missing-sections.md
 
+# === VALIDATION FAILURE: an unevaluable rule, exit 1 with an author-directed report ===
+
+cp ../unguarded-template.yaml .akb/templates/sourced.yaml
+
+exec bash -c 'akb write sourced/unguarded.md <../unguarded-page.md; echo "akb-exit=$?"'
+stdout 'akb-exit=1$'
+stderr 'rule sources_named could not be evaluated'
+stderr 'no such key: sources'
+stderr 'template authoring problem'
+stderr 'guard optional frontmatter keys with has\(\)'
+! stderr 'internal:'
+! exists kb/sourced/unguarded.md
+
 # === UNKNOWN TYPE: content failure the caller can fix, exit 1 ===
 
 exec bash -c 'akb write notes/unknown.md <../unknown-type.md; echo "akb-exit=$?"'
@@ -199,6 +212,35 @@ title: Page for a template whose rule does not compile
 ---
 
 Content that never reaches validation.
+
+-- unguarded-template.yaml --
+name: sourced
+description: Template whose rule reads an absent optional key unguarded
+dir: sourced
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    type:
+      type: string
+      required: true
+    sources:
+      type: list
+      required: false
+validations:
+  - id: sources_named
+    rule: 'page.frontmatter.sources[0] != ""'
+    requirement: sources must name at least one source
+    expect: sources must name at least one source
+
+-- unguarded-page.md --
+---
+type: sourced
+title: Unguarded rule
+---
+
+A page whose type has an optional `sources` field it leaves out.
 
 -- corrupt-manifest.txt --
 invalid line without pipes
