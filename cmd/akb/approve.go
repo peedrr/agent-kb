@@ -70,8 +70,10 @@ func runApprove(_ *cobra.Command, args []string) error {
 	}
 
 	inputPath := args[0]
-	cleanPath := strings.TrimPrefix(inputPath, "kb/")
-	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
+	fullPath, err := path.ResolveKBPath(kbRoot, inputPath)
+	if err != nil {
+		return fmt.Errorf("resolve path: %w", err)
+	}
 
 	approved, err := approvePage(ctx, dbConn, kbRoot, fullPath, inputPath)
 	if err != nil {

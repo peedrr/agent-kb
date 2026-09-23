@@ -156,7 +156,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 		}
 
 		// Reject .. and absolute paths via ResolveKBPath
-		_, err = path.ResolveKBPath(kbRoot, inputPath)
+		fullPath, err = path.ResolveKBPath(kbRoot, inputPath)
 		if err != nil {
 			return fmt.Errorf("resolve path: %w", err)
 		}
@@ -172,7 +172,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 		defer pageLock.Release()
 
 		// Try to find the existing file
-		candidates := []string{filepath.Join(kbRoot, "kb", cleanPath)}
+		candidates := []string{fullPath}
 		for _, tmpl := range templates {
 			if tmpl.Dir != "" {
 				candidates = append(candidates, filepath.Join(kbRoot, "kb", tmpl.Dir, cleanPath))
@@ -182,6 +182,9 @@ func runWrite(_ *cobra.Command, args []string) error {
 		var existingContent []byte
 		var found bool
 		for _, candidate := range candidates {
+			if err := path.AssertContained(kbRoot, candidate); err != nil {
+				return fmt.Errorf("resolve path: %w", err)
+			}
 			existingContent, err = os.ReadFile(candidate)
 			if err == nil {
 				fullPath = candidate
@@ -301,7 +304,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 			}
 
 			// Reject .. and absolute paths via ResolveKBPath
-			_, err = path.ResolveKBPath(kbRoot, inputPath)
+			fullPath, err = path.ResolveKBPath(kbRoot, inputPath)
 			if err != nil {
 				return fmt.Errorf("resolve path: %w", err)
 			}
@@ -315,7 +318,6 @@ func runWrite(_ *cobra.Command, args []string) error {
 			}
 			defer pageLock.Release()
 
-			fullPath = filepath.Join(kbRoot, "kb", cleanPath)
 			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 				return fmt.Errorf("page does not exist; use 'akb write' without --append to create")
 			}
@@ -442,16 +444,20 @@ func runWrite(_ *cobra.Command, args []string) error {
 			}
 
 			// Reject .. and absolute paths via ResolveKBPath
-			_, err = path.ResolveKBPath(kbRoot, inputPath)
+			resolvedPath, err := path.ResolveKBPath(kbRoot, inputPath)
 			if err != nil {
 				return fmt.Errorf("resolve path: %w", err)
 			}
 
-			// Construct final path
+			// Construct final path. A type directory is a component the resolver
+			// did not validate, so its candidate path is checked on its own.
 			if dirFromType != "" {
 				fullPath = filepath.Join(kbRoot, "kb", dirFromType, cleanPath)
+				if err := path.AssertContained(kbRoot, fullPath); err != nil {
+					return fmt.Errorf("resolve path: %w", err)
+				}
 			} else {
-				fullPath = filepath.Join(kbRoot, "kb", cleanPath)
+				fullPath = resolvedPath
 			}
 
 			// Compute relative path for output and indexing

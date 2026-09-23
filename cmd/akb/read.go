@@ -41,16 +41,13 @@ func runRead(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	_, err = path.ResolveKBPath(kbRoot, inputPath)
+	resolvedPath, err := path.ResolveKBPath(kbRoot, inputPath)
 	if err != nil {
 		if errors.Is(err, path.ErrUseAKBRawWrite) {
 			return &usageError{msg: "use `akb raw read`"}
 		}
 		return fmt.Errorf("resolve path: %w", err)
 	}
-
-	cleanPath := strings.TrimPrefix(inputPath, "kb/")
-	resolvedPath := filepath.Join(kbRoot, "kb", cleanPath)
 
 	provider := storage.NewFilesystemProvider(kbRoot)
 

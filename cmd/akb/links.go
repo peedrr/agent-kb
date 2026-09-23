@@ -64,13 +64,12 @@ func openLinkGraphDB(kbRoot string) (*sql.DB, *linkgraph.SQLiteLinkGraph, error)
 }
 
 func resolvePagePath(kbRoot, inputPath string) (string, error) {
-	_, err := path.ResolveKBPath(kbRoot, inputPath)
+	fullPath, err := path.ResolveKBPath(kbRoot, inputPath)
 	if err != nil {
 		return "", fmt.Errorf("resolve path: %w", err)
 	}
 
 	cleanPath := strings.TrimPrefix(inputPath, "kb/")
-	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
 
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 		return "", fmt.Errorf("page not found: %s. Use 'akb list' to see available pages", cleanPath)

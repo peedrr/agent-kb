@@ -106,12 +106,10 @@ func runAppend(_ *cobra.Command, args []string) error {
 		return &usageError{msg: "cannot append to log.md; it is a managed file"}
 	}
 
-	_, err = path.ResolveKBPath(kbRoot, inputPath)
+	fullPath, err := path.ResolveKBPath(kbRoot, inputPath)
 	if err != nil {
 		return fmt.Errorf("resolve path: %w", err)
 	}
-
-	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
 
 	exists, err := fileExists(fullPath)
 	if err != nil {

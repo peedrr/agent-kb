@@ -100,8 +100,12 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 
 		deleted := 0
 		for _, relPath := range filtered {
+			fullPath, resolveErr := path.ResolveKBPath(kbRoot, relPath)
+			if resolveErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: invalid orphan path %s: %v — skipping\n", relPath, resolveErr)
+				continue
+			}
 			cleanPath := strings.TrimPrefix(relPath, "kb/")
-			fullPath := filepath.Join(kbRoot, relPath)
 
 			exists, err := fileExists(fullPath)
 			if err != nil {
@@ -114,7 +118,7 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 			}
 
 			title := ""
-			if content, err := os.ReadFile(fullPath); err == nil { //nolint:gosec // path validated
+			if content, err := os.ReadFile(fullPath); err == nil { //nolint:gosec // path validated by ResolveKBPath
 				if fm, _, err := frontmatter.Parse(content); err == nil {
 					title = fm.Title
 				}
@@ -137,7 +141,7 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 		return &usageError{msg: "use `akb raw delete`"}
 	}
 
-	_, err = path.ResolveKBPath(kbRoot, inputPath)
+	fullPath, err := path.ResolveKBPath(kbRoot, inputPath)
 	if err != nil {
 		return fmt.Errorf("resolve path: %w", err)
 	}
@@ -152,8 +156,6 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 	if base == "log.md" {
 		return &usageError{msg: "cannot delete log.md; it is a managed file"}
 	}
-
-	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
 
 	exists, err := fileExists(fullPath)
 	if err != nil {

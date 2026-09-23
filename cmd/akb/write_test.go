@@ -13,6 +13,7 @@ import (
 
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/template"
 )
 
@@ -1087,4 +1088,209 @@ func TestWriteLinkFailureRollsBackSearchIndex(t *testing.T) {
 	if got := searchDBRowCount(t, kbRoot, "SELECT COUNT(*) FROM links WHERE source_page = ?", failedRel); got != 0 {
 		t.Errorf("links rows for %s = %d after the failed link step, want 0", failedRel, got)
 	}
+}
+
+// symlinkFixture links target at linkPath, skipping the test when the
+// filesystem does not support symlinks.
+func symlinkFixture(t *testing.T, linkPath, target string) {
+	t.Helper()
+	if err := os.Symlink(target, linkPath); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+}
+
+// assertSymlinkEscape fails unless err is the guard error the resolvers report
+// for a path that escapes the base through a symlink, and the CLI classifies it
+// as a usage fault.
+func assertSymlinkEscape(t *testing.T, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected the symlink escape to be rejected, got nil error")
+	}
+	var guardErr *path.GuardError
+	if !errors.As(err, &guardErr) {
+		t.Fatalf("failure %v is not a path guard error", err)
+	}
+	if !errors.Is(err, path.ErrSymlinkEscape) {
+		t.Fatalf("failure %v does not wrap ErrSymlinkEscape", err)
+	}
+	code, report := classifyExit(commandFailure{err: err})
+	if code != exitFault {
+		t.Errorf("exit code = %d, want %d", code, exitFault)
+	}
+	if !strings.Contains(report, "usage: ") || !strings.Contains(report, "escapes the knowledge base through a symlink") {
+		t.Errorf("report = %q, want a usage report naming the symlink escape", report)
+	}
+}
+
+// assertSymlinkEscapeExit fails unless the CLI invocation failed with the usage
+// fault exit code and reported the symlink escape.
+func assertSymlinkEscapeExit(t *testing.T, out string, err error) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("expected the symlink escape to be rejected, got output: %s", out)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("failure %v is not an exit error", err)
+	}
+	if exitErr.ExitCode() != exitFault {
+		t.Errorf("exit code = %d, want %d; output: %s", exitErr.ExitCode(), exitFault, out)
+	}
+	if !strings.Contains(out, "usage: ") || !strings.Contains(out, "escapes the knowledge base through a symlink") {
+		t.Errorf("output = %q, want a usage report naming the symlink escape", out)
+	}
+}
+
+// TestReadRejectsPageSymlinkedOutOfTheKB pins the read path against a page that
+// is a symlink to a file outside the base: the path is rejected before the
+// content is read.
+func TestReadRejectsPageSymlinkedOutOfTheKB(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const outsideContent = "---\ntype: note\ntitle: Secret\n---\ncontent outside the base"
+	outsideFile := filepath.Join(t.TempDir(), "secret.md")
+	if err := os.WriteFile(outsideFile, []byte(outsideContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, filepath.Join(kbRoot, "kb", "evil.md"), outsideFile)
+
+	assertSymlinkEscape(t, runRead(nil, []string{"evil.md"}))
+
+	data, err := os.ReadFile(outsideFile) //nolint:gosec // test reading a known temp file
+	if err != nil {
+		t.Fatalf("read the outside file: %v", err)
+	}
+	if string(data) != outsideContent {
+		t.Errorf("outside file = %q, want it untouched", string(data))
+	}
+}
+
+// TestApproveRejectsPageSymlinkedOutOfTheKB pins that approve resolves the page
+// through the path guard instead of joining the base root on its own.
+func TestApproveRejectsPageSymlinkedOutOfTheKB(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const outsideContent = "---\ntype: note\ntitle: Secret\n---\n<!-- olw-auto: action=review -->\ncontent"
+	outsideFile := filepath.Join(t.TempDir(), "secret.md")
+	if err := os.WriteFile(outsideFile, []byte(outsideContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, filepath.Join(kbRoot, "kb", "evil.md"), outsideFile)
+
+	assertSymlinkEscape(t, runApprove(nil, []string{"evil.md"}))
+
+	data, err := os.ReadFile(outsideFile) //nolint:gosec // test reading a known temp file
+	if err != nil {
+		t.Fatalf("read the outside file: %v", err)
+	}
+	if string(data) != outsideContent {
+		t.Errorf("outside file = %q, want it untouched by approve", string(data))
+	}
+}
+
+// TestWriteRejectsSymlinkedTypeDirectoryCandidates pins that the type-derived
+// directory the write command joins onto the validated path is checked for
+// symlink escapes before it is used for I/O.
+func TestWriteRejectsSymlinkedTypeDirectoryCandidates(t *testing.T) {
+	const noteContent = "---\ntype: note\ntitle: Test\nsummary: test\ntags: test\n---\nContent."
+
+	t.Run("type dir symlinked out of the base", func(t *testing.T) {
+		kbRoot := writeSetupTestKB(t)
+		defer writeCleanup(kbRoot)
+
+		outsideDir := t.TempDir()
+		symlinkFixture(t, filepath.Join(kbRoot, "kb", "notes"), outsideDir)
+
+		out, err := writeRun(kbRoot, "note.md", noteContent)
+		assertSymlinkEscapeExit(t, out, err)
+		if _, err := os.Stat(filepath.Join(outsideDir, "note.md")); !os.IsNotExist(err) {
+			t.Errorf("the write created a page outside the base: %v", err)
+		}
+	})
+
+	t.Run("subdirectory below the type dir symlinked out of the base", func(t *testing.T) {
+		kbRoot := writeSetupTestKB(t)
+		defer writeCleanup(kbRoot)
+
+		outsideDir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(kbRoot, "kb", "notes"), 0750); err != nil {
+			t.Fatal(err)
+		}
+		symlinkFixture(t, filepath.Join(kbRoot, "kb", "notes", "sub"), outsideDir)
+
+		out, err := writeRun(kbRoot, "sub/note.md", noteContent)
+		assertSymlinkEscapeExit(t, out, err)
+		if _, err := os.Stat(filepath.Join(outsideDir, "note.md")); !os.IsNotExist(err) {
+			t.Errorf("the write created a page outside the base: %v", err)
+		}
+	})
+
+	t.Run("frontmatter candidate under a symlinked type dir", func(t *testing.T) {
+		kbRoot := writeSetupTestKB(t)
+		defer writeCleanup(kbRoot)
+
+		outsideDir := t.TempDir()
+		const outsideContent = "---\ntype: note\ntitle: Outside\nsummary: test\ntags: test\n---\noutside body"
+		outsidePage := filepath.Join(outsideDir, "note.md")
+		if err := os.WriteFile(outsidePage, []byte(outsideContent), 0600); err != nil {
+			t.Fatal(err)
+		}
+		symlinkFixture(t, filepath.Join(kbRoot, "kb", "notes"), outsideDir)
+
+		out, err := writeRun(kbRoot, "note.md", "", "--frontmatter", "title=Updated")
+		assertSymlinkEscapeExit(t, out, err)
+
+		data, err := os.ReadFile(outsidePage) //nolint:gosec // test reading a known temp file
+		if err != nil {
+			t.Fatalf("read the outside page: %v", err)
+		}
+		if string(data) != outsideContent {
+			t.Errorf("the frontmatter update wrote through the symlink: %s", string(data))
+		}
+	})
+}
+
+// TestInTreeSymlinksStillWork pins that a symlink whose target stays inside the
+// base keeps resolving: only links out of the base are rejected.
+func TestInTreeSymlinksStillWork(t *testing.T) {
+	t.Run("read through a page alias", func(t *testing.T) {
+		kbRoot := writeSetupTestKB(t)
+		defer writeCleanup(kbRoot)
+
+		content := "---\ntype: note\ntitle: Real Note\nsummary: test\ntags: test\n---\nreal body"
+		if out, err := writeRun(kbRoot, "real.md", content); err != nil {
+			t.Fatalf("setup write failed: %s: %v", out, err)
+		}
+		symlinkFixture(t, filepath.Join(kbRoot, "kb", "alias.md"), filepath.Join(kbRoot, "kb", "notes", "real.md"))
+
+		out, err := captureOutput(func() error { return runRead(nil, []string{"alias.md"}) })
+		if err != nil {
+			t.Fatalf("read through the in-tree alias failed: %v", err)
+		}
+		if !strings.Contains(out, "real body") {
+			t.Errorf("read output = %q, want the aliased page content", out)
+		}
+	})
+
+	t.Run("write through a type dir alias", func(t *testing.T) {
+		kbRoot := writeSetupTestKB(t)
+		defer writeCleanup(kbRoot)
+
+		if err := os.MkdirAll(filepath.Join(kbRoot, "kb", "real-notes"), 0750); err != nil {
+			t.Fatal(err)
+		}
+		symlinkFixture(t, filepath.Join(kbRoot, "kb", "notes"), filepath.Join(kbRoot, "kb", "real-notes"))
+
+		content := "---\ntype: note\ntitle: Aliased\nsummary: test\ntags: test\n---\nBody."
+		out, err := writeRun(kbRoot, "aliased.md", content)
+		if err != nil && strings.Contains(out, "escapes the knowledge base") {
+			t.Fatalf("the in-tree type dir alias was rejected as an escape: %s", out)
+		}
+		if _, err := os.Stat(filepath.Join(kbRoot, "kb", "real-notes", "aliased.md")); err != nil {
+			t.Errorf("expected the page behind the alias, got: %v", err)
+		}
+	})
 }

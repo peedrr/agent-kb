@@ -118,7 +118,7 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
-	_, err = path.ResolveKBPath(kbRoot, entryPath)
+	fullPath, err := path.ResolveKBPath(kbRoot, entryPath)
 	if err != nil {
 		return fmt.Errorf("resolve path: %w", err)
 	}
@@ -134,7 +134,6 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 
 	// Resolve the full file path
 	cleanPath := strings.TrimPrefix(entryPath, "kb/")
-	fullPath := filepath.Join(kbRoot, "kb", cleanPath)
 
 	// Read the file to get frontmatter for title and type
 	content, err := os.ReadFile(fullPath) //nolint:gosec // path validated by ResolveKBPath
@@ -150,6 +149,9 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 				continue
 			}
 			candidatePath := filepath.Join(kbRoot, "kb", tmpl.Dir, cleanPath)
+			if err := path.AssertContained(kbRoot, candidatePath); err != nil {
+				return fmt.Errorf("resolve path: %w", err)
+			}
 			candidateContent, readErr := os.ReadFile(candidatePath) //nolint:gosec
 			if readErr != nil {
 				continue

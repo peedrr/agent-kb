@@ -490,3 +490,70 @@ func TestDeleteLinkFailureRollsBackSearchRemoval(t *testing.T) {
 		t.Errorf("the page file should stay on disk after the failed index removal, stat error: %v", statErr)
 	}
 }
+
+// TestDeleteOrphansValidatesListedPaths pins that `akb delete --orphans`
+// resolves every listed path before it touches the file: a listed path that
+// escapes the base is skipped, while a genuine orphan is still deleted.
+func TestDeleteOrphansValidatesListedPaths(t *testing.T) {
+	base := t.TempDir()
+	kbRoot := filepath.Join(base, "kbroot")
+	if err := os.MkdirAll(kbRoot, 0750); err != nil {
+		t.Fatal(err)
+	}
+	setupTestKBWithGit(t, kbRoot)
+
+	victim := filepath.Join(base, "victim.md")
+	if err := os.WriteFile(victim, []byte("keep me"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	outsideFile := filepath.Join(base, "outside.md")
+	if err := os.WriteFile(outsideFile, []byte("outside the base"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, filepath.Join(kbRoot, "kb", "evil.md"), outsideFile)
+
+	writeTestPage(t, kbRoot, "notes/legit.md", "---\ntype: note\ntitle: Legit\n---\nlegit body")
+	if err := addToGit(kbRoot, "kb/notes/legit.md"); err != nil {
+		t.Fatal(err)
+	}
+	commitInitial(kbRoot)
+
+	d := setupLinkGraphDB(t, kbRoot)
+	insertTestPage(t, d, "kb/evil.md")
+	insertTestPage(t, d, "../victim.md")
+	insertTestPage(t, d, "kb/notes/legit.md")
+
+	origOrphans, origForce, origNoCommit := deleteOrphans, deleteForce, noCommit
+	deleteOrphans, deleteForce, noCommit = true, true, true
+	t.Cleanup(func() { deleteOrphans, deleteForce, noCommit = origOrphans, origForce, origNoCommit })
+
+	var stdout string
+	var runErr error
+	stderr := captureStderr(t, func() {
+		stdout, runErr = captureOutput(func() error { return runDeleteCmd(nil, nil) })
+	})
+	if runErr != nil {
+		t.Fatalf("orphan delete failed: %v (stderr: %s)", runErr, stderr)
+	}
+
+	if _, err := os.Stat(victim); err != nil {
+		t.Errorf("the listed path outside the base was deleted: %v", err)
+	}
+	link, err := os.Lstat(filepath.Join(kbRoot, "kb", "evil.md"))
+	if err != nil || link.Mode()&os.ModeSymlink == 0 {
+		t.Errorf("the symlinked orphan is gone, lstat error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(kbRoot, "kb", "notes", "legit.md")); !os.IsNotExist(err) {
+		t.Errorf("the genuine orphan was not deleted, stat error = %v", err)
+	}
+	if !strings.Contains(stdout, "Deleted 1 orphan pages") {
+		t.Errorf("stdout = %q, want the genuine orphan reported as deleted", stdout)
+	}
+	if !strings.Contains(stderr, "path escapes the knowledge base through a symlink") {
+		t.Errorf("stderr = %q, want the symlinked orphan reported as rejected", stderr)
+	}
+	if !strings.Contains(stderr, "path must not contain '..'") {
+		t.Errorf("stderr = %q, want the parent-dir orphan reported as rejected", stderr)
+	}
+}
