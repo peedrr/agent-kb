@@ -1,9 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-05-10
-**Commit:** 02e26d2
-**Branch:** master
-**Status:** v0.16.0 — template CRUD complete
+**Status:** v0.16.0 — template CRUD complete (the version string is kept in lockstep with `Makefile` and `flake.nix` by `scripts/check-version-lockstep.sh`)
 
 ## OVERVIEW
 
@@ -24,9 +21,8 @@ agent-kb/
 │   ├── lint/       # 9 lint checkers + engine
 │   ├── log/        # kb/log.md append-only log
 │   ├── manifest/   # raw/files.log SHA-256 manifest
-│   ├── markdown/   # Wikilink, annotation, provenance, AST parsers
+│   ├── markdown/   # Wikilink, annotation, provenance parsers
 │   ├── path/       # KB path resolution & guards
-│   ├── registry/   # ~/.config/agent-kb/registry.yaml
 │   ├── search/     # SQLite FTS5 full-text search
 │   ├── skill/      # Embedded skill management (//go:embed)
 │   ├── storage/    # GitProvider (auto-commit)
@@ -41,7 +37,7 @@ agent-kb/
 | Task | Location | Notes |
 |------|----------|-------|
 | Add command | `cmd/akb/` | New subcommand = new file |
-| KB path logic | `internal/path/path.go` | KBRoot(), ResolveKBPath() |
+| KB path logic | `internal/path/path.go` | `ResolveKB()` selects the invocation's base; `KBRoot()` walks up to the nearest `.akb/` root, the check that marks a directory as a knowledge base |
 | Page write flow | `cmd/akb/write.go` | stdin → frontmatter → CEL validation → git → search → links |
 | Index management | `internal/index/index.go` | kb/index.md parsing/rendering |
 | Search | `internal/search/sqlite.go` | SQLite FTS5 with BM25 ranking |
@@ -49,9 +45,8 @@ agent-kb/
 | Wikilink parser | `internal/markdown/wikilink.go` | Excludes code blocks, inline code, HTML comments |
 | Annotation parser | `internal/markdown/annotation.go` | `<!-- olw-auto: ... -->` HTML comments |
 | Provenance markers | `internal/markdown/provenance.go` | `^[inferred]`, `^[ambiguous]`, `^[extracted]` |
-| Markdown AST | `internal/markdown/ast.go` | Goldmark AST flattener for CEL (headings, links, code blocks) |
 | CEL engine | `internal/cel/engine.go` | Environment builder, rule compiler, evaluator with panic recovery |
-| CEL page builder | `internal/cel/pagebuilder.go` | Builds `page`/`old_page` maps from frontmatter + AST |
+| CEL page builder | `internal/cel/pagebuilder.go` | Builds `page`/`old_page` maps; walks the Goldmark AST into `page.ast` (headings, links, code blocks) |
 | Template loader | `internal/template/template.go` | TemplateV2 with schema, validations, lint_rules |
 | Template commands | `cmd/akb/template.go`, `templates_write.go`, `template_delete.go` | `template get/list`, `templates write`, `template delete` |
 | Template delete | `cmd/akb/template_delete.go` | Impact analysis (page count), `--force`, path traversal prevention |
@@ -63,7 +58,6 @@ agent-kb/
 | CEL lint checker | `internal/lint/cel.go` | Evaluates template `lint_rules` with `now` injection |
 | Manifest | `internal/manifest/manifest.go` | raw/files.log SHA-256 tracking |
 | Skill install | `internal/skill/skill.go` | `//go:embed embedded/*` |
-| Registry | `internal/registry/registry.go` | Multi-KB registry with default |
 | Raw drift | `cmd/akb/raw_status.go` | `akb raw status` exits 0/1/2 |
 | Nix flake | `flake.nix` | Dev shell (`nix develop`) + build package |
 | Write append | `cmd/akb/write.go` | `--append` to append to existing page body |
@@ -76,13 +70,13 @@ agent-kb/
 
 | Symbol | Type | Location | Role |
 |--------|------|----------|------|
-| RootCmd | Cobra.Command | cmd/akb/root.go:11 | Base CLI command |
-| version | string | cmd/akb/main.go:8 | CLI version (injected at build via LDFLAGS) |
+| RootCmd | Cobra.Command | cmd/akb/root.go:43 | Base CLI command |
+| version | string | cmd/akb/main.go:11 | CLI version (injected at build via LDFLAGS) |
 | Provider | interface | internal/storage/provider.go:6 | Write/Read/Delete/Exists/List |
-| GitProvider | struct | internal/storage/git.go:15 | Git-tracked file operations |
-| Searcher | interface | internal/search/searcher.go:27 | IndexPage/RemovePage/Search/RebuildIndex |
+| GitProvider | struct | internal/storage/git.go:41 | Git-tracked file operations |
+| Searcher | interface | internal/search/searcher.go:33 | IndexPage/RemovePage/Search/RebuildIndex |
 | SQLiteFTS5Searcher | struct | internal/search/sqlite.go:18 | FTS5 implementation |
-| Updater | interface | internal/linkgraph/updater.go:7 | UpdatePageLinks/RemovePage |
+| Updater | interface | internal/linkgraph/updater.go:13 | UpdatePageLinks/RemovePage |
 | SQLiteLinkGraph | struct | internal/linkgraph/sqlite.go:24 | SQLite implementation |
 | Link | struct | internal/linkgraph/sqlite.go:16 | Source, target, display, resolved |
 | LintChecker | interface | internal/lint/engine.go:37 | Name()/Check() interface |
@@ -95,12 +89,12 @@ agent-kb/
 | Schema | struct | internal/template/template.go:15 | Frontmatter schema definition |
 | ValidationRule | struct | internal/template/template.go:27 | Write-time CEL validation rule |
 | LintRule | struct | internal/template/template.go:35 | Sweep-time CEL lint rule |
-| NewEnv | func | internal/cel/engine.go:19 | Creates CEL env with page/old_page/now variables |
-| CompileRule | func | internal/cel/engine.go:29 | Parses/compiles CEL expr, caches programs |
-| Evaluate | func | internal/cel/engine.go:51 | Evaluates CEL program with panic recovery |
+| NewEnv | func | internal/cel/engine.go:23 | Creates CEL env with page/old_page/now variables |
+| CompileRule | func | internal/cel/engine.go:35 | Parses/compiles CEL expr with the cost limit, caches programs |
+| Evaluate | func | internal/cel/engine.go:58 | Evaluates CEL program with panic recovery |
 | ValidationError | struct | internal/cel/errors.go:5 | RuleID/Message/Line/Severity |
-| BuildPage | func | internal/cel/pagebuilder.go:48 | Assembles page map from frontmatter + AST |
-| BuildOldPage | func | internal/cel/pagebuilder.go:88 | Reads on-disk page, builds old_page map |
+| BuildPage | func | internal/cel/pagebuilder.go:43 | Assembles page map from frontmatter + AST |
+| BuildOldPage | func | internal/cel/pagebuilder.go:83 | Reads on-disk page, builds old_page map |
 | IndexEntry | struct | internal/index/index.go:16 | Page in index |
 | ParsedFrontmatter | struct | internal/frontmatter/frontmatter.go:18 | Type, Title, Fields, IsDraft |
 | Wikilink | struct | internal/markdown/wikilink.go:9 | Target, Display, Heading |
@@ -109,9 +103,8 @@ agent-kb/
 | Entry | struct | internal/manifest/manifest.go:17 | Filename, SHA256, LastUpdated |
 | Manager | struct | internal/manifest/manifest.go:24 | Read/Write/Add/Remove/Update entries |
 | Skill | struct | internal/skill/skill.go:17 | Name, Files map |
-| Entry | struct | internal/registry/registry.go:14 | Registry KB entry |
-| Config | struct | internal/config/config.go:15 | .akb.yaml |
-| DB | struct | internal/db/db.go:14 | Wrapper around sql.DB |
+| Config | struct | internal/config/config.go:14 | .akb.yaml |
+| DB | struct | internal/db/db.go:13 | Wrapper around sql.DB |
 
 ## CONVENTIONS (THIS PROJECT)
 
@@ -121,14 +114,14 @@ agent-kb/
 - **Raw access**: `raw/` prefix → separate storage; use `akb raw` commands
 - **Commits**: Git commits auto-created with `akb: write/delete <path>` messages
 - **Merge conflicts**: Blocked; must resolve before any write/delete
-- **Git config**: Auto-sets `user.name=akb` / `user.email=akb@local` if unset
+- **Git identity**: A commit is authored by the repository's configured `user.name`; a repository without one gets the per-invocation fallback `-c user.name=akb -c user.email=akb@local`. Repository config is never written, except by `akb init` (`ensureGitConfig`)
 - **DB path**: `.akb/search.db` with WAL mode, single connection
 - **is_draft**: Auto-managed frontmatter field; new pages are implicit drafts; `akb approve` sets `is_draft: false`
 - **Type enforcement**: All pages MUST declare `type` in frontmatter matching a template in `.akb/templates/`
 - **Build output**: Always `-o bin/akb` (never project root)
 - **Template format**: TemplateV2 uses `schema.frontmatter`, `validations[]`, `lint_rules[]` (old `required[]`/`optional[]`/`body` rejected)
 - **CEL variables**: `page` (map), `old_page` (nullable map), `now` (timestamp) injected at evaluation time
-- **Date fields**: ISO-8601 strings (`created`, `updated`) auto-converted to `time.Time` for CEL `timestamp()`
+- **Date fields**: any frontmatter string value that parses as RFC3339 or date-only `2006-01-02` is converted to `time.Time` for CEL `timestamp()` and duration math
 - **Template name validation**: Names must match `^[a-zA-Z0-9_-]+$` (regex-enforced, prevents path traversal)
 - **`--force` semantics**: On template commands, bypasses existence warning only; never bypasses mockup validation
 
@@ -173,5 +166,5 @@ nix develop                     # Dev shell (Go, gopls, delve, golangci-lint)
 - `akb template get <name> --full` returns complete YAML with CEL rules
 - `akb templates write` validates CEL syntax and test-driven mockups; overwrite: shows diff + page count, reuses existing mockups, `--force` bypasses existence warning only
 - All-errors aggregation on write: ALL failed rules reported, file NOT written if any fail
-- Exit codes: 0=success, 1=validation failure, 2=internal error
+- Exit codes: 0=success; 1=the command ran but produced a result to act on (failed page validation, raw drift); 2=the command could not do its work — bad invocations print a `usage:` prefix, akb faults an `internal:` prefix
 - `akb template delete <name>` impact analysis: counts pages using the type before deletion; auto-runs lint after
