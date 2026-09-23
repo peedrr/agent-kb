@@ -195,6 +195,10 @@ func approveAllDraftPages(ctx context.Context, dbConn *sql.DB, kbRoot string) er
 			return nil
 		}
 
+		if err := path.AssertContained(kbRoot, fullPath); err != nil {
+			return fmt.Errorf("check page path: %w", err)
+		}
+
 		approved, err := approvePage(ctx, dbConn, kbRoot, fullPath, relPath)
 		if err != nil {
 			return err

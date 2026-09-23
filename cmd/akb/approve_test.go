@@ -425,3 +425,32 @@ func TestApproveAllDraftsLinkFailureRollsBackSearchIndex(t *testing.T) {
 		t.Errorf("indexed body after the failed link step = %q, want the pre-approval body %q — the search-index step did not roll back", postBody, preBody)
 	}
 }
+
+// TestApproveAllDraftsRejectsSymlinkedPage pins the bulk-approve walk against a
+// page that is a symlink to a file outside the base: the path is rejected
+// before the page is read or rewritten.
+func TestApproveAllDraftsRejectsSymlinkedPage(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const outsideContent = "---\ntype: note\ntitle: Secret\nis_draft: true\n---\ncontent outside the base"
+	outsideFile := filepath.Join(t.TempDir(), "secret.md")
+	if err := os.WriteFile(outsideFile, []byte(outsideContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, filepath.Join(kbRoot, "kb", "evil.md"), outsideFile)
+
+	origAllDrafts := approveAllDrafts
+	approveAllDrafts = true
+	t.Cleanup(func() { approveAllDrafts = origAllDrafts })
+
+	assertSymlinkEscape(t, runApprove(nil, nil))
+
+	data, err := os.ReadFile(outsideFile) //nolint:gosec // test reading a known temp file
+	if err != nil {
+		t.Fatalf("read the outside file: %v", err)
+	}
+	if string(data) != outsideContent {
+		t.Errorf("outside file = %q, want it untouched by approve", string(data))
+	}
+}
