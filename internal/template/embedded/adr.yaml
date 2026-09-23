@@ -47,7 +47,7 @@ validations:
 
   # CEL Concept: List membership / enum validation
   - id: valid_status
-    rule: 'page.frontmatter.status in ["proposed", "accepted", "deprecated", "superseded"]'
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status in ["proposed", "accepted", "deprecated", "superseded"]'
     requirement: Status must be a valid ADR status
     expect: status must be one of proposed, accepted, deprecated, superseded
 
@@ -83,19 +83,19 @@ validations:
 
   # CEL Concept: State machine with old_page / has() guard
   - id: valid_state_transition
-    rule: '!has(old_page.frontmatter) || old_page.frontmatter.status == page.frontmatter.status || (old_page.frontmatter.status == "proposed" && page.frontmatter.status == "accepted") || (old_page.frontmatter.status == "accepted" && page.frontmatter.status == "deprecated") || (old_page.frontmatter.status == "accepted" && page.frontmatter.status == "superseded")'
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.status) || !has(page.frontmatter.status) || old_page.frontmatter.status == page.frontmatter.status || (old_page.frontmatter.status == "proposed" && page.frontmatter.status == "accepted") || (old_page.frontmatter.status == "accepted" && page.frontmatter.status == "deprecated") || (old_page.frontmatter.status == "accepted" && page.frontmatter.status == "superseded")'
     requirement: Status transitions must follow the ADR lifecycle
     expect: only proposed->accepted, accepted->deprecated, accepted->superseded transitions are allowed
 
   # CEL Concept: Conditional requirement / logical implication
   - id: superseded_requires_field
-    rule: 'page.frontmatter.status != "superseded" || (has(page.frontmatter.supersedes) && page.frontmatter.supersedes != "")'
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "superseded" || (has(page.frontmatter.supersedes) && page.frontmatter.supersedes != "")'
     requirement: When status is superseded, supersedes field must be set
     expect: superseded ADRs must specify what they supersede
 
   # CEL Concept: Cross-reference validation between frontmatter and AST
   - id: superseded_requires_link
-    rule: 'page.frontmatter.status != "superseded" || page.ast.links.exists(l, l.is_wikilink && l.target == page.frontmatter.supersedes)'
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "superseded" || page.ast.links.exists(l, l.is_wikilink && l.target == page.frontmatter.supersedes)'
     requirement: When status is superseded, body must contain wikilink to superseded ADR
     expect: superseded ADRs must link to the ADR they supersede
 
@@ -107,12 +107,12 @@ validations:
 lint_rules:
   # CEL Concept: Temporal drift detection (warning)
   - id: adr_stale
-    rule: 'now - timestamp(page.frontmatter.updated) < duration("4320h")'
+    rule: '!has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("4320h")'
     severity: warning
     expect: ADR hasn't been updated in 180 days
 
   # CEL Concept: Temporal conditional enforcement (error)
   - id: deprecated_flagged
-    rule: 'page.frontmatter.status != "deprecated" || now - timestamp(page.frontmatter.updated) < duration("720h")'
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "deprecated" || !has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("720h")'
     severity: error
     expect: Deprecated ADRs must be updated within 30 days

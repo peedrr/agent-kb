@@ -5,11 +5,12 @@
 # The page is therefore excluded from lint_tests.txt, where an ADR with an
 # invalid enum value stands in for the frontmatter_schema checks.
 
-skip 'product-finding: ADR missing status aborts write and lint with an internal CEL error instead of a validation failure'
+exec akb init adr-write-kb
+cd adr-write-kb
 
-# stdin ../adr-missing-status.md
-# exec akb write bad-adr.md
-# stdout 'Written to kb/decisions/bad-adr.md'
+stdin ../adr-missing-status.md
+exec akb write bad-adr.md
+stdout 'Written to kb/decisions/bad-adr.md'
 
 -- adr-missing-status.md --
 ---
@@ -21,4 +22,14 @@ tags: linttest
 created: '2026-01-01'
 updated: '2026-09-01'
 ---
+## Context
+
+An ADR whose frontmatter omits the status field.
+
+## Decision
+
 Decision without status.
+
+## Consequences
+
+None.

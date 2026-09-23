@@ -8,10 +8,8 @@ cd lint-updated-kb
 stdin ../note-input.md
 exec akb write note.md
 
-skip 'product-finding: lint aborts with an internal CEL error when a page has no updated field'
-
-# exec akb lint
-# stdout 'issue(s) found'
+exec akb lint
+stdout 'issue\(s\) found'
 
 -- note-input.md --
 ---

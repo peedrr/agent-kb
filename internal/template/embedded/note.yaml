@@ -31,6 +31,6 @@ validations:
     expect: frontmatter title must be non-empty
 lint_rules:
   - id: note_stale
-    rule: 'now - timestamp(page.frontmatter.updated) < duration("2160h")'
+    rule: '!has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("2160h")'
     severity: warning
     expect: Note hasn't been updated in 90 days

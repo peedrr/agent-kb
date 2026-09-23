@@ -68,7 +68,17 @@ func (c *CELLintChecker) Check(ctx context.Context, kb *KB) ([]LintIssue, error)
 				"now":  now,
 			})
 			if err != nil {
-				return nil, fmt.Errorf("evaluate lint rule %s: %w", rule.ID, err)
+				// A rule that cannot be evaluated is reported against the page it
+				// failed on; the sweep continues with the remaining rules and pages
+				// so one broken rule does not hide every other finding.
+				issues = append(issues, LintIssue{
+					Type:     "cel_lint",
+					RuleID:   rule.ID,
+					Message:  fmt.Sprintf("rule evaluation error: %v", err),
+					Path:     page.RelPath,
+					Severity: "error",
+				})
+				continue
 			}
 
 			if result != types.True {

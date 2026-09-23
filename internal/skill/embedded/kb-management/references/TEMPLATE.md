@@ -78,6 +78,8 @@ Inspectable fields:
 
 Any frontmatter string that parses as RFC3339 or a date-only `2006-01-02` is auto-converted to a timestamp for CEL `timestamp()` and duration math.
 
+Every rule that reads an optional frontmatter key must guard the access with `has()`, e.g. `!has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("2160h")`. An absent key makes the rule vacuously true; reading the key unguarded fails the rule instead of skipping it. `type` and `title` need no guard — every page write guarantees both.
+
 ## Workflow: Create a New Template
 
 Creating a template is a **design act**. You are defining what "correct" means for every future page of this type.
