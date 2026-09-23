@@ -310,6 +310,29 @@ func TestParseWikilinksExplicitDestination(t *testing.T) {
 		}
 	})
 
+	t.Run("pipe display survives heading clearing with explicit dest", func(t *testing.T) {
+		links := ParseWikilinks("[[a#h|b]](dest)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "dest" {
+			t.Errorf("Target = %q, want %q", wl.Target, "dest")
+		}
+		if wl.Destination != "dest" {
+			t.Errorf("Destination = %q, want %q", wl.Destination, "dest")
+		}
+		if wl.Display != "b" {
+			t.Errorf("Display = %q, want %q", wl.Display, "b")
+		}
+		if wl.HasHeading {
+			t.Error("HasHeading = true, want false (the heading is discarded)")
+		}
+		if wl.Heading != "" {
+			t.Errorf("Heading = %q, want empty string", wl.Heading)
+		}
+	})
+
 	t.Run("explicit dest wins over a heading in the bracket part", func(t *testing.T) {
 		links := ParseWikilinks("[[label#section]](dest)")
 		if len(links) != 1 {
@@ -321,6 +344,34 @@ func TestParseWikilinksExplicitDestination(t *testing.T) {
 		}
 		if wl.Destination != "dest" {
 			t.Errorf("Destination = %q, want %q", wl.Destination, "dest")
+		}
+		if wl.HasHeading {
+			t.Error("HasHeading = true, want false (the heading is discarded)")
+		}
+		if wl.Heading != "" {
+			t.Errorf("Heading = %q, want empty string", wl.Heading)
+		}
+		if wl.Display != "label" {
+			t.Errorf("Display = %q, want %q (the heading-derived display falls back to the bracket label)", wl.Display, "label")
+		}
+	})
+
+	t.Run("hash after the pipe is display text, not a heading", func(t *testing.T) {
+		// The pipe split runs before the heading split, so in [[a|b#h]] the "#h"
+		// belongs to the pipe display and survives the explicit-dest override.
+		links := ParseWikilinks("[[a|b#h]](dest)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "dest" {
+			t.Errorf("Target = %q, want %q", wl.Target, "dest")
+		}
+		if wl.Display != "b#h" {
+			t.Errorf("Display = %q, want %q", wl.Display, "b#h")
+		}
+		if wl.HasHeading {
+			t.Error("HasHeading = true, want false")
 		}
 	})
 
@@ -342,6 +393,27 @@ func TestParseWikilinksExplicitDestination(t *testing.T) {
 		}
 	})
 
+	t.Run("invalid dest with a space leaves a plain wikilink", func(t *testing.T) {
+		content := "[[Paris]](the city)"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "Paris" {
+			t.Errorf("Target = %q, want %q", wl.Target, "Paris")
+		}
+		if wl.Display != "Paris" {
+			t.Errorf("Display = %q, want %q", wl.Display, "Paris")
+		}
+		if wl.Destination != "" {
+			t.Errorf("Destination = %q, want empty string", wl.Destination)
+		}
+		if wantEnd := len("[[Paris]]"); wl.End != wantEnd {
+			t.Errorf("End = %d, want %d (an invalid dest is not part of the token)", wl.End, wantEnd)
+		}
+	})
+
 	t.Run("angle brackets around the dest are stripped", func(t *testing.T) {
 		links := ParseWikilinks("[[My Page]](<my page.md>)")
 		if len(links) != 1 {
@@ -353,6 +425,20 @@ func TestParseWikilinksExplicitDestination(t *testing.T) {
 		}
 		if wl.Display != "My Page" {
 			t.Errorf("Display = %q, want %q", wl.Display, "My Page")
+		}
+	})
+
+	t.Run("angle-bracket dest with spaces is a valid explicit dest", func(t *testing.T) {
+		links := ParseWikilinks("[[a]](<my page.md>)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "my page" {
+			t.Errorf("Target = %q, want %q", wl.Target, "my page")
+		}
+		if wl.Destination != "my page" {
+			t.Errorf("Destination = %q, want %q", wl.Destination, "my page")
 		}
 	})
 
@@ -379,6 +465,34 @@ func TestParseWikilinksExplicitDestination(t *testing.T) {
 		wl := links[0]
 		if wl.Target != "concepts/guide" {
 			t.Errorf("Target = %q, want %q", wl.Target, "concepts/guide")
+		}
+	})
+
+	t.Run("path dest without whitespace still parses", func(t *testing.T) {
+		links := ParseWikilinks("[[Guide]](notes/daily/2024-01-01)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "notes/daily/2024-01-01" {
+			t.Errorf("Target = %q, want %q", wl.Target, "notes/daily/2024-01-01")
+		}
+		if wl.Destination != "notes/daily/2024-01-01" {
+			t.Errorf("Destination = %q, want %q", wl.Destination, "notes/daily/2024-01-01")
+		}
+	})
+
+	t.Run("balanced nested parens in the dest are accepted", func(t *testing.T) {
+		links := ParseWikilinks("[[a]](foo(bar))")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "foo(bar)" {
+			t.Errorf("Target = %q, want %q", wl.Target, "foo(bar)")
+		}
+		if wl.Destination != "foo(bar)" {
+			t.Errorf("Destination = %q, want %q", wl.Destination, "foo(bar)")
 		}
 	})
 
@@ -428,6 +542,21 @@ func TestParseWikilinksExplicitDestination(t *testing.T) {
 		wl := links[0]
 		if wl.Target != "a" || wl.Destination != "" {
 			t.Errorf("Target = %q, Destination = %q, want %q and empty string", wl.Target, wl.Destination, "a")
+		}
+	})
+
+	t.Run("unclosed dest scanning into a fenced code block leaves a plain wikilink", func(t *testing.T) {
+		content := "[[a]](see below\n```\n)\n```\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "a" || wl.Destination != "" {
+			t.Errorf("Target = %q, Destination = %q, want %q and empty string", wl.Target, wl.Destination, "a")
+		}
+		if wantEnd := len("[[a]]"); wl.End != wantEnd {
+			t.Errorf("End = %d, want %d (the ) found inside the code block is not part of the token)", wl.End, wantEnd)
 		}
 	})
 

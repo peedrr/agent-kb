@@ -42,22 +42,30 @@ func ParseWikilinks(content string) []Wikilink {
 		}
 
 		inner := content[innerStart:innerEnd]
-		wl := parseWikilinkInner(inner)
+		wl, hasPipeDisplay := parseWikilinkInner(inner)
 		wl.Start = m[0]
 		wl.End = m[1]
 
 		// An explicit destination requires the opening paren to be adjacent to
 		// the closing brackets (CommonMark's inline-link rule); whitespace
 		// between them keeps the link a plain wikilink. A non-empty destination
-		// overrides the target; an empty () is a plain wikilink, parens ignored.
+		// that is a valid link destination overrides the target; an empty ()
+		// or an invalid destination is a plain wikilink, parens ignored.
 		if wl.End < len(content) && content[wl.End] == '(' {
-			if raw, end, ok := scanParenDestination(content[wl.End:]); ok {
+			if raw, end, ok := scanParenDestination(content[wl.End:]); ok && isValidLinkDestination(raw) {
 				if dest := normalizeDest(raw); dest != "" {
 					// An explicit destination takes precedence over any #heading in
-					// the bracket part: the destination is the target and the two
-					// are never combined.
+					// the bracket part: the destination is the target and the
+					// heading is discarded, never merged into the destination. A
+					// display derived from that heading falls back to the
+					// bracket-part label; a pipe display still wins.
+					if wl.HasHeading && !hasPipeDisplay {
+						wl.Display = wl.Target
+					}
 					wl.Target = dest
 					wl.Destination = dest
+					wl.HasHeading = false
+					wl.Heading = ""
 					wl.End += end
 				}
 			}
@@ -88,6 +96,22 @@ func scanParenDestination(s string) (string, int, bool) {
 	return "", 0, false
 }
 
+// isValidLinkDestination reports whether raw, the text scanned between an
+// adjacent pair of parens, is a valid CommonMark link destination. Surrounding
+// whitespace is ignored; the remainder is valid when it is either
+// angle-bracketed with no newline inside the brackets, or free of whitespace
+// entirely. Balanced nested parentheses are accepted in both forms.
+func isValidLinkDestination(raw string) bool {
+	d := strings.TrimSpace(raw)
+	if d == "" {
+		return false
+	}
+	if len(d) >= 2 && strings.HasPrefix(d, "<") && strings.HasSuffix(d, ">") {
+		return !strings.ContainsAny(d[1:len(d)-1], "\n\r")
+	}
+	return !strings.ContainsAny(d, " \t\n\r")
+}
+
 // normalizeDest cleans an explicit destination: surrounding whitespace and
 // angle brackets are dropped, as are a leading "./" and a trailing ".md" (the
 // link graph's resolution step re-adds the extension).
@@ -101,12 +125,17 @@ func normalizeDest(dest string) string {
 	return d
 }
 
-func parseWikilinkInner(inner string) Wikilink {
+// parseWikilinkInner parses the text between the brackets. It also reports
+// whether a non-empty pipe display was present, so callers can tell a display
+// the author wrote from one derived from the heading.
+func parseWikilinkInner(inner string) (Wikilink, bool) {
 	wl := Wikilink{}
 
+	hasPipeDisplay := false
 	var customDisplay string
 	if pipeIdx := strings.Index(inner, "|"); pipeIdx >= 0 {
 		customDisplay = inner[pipeIdx+1:]
+		hasPipeDisplay = customDisplay != ""
 		inner = inner[:pipeIdx]
 	}
 
@@ -127,7 +156,7 @@ func parseWikilinkInner(inner string) Wikilink {
 		wl.Display = wl.Target
 	}
 
-	return wl
+	return wl, hasPipeDisplay
 }
 
 type exclusion struct {
