@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/goccy/go-yaml"
@@ -19,6 +21,7 @@ import (
 
 var templateExample bool
 var templateFull bool
+var templateExamples bool
 
 var templateCmd = &cobra.Command{
 	Use:   "template",
@@ -41,44 +44,106 @@ var templateListCmd = &cobra.Command{
 func init() {
 	templateGetCmd.Flags().BoolVar(&templateExample, "example", false, "Show pass mockup")
 	templateGetCmd.Flags().BoolVar(&templateFull, "full", false, "Show complete template YAML")
+	templateGetCmd.Flags().BoolVar(&templateExamples, "examples", false, "Read the embedded showcase templates instead of the knowledge base")
+	templateListCmd.Flags().BoolVar(&templateExamples, "examples", false, "List the embedded showcase templates instead of the knowledge base")
 	templateCmd.AddCommand(templateGetCmd)
 	templateCmd.AddCommand(templateListCmd)
 	RootCmd.AddCommand(templateCmd)
 }
 
-func runTemplateGet(_ *cobra.Command, args []string) error {
+// resolveTemplateSource loads the templates a get or list command reads and
+// returns a reader for the companion files beside them (the template YAML and
+// the pass mockup). With --examples both come from the embedded showcase set
+// and no KB is resolved, so the commands work without a base selected.
+func resolveTemplateSource() (map[string]template.Template, func(string) ([]byte, error), error) {
+	if templateExamples {
+		templates, err := loadExampleTemplates()
+		if err != nil {
+			return nil, nil, err
+		}
+		readFile := func(name string) ([]byte, error) {
+			return fs.ReadFile(template.DefaultTemplates, name)
+		}
+		return templates, readFile, nil
+	}
+
 	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
-		return fmt.Errorf("resolve knowledge base: %w", err)
+		return nil, nil, fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
 	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
 	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
-		return fmt.Errorf("resolve templates directory: %w", err)
+		return nil, nil, fmt.Errorf("resolve templates directory: %w", err)
 	}
 	if err := assertTemplateFilesContained(kbRoot, templatesDir); err != nil {
-		return fmt.Errorf("resolve templates directory: %w", err)
+		return nil, nil, fmt.Errorf("resolve templates directory: %w", err)
 	}
 	templates, err := template.LoadTemplates(templatesDir)
 	if err != nil {
-		return fmt.Errorf("load templates: %w", err)
+		return nil, nil, fmt.Errorf("load templates: %w", err)
 	}
 
+	readFile := func(name string) ([]byte, error) {
+		filePath := filepath.Join(templatesDir, name)
+		if err := path.AssertContained(kbRoot, filePath); err != nil {
+			return nil, fmt.Errorf("resolve template path: %w", err)
+		}
+		return os.ReadFile(filePath) //nolint:gosec // name validated by templateNameRe
+	}
+	return templates, readFile, nil
+}
+
+// loadExampleTemplates reads the embedded showcase templates, the copy source
+// for a KB that has none of its own.
+func loadExampleTemplates() (map[string]template.Template, error) {
+	entries, err := fs.ReadDir(template.DefaultTemplates, ".")
+	if err != nil {
+		return nil, fmt.Errorf("read embedded templates: %w", err)
+	}
+
+	templates := make(map[string]template.Template)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".yaml" {
+			continue
+		}
+
+		data, err := fs.ReadFile(template.DefaultTemplates, entry.Name())
+		if err != nil {
+			return nil, fmt.Errorf("read embedded %s: %w", entry.Name(), err)
+		}
+
+		var tmpl template.Template
+		if err := yaml.Unmarshal(data, &tmpl); err != nil {
+			return nil, fmt.Errorf("parse embedded %s: %w", entry.Name(), err)
+		}
+		templates[tmpl.Name] = tmpl
+	}
+
+	return templates, nil
+}
+
+func runTemplateGet(_ *cobra.Command, args []string) error {
 	name := args[0]
 	if !templateNameRe.MatchString(name) {
 		return fmt.Errorf("invalid template name %q: must contain only letters, numbers, hyphens, and underscores", name)
 	}
+
+	templates, readFile, err := resolveTemplateSource()
+	if err != nil {
+		return err
+	}
+
 	tmpl, ok := templates[name]
 	if !ok {
+		if templateExamples {
+			return fmt.Errorf("template %q not found in the embedded examples. Run `akb template list --examples` to see them", name)
+		}
 		return fmt.Errorf("template %q not found. Run `akb template list` to see available templates", name)
 	}
 
 	if templateExample {
-		passPath := filepath.Join(templatesDir, name+"_pass.md")
-		if err := path.AssertContained(kbRoot, passPath); err != nil {
-			return fmt.Errorf("resolve template path: %w", err)
-		}
-		data, err := os.ReadFile(passPath) //nolint:gosec // name validated by templateNameRe
+		data, err := readFile(name + "_pass.md")
 		if err != nil {
 			return fmt.Errorf("pass mockup not found for template %q: %w", name, err)
 		}
@@ -123,11 +188,7 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 	}
 
 	if templateFull {
-		fullPath := filepath.Join(templatesDir, name+".yaml")
-		if err := path.AssertContained(kbRoot, fullPath); err != nil {
-			return fmt.Errorf("resolve template path: %w", err)
-		}
-		data, err := os.ReadFile(fullPath) //nolint:gosec // name validated by templateNameRe
+		data, err := readFile(name + ".yaml")
 		if err != nil {
 			return fmt.Errorf("template file not found: %w", err)
 		}
@@ -160,21 +221,9 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 }
 
 func runTemplateList(_ *cobra.Command, _ []string) error {
-	kbRoot, err := path.ResolveKB(kbFlag)
+	templates, _, err := resolveTemplateSource()
 	if err != nil {
-		return fmt.Errorf("resolve knowledge base: %w", err)
-	}
-
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
-	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
-		return fmt.Errorf("resolve templates directory: %w", err)
-	}
-	if err := assertTemplateFilesContained(kbRoot, templatesDir); err != nil {
-		return fmt.Errorf("resolve templates directory: %w", err)
-	}
-	templates, err := template.LoadTemplates(templatesDir)
-	if err != nil {
-		return fmt.Errorf("load templates: %w", err)
+		return err
 	}
 
 	if len(templates) == 0 {
@@ -182,8 +231,14 @@ func runTemplateList(_ *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	for name, tmpl := range templates {
-		fmt.Printf("%s: %s\n", name, tmpl.Description)
+	names := make([]string, 0, len(templates))
+	for name := range templates {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		fmt.Printf("%s: %s\n", name, templates[name].Description)
 	}
 	return nil
 }

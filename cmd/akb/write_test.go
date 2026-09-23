@@ -256,8 +256,11 @@ func TestWriteUnknownType(t *testing.T) {
 	if !strings.Contains(out, "unknown type 'recipe'") {
 		t.Errorf("expected error to contain \"unknown type 'recipe'\", got: %s", out)
 	}
-	if !strings.Contains(out, "Create .akb/templates/recipe.yaml") {
-		t.Errorf("expected error to contain template suggestion, got: %s", out)
+	if !strings.Contains(out, ".akb/templates/recipe.yaml") {
+		t.Errorf("expected error to name the template path to author, got: %s", out)
+	}
+	if !strings.Contains(out, "akb template list --examples") {
+		t.Errorf("expected error to point at the showcase copy workflow, got: %s", out)
 	}
 }
 

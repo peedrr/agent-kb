@@ -128,7 +128,7 @@ func ValidateType(fm *ParsedFrontmatter, templates map[string]template.Template)
 		return fmt.Errorf("missing required field 'type' in frontmatter")
 	}
 	if _, ok := templates[fm.Type]; !ok {
-		return fmt.Errorf("unknown type '%s'. Create .akb/templates/%s.yaml first", fm.Type, fm.Type)
+		return fmt.Errorf("unknown type '%s'. Author .akb/templates/%s.yaml (see the kb-management skill's TEMPLATE.md) or copy a showcase with `akb template list --examples`", fm.Type, fm.Type)
 	}
 	return nil
 }

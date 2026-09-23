@@ -127,9 +127,11 @@ Every command below is shown without its selection: pass `--kb <path>` or set
 | Index | `akb index show\|add\|remove\|rebuild` |
 | Log | `akb log show\|append` |
 | Template list | `akb template list` |
+| Template list (embedded showcase, works without a KB) | `akb template list --examples` |
 | Template get (schema + requirements) | `akb template get <name>` |
 | Template get (example page) | `akb template get <name> --example` |
 | Template get (full YAML) | `akb template get <name> --full` |
+| Template get (embedded showcase, works without a KB) | `akb template get <name> --full --examples` |
 | Template write (new) | `akb template write <name> --template <yaml> --pass <md> --fail <md>` |
 | Template write (update) | `akb template write <name> --template <yaml> [--pass <md>] [--fail <md>] --force` |
 | Template delete | `akb template delete <name> [--force]` |

@@ -99,6 +99,20 @@ An unguarded read is an evaluation error, and the three surfaces react to it dif
 
 **Known limit:** the stripped variants enumerate schema-declared optional keys only. A rule reading an **undeclared** key is not caught by them — deliberately, because an undeclared-but-guarded read is a legitimate pattern (open frontmatter, cross-cutting convention fields). An unguarded read of an undeclared key fails loudly and precisely at first use: exit 1 at write time naming the rule. The lint sweep evaluates only template `lint_rules`, so the same read surfaces as a `cel_lint` issue at sweep time only when it appears in a `lint_rules` entry.
 
+## Workflow: Start from a Showcase
+
+`akb init` seeds no templates: a KB refuses every write of a type it has no template for. The embedded showcase set is the copy source — it is read on demand with `--examples` and is never consulted at write or lint time.
+
+```bash
+akb template list --examples                            # the embedded showcase set: adr, note
+akb template get adr --full --examples > /tmp/adr.yaml   # copy the template out
+akb template get adr --example --examples > /tmp/adr_pass.md  # and its pass mockup
+# edit /tmp/adr.yaml, write a fail mockup, then install:
+akb template write adr --template /tmp/adr.yaml --pass /tmp/adr_pass.md --fail /tmp/adr_fail.md
+```
+
+`--examples` reads the embedded set instead of the KB, so it works with no base selected and in a KB with no templates of its own. `adr` is the showcase (full CEL validation surface); `note` is the minimal counterpoint.
+
 ## Workflow: Create a New Template
 
 Creating a template is a **design act**. You are defining what "correct" means for every future page of this type.
@@ -253,6 +267,7 @@ Verify zero `type_orphan` errors remain.
 - **DO reuse existing mockups on overwrite when rules are unchanged.** Omit `--pass`/`--fail` — existing mockups are loaded and validated automatically.
 - **DO review the diff and page count before overwriting.** The overwrite protection shows the blast radius for a reason.
 - **DO run `akb lint` after any template change.** This catches type-orphans and pages that no longer validate.
+- **DO start from a showcase when the KB has no template for the type.** `akb template get <name> --full --examples` copies one out; see *Start from a Showcase*.
 - **DO start minimal (like `note`), then add rigor as needed.** Over-constraining creates friction. Under-constraining causes drift.
 - **DO use `enum` for fields with a closed set of values** (e.g., `status: [proposed, accepted, deprecated]`).
 - **DO keep `requirement` strings human-readable** — they appear in `akb template get` output and help the next agent understand intent.

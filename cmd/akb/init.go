@@ -12,7 +12,6 @@ import (
 
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/db"
-	"github.com/peedrr/agent-kb/internal/template"
 )
 
 var initCmd = &cobra.Command{
@@ -54,10 +53,6 @@ func runInit(_ *cobra.Command, args []string) error {
 	now := time.Now().Format(time.RFC3339)
 	if err := writeAkbConfig(name, now); err != nil {
 		return err
-	}
-
-	if err := template.CopyDefaults(filepath.Join(name, ".akb", "templates")); err != nil {
-		return fmt.Errorf("copy templates: %w", err)
 	}
 
 	if err := initSearchDB(name); err != nil {
@@ -105,6 +100,9 @@ func checkGitAvailable() error {
 	return nil
 }
 
+// createDirectoryStructure creates the templates directory empty: page types
+// are authored per KB, and `akb template get --examples` is the copy source
+// for a KB that has none of its own.
 func createDirectoryStructure(name string) error {
 	dirs := []string{
 		filepath.Join(name, "kb"),

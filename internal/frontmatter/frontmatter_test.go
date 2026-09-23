@@ -131,7 +131,7 @@ func TestValidateType(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error for unknown type, got nil")
 		}
-		expected := "unknown type 'unknown'. Create .akb/templates/unknown.yaml first"
+		expected := "unknown type 'unknown'. Author .akb/templates/unknown.yaml (see the kb-management skill's TEMPLATE.md) or copy a showcase with `akb template list --examples`"
 		if err.Error() != expected {
 			t.Errorf("error = %q, want %q", err.Error(), expected)
 		}
