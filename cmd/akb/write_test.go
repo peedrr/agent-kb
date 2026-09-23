@@ -905,6 +905,53 @@ validations:
 	}
 }
 
+// TestWriteOverwriteCorruptFrontmatterIsPageError pins that overwriting a page
+// whose on-disk frontmatter does not parse fails as a page error: the command
+// reports the parse failure and classifies it as a result to act on rather than
+// an akb fault, matching the sibling --frontmatter and --append branches.
+func TestWriteOverwriteCorruptFrontmatterIsPageError(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+	withWriteFlags(t, nil, false)
+
+	writeRawPage(t, kbRoot, "kb/notes/corrupt.md",
+		"---\ntype: note\ntitle: Corrupt\nsummary: [broken yaml {{{\n---\nOriginal body.")
+
+	// runWrite reads the replacement page from stdin; a regular file keeps the
+	// read from blocking and is not a character device.
+	stdinPath := filepath.Join(t.TempDir(), "stdin.md")
+	overwrite := "---\ntype: note\ntitle: Corrupt\nsummary: rewritten\ntags: test\n---\nRewritten body."
+	if err := os.WriteFile(stdinPath, []byte(overwrite), 0600); err != nil {
+		t.Fatalf("write stdin content: %v", err)
+	}
+	stdinFile, err := os.Open(stdinPath) //nolint:gosec // test opening known temp file
+	if err != nil {
+		t.Fatalf("open stdin content: %v", err)
+	}
+	oldStdin := os.Stdin
+	os.Stdin = stdinFile
+	t.Cleanup(func() {
+		os.Stdin = oldStdin
+		_ = stdinFile.Close() //nolint:errcheck // test cleanup — failure is non-fatal
+	})
+
+	err = runWrite(nil, []string{"notes/corrupt.md"})
+	if err == nil {
+		t.Fatal("expected overwriting a page with corrupt frontmatter to fail")
+	}
+
+	var internalErr *internalError
+	if errors.As(err, &internalErr) {
+		t.Fatalf("failure %v is an akb fault; corrupt page data must fail as a page error", err)
+	}
+	if !strings.Contains(err.Error(), "parse existing frontmatter") {
+		t.Errorf("error = %v, want it to report the frontmatter parse failure", err)
+	}
+	if code, _ := classifyExit(err); code != exitFailure {
+		t.Errorf("exit code = %d, want %d; error: %v", code, exitFailure, err)
+	}
+}
+
 // TestWriteNewPageCELOldPageIsNull pins that a page akb write creates sees a
 // null old_page, while overwriting that page does not.
 func TestWriteNewPageCELOldPageIsNull(t *testing.T) {

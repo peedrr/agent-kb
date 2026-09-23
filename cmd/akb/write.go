@@ -443,6 +443,16 @@ func runWrite(_ *cobra.Command, args []string) error {
 			}
 			relPath = filepath.ToSlash(relPath)
 
+			// Hold the repository lock from the on-disk read of the page being
+			// overwritten (os.Stat and BuildOldPage) through the CEL validation
+			// that follows it: old_page reflects the page as it is at commit time,
+			// so a concurrent write of the same page cannot slip in between.
+			pageLock, err := storage.LockRepo(kbRoot)
+			if err != nil {
+				return fmt.Errorf("lock repository: %w", err)
+			}
+			defer pageLock.Release()
+
 			// The update time moves on with a content change: overwriting an
 			// existing page always gets a fresh `updated`, while a new page only
 			// defaults it and keeps an explicit value from stdin.
@@ -454,7 +464,9 @@ func runWrite(_ *cobra.Command, args []string) error {
 			if statErr == nil {
 				oldPage, err = cel.BuildOldPage(relPath, store)
 				if err != nil {
-					return &internalError{err: fmt.Errorf("CEL engine error: %w", err)}
+					// On-disk page state that does not parse is a page error the
+					// caller can act on, not an akb fault.
+					return err
 				}
 			}
 
