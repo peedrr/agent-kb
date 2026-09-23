@@ -5,6 +5,12 @@
 exec akb init test-kb
 cd test-kb
 
+# init seeds no templates: copy the ones this scenario writes pages of.
+exec akb template get note --full --examples
+cp stdout .akb/templates/note.yaml
+exec git add .akb/templates
+exec git commit -m 'seed note template'
+
 # --- Write a page, search immediately finds it ---
 
 stdin ../note-input.md

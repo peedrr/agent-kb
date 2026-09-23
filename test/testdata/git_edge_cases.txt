@@ -4,6 +4,12 @@
 exec akb init git-kb
 cd git-kb
 
+# init seeds no templates: copy the ones this scenario writes pages of.
+exec akb template get note --full --examples
+cp stdout .akb/templates/note.yaml
+exec git add .akb/templates
+exec git commit -m 'seed note template'
+
 # === VERIFY GIT REPO EXISTS ===
 exists .git
 exec git log --oneline

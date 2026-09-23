@@ -18,8 +18,22 @@ exists raw/files.log
 
 exists .akb/.akb.yaml
 
-exists .akb/templates/note.yaml
-exists .akb/templates/adr.yaml
+# init seeds no templates: the directory is created empty.
+exec ls -A .akb/templates
+stdout ''
+! exists .akb/templates/note.yaml
+! exists .akb/templates/adr.yaml
+
+exec akb template list
+stdout 'No templates found'
+
+# A typed page is refused until a template exists for its type.
+stdin ../unknown-note.md
+! exec akb write notes/first.md
+stderr 'unknown type .note.'
+stderr 'Author .akb/templates/note.yaml'
+stderr 'akb template list --examples'
+! exists kb/notes/first.md
 
 exists .akb/search.db
 
@@ -36,3 +50,13 @@ exec akb status
 stdout 'Name: test-kb'
 stdout 'Pages: 0'
 stdout 'Git: clean'
+
+-- unknown-note.md --
+---
+type: note
+title: First note
+---
+
+# First note
+
+A note the KB refuses until it has a note template.

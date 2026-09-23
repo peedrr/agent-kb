@@ -4,6 +4,12 @@
 exec akb init clean-cel-kb
 cd clean-cel-kb
 
+# init seeds no templates: copy the ones this scenario writes pages of.
+exec akb template get note --full --examples
+cp stdout .akb/templates/note.yaml
+exec git add .akb/templates
+exec git commit -m 'seed note template'
+
 stdin ../fresh-note.md
 exec akb write notes/fresh.md
 stdout 'Written to kb/notes/fresh.md'

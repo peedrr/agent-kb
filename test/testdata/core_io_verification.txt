@@ -14,6 +14,14 @@ stdout 'Initialized KB "test-kb"'
 
 cd test-kb
 
+# init seeds no templates: copy the ones this scenario writes pages of.
+exec akb template get note --full --examples
+cp stdout .akb/templates/note.yaml
+exec akb template get adr --full --examples
+cp stdout .akb/templates/adr.yaml
+exec git add .akb/templates
+exec git commit -m 'seed note and adr templates'
+
 # Verify KB structure exists
 exists kb
 exists raw
@@ -88,7 +96,8 @@ stdout 'Deleted kb/decisions/gate-adr.md'
 stdin ../unknown-type-input.md
 ! exec akb write bad-type.md
 stderr 'unknown type'
-stderr 'Create .akb/templates'
+stderr 'Author .akb/templates/nonexistent.yaml'
+stderr 'akb template list --examples'
 
 # Missing type error
 stdin ../no-type-input.md

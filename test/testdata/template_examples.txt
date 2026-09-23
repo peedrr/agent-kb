@@ -1,0 +1,102 @@
+# Template Showcase Examples — `--examples` reads the embedded showcase set
+# without a KB selected, and is the copy source for a KB with no templates.
+
+# === WITHOUT A KB: --examples still answers ===
+
+# The harness selects the scenario work dir (AKB_KB=.), which holds no KB.
+env AKB_KB=
+
+# Sorted by name, so the listing is pinnable.
+exec akb template list --examples
+stdout '(?s)^adr: .*\nnote: .*\n$'
+
+exec akb template get note --examples
+stdout 'name: note'
+stdout 'requirements:'
+stdout 'Title must not be empty'
+
+exec akb template get note --full --examples
+stdout 'name: note'
+stdout 'lint_rules:'
+stdout 'note_stale'
+
+exec akb template get note --example --examples
+stdout 'type: note'
+stdout 'This is a valid note.'
+! stderr 'WARNING'
+
+! exec akb template get nope --examples
+stderr 'not found in the embedded examples'
+stderr 'akb template list --examples'
+
+# The KB-backed forms still require a base.
+! exec akb template list
+stderr 'usage: resolve knowledge base'
+
+# === COPY WORKFLOW: a fresh KB has no templates ===
+
+exec akb init copy-kb
+stdout 'Initialized KB .copy-kb.'
+
+cd copy-kb
+env AKB_KB=.
+
+exec akb template list
+stdout 'No templates found'
+
+# The refusal names both exits: author the template, or copy a showcase.
+stdin ../copy-note.md
+! exec akb write notes/copied.md
+stderr 'unknown type .note.'
+stderr 'Author .akb/templates/note.yaml'
+stderr 'kb-management skill'
+stderr 'akb template list --examples'
+! exists kb/notes/copied.md
+
+# Copy the showcase template and its pass mockup out of the embedded set.
+exec akb template get note --full --examples
+cp stdout note.yaml
+exec akb template get note --example --examples
+cp stdout note_pass.md
+
+# Install the copy; the fail mockup proves the rule still catches a bad page.
+exec akb template write note --template note.yaml --pass note_pass.md --fail ../note-fail.md
+stdout 'Template .note. written'
+exists .akb/templates/note.yaml
+exists .akb/templates/note_pass.md
+exists .akb/templates/note_fail.md
+
+exec akb template list
+stdout 'note: General knowledge note'
+
+# The type now validates: the same page writes.
+stdin ../copy-note.md
+exec akb write notes/copied.md
+stdout 'Written to kb/notes/copied.md'
+exists kb/notes/copied.md
+
+# The KB-backed --example reads the mockup installed beside the template.
+exec akb template get note --example
+stdout 'This is a valid note.'
+
+-- copy-note.md --
+---
+type: note
+title: Copied note
+---
+
+# Copied note
+
+Written from a template copied out of the embedded showcase set.
+
+-- note-fail.md --
+---
+type: note
+title: ""
+summary: A note whose title is empty
+tags: [test]
+---
+
+# Empty title
+
+This note fails require_title because the title is an empty string.

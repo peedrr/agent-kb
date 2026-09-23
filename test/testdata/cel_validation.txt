@@ -9,6 +9,15 @@
 exec akb init cel-kb
 cd cel-kb
 
+# init seeds no templates: copy the adr template this scenario writes pages of,
+# and the pass mockup its `template get adr --example` assertion reads.
+exec akb template get adr --full --examples
+cp stdout .akb/templates/adr.yaml
+exec akb template get adr --example --examples
+cp stdout .akb/templates/adr_pass.md
+exec git add .akb/templates
+exec git commit -m 'seed adr template'
+
 stdin ../valid-adr.md
 exec akb write adr/use-sqlite.md
 stdout 'Written to kb/decisions/adr/use-sqlite.md'

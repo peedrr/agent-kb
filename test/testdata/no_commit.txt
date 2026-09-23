@@ -4,7 +4,13 @@
 exec akb init test-kb
 cd test-kb
 
-# Record initial commit count (should be 1 from init)
+# init seeds no templates: copy the ones this scenario writes pages of.
+exec akb template get note --full --examples
+cp stdout .akb/templates/note.yaml
+exec git add .akb/templates
+exec git commit -m 'seed note template'
+
+# Record initial commit count (init plus the template seed)
 exec git log --oneline
 cp stdout initial-commits.txt
 

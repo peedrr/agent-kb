@@ -7,6 +7,14 @@
 exec akb init lint-kb
 cd lint-kb
 
+# init seeds no templates: copy the ones this scenario writes pages of.
+exec akb template get note --full --examples
+cp stdout .akb/templates/note.yaml
+exec akb template get adr --full --examples
+cp stdout .akb/templates/adr.yaml
+exec git add .akb/templates
+exec git commit -m 'seed note and adr templates'
+
 # --- Write pages via akb write (tracked in link graph) ---
 
 stdin ../broken-link-note.md

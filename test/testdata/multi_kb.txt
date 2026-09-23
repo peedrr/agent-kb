@@ -4,8 +4,28 @@
 exec akb init kb-a
 stdout 'Initialized KB .kb-a.'
 
+cd kb-a
+
+# init seeds no templates: copy the one this scenario writes pages of.
+exec akb template get note --full --examples
+cp stdout .akb/templates/note.yaml
+exec git add .akb/templates
+exec git commit -m 'seed note template'
+
+cd $WORK
+
 exec akb init kb-b
 stdout 'Initialized KB .kb-b.'
+
+cd kb-b
+
+# init seeds no templates: copy the one this scenario writes pages of.
+exec akb template get note --full --examples
+cp stdout .akb/templates/note.yaml
+exec git add .akb/templates
+exec git commit -m 'seed note template'
+
+cd $WORK
 
 # Write to KB-A only.
 stdin note-a.md

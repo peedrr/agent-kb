@@ -8,6 +8,12 @@
 exec akb init append-validation-kb
 cd append-validation-kb
 
+# init seeds no templates: copy the ones this scenario writes pages of.
+exec akb template get adr --full --examples
+cp stdout .akb/templates/adr.yaml
+exec git add .akb/templates
+exec git commit -m 'seed adr template'
+
 # --- A valid ADR page ---
 stdin ../adr-input.md
 exec akb write append-adr.md

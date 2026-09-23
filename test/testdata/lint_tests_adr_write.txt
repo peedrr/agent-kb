@@ -6,6 +6,12 @@
 exec akb init adr-write-kb
 cd adr-write-kb
 
+# init seeds no templates: copy the ones this scenario writes pages of.
+exec akb template get adr --full --examples
+cp stdout .akb/templates/adr.yaml
+exec git add .akb/templates
+exec git commit -m 'seed adr template'
+
 stdin ../adr-missing-status.md
 exec bash -c 'akb write bad-adr.md; echo "akb-exit=$?"'
 stdout 'akb-exit=1$'
