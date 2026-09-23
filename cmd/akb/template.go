@@ -52,7 +52,11 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
-	templates, err := template.LoadTemplates(filepath.Join(kbRoot, ".akb", "templates"))
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
+		return fmt.Errorf("resolve templates directory: %w", err)
+	}
+	templates, err := template.LoadTemplates(templatesDir)
 	if err != nil {
 		return fmt.Errorf("load templates: %w", err)
 	}
@@ -67,7 +71,10 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 	}
 
 	if templateExample {
-		passPath := filepath.Join(kbRoot, ".akb", "templates", name+"_pass.md")
+		passPath := filepath.Join(templatesDir, name+"_pass.md")
+		if err := path.AssertContained(kbRoot, passPath); err != nil {
+			return fmt.Errorf("resolve template path: %w", err)
+		}
 		data, err := os.ReadFile(passPath) //nolint:gosec // name validated by templateNameRe
 		if err != nil {
 			return fmt.Errorf("pass mockup not found for template %q: %w", name, err)
@@ -113,7 +120,11 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 	}
 
 	if templateFull {
-		data, err := os.ReadFile(filepath.Join(kbRoot, ".akb", "templates", name+".yaml")) //nolint:gosec // name validated by templateNameRe
+		fullPath := filepath.Join(templatesDir, name+".yaml")
+		if err := path.AssertContained(kbRoot, fullPath); err != nil {
+			return fmt.Errorf("resolve template path: %w", err)
+		}
+		data, err := os.ReadFile(fullPath) //nolint:gosec // name validated by templateNameRe
 		if err != nil {
 			return fmt.Errorf("template file not found: %w", err)
 		}
@@ -151,7 +162,11 @@ func runTemplateList(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
-	templates, err := template.LoadTemplates(filepath.Join(kbRoot, ".akb", "templates"))
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
+		return fmt.Errorf("resolve templates directory: %w", err)
+	}
+	templates, err := template.LoadTemplates(templatesDir)
 	if err != nil {
 		return fmt.Errorf("load templates: %w", err)
 	}

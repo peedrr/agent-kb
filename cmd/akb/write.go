@@ -107,7 +107,11 @@ func runWrite(_ *cobra.Command, args []string) error {
 	}
 
 	// Load templates
-	templates, err := template.LoadTemplates(filepath.Join(kbRoot, ".akb", "templates"))
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
+		return fmt.Errorf("resolve templates directory: %w", err)
+	}
+	templates, err := template.LoadTemplates(templatesDir)
 	if err != nil {
 		return fmt.Errorf("load templates: %w", err)
 	}

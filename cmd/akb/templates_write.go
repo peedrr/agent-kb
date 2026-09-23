@@ -54,7 +54,12 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
-	templateYAMLPath := filepath.Join(kbRoot, ".akb", "templates", name+".yaml")
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
+		return fmt.Errorf("resolve templates directory: %w", err)
+	}
+
+	templateYAMLPath := filepath.Join(templatesDir, name+".yaml")
 	templateExists := false
 	if _, err := os.Stat(templateYAMLPath); err == nil {
 		templateExists = true
@@ -114,7 +119,7 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 			return fmt.Errorf("read pass mockup: %w", err)
 		}
 	case templateExists:
-		existingPass := filepath.Join(kbRoot, ".akb", "templates", name+"_pass.md")
+		existingPass := filepath.Join(templatesDir, name+"_pass.md")
 		passData, err = os.ReadFile(existingPass) //nolint:gosec // known path
 		if err != nil {
 			return fmt.Errorf("read existing pass mockup: %w", err)
@@ -158,7 +163,7 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 			return fmt.Errorf("read fail mockup: %w", err)
 		}
 	case templateExists:
-		existingFail := filepath.Join(kbRoot, ".akb", "templates", name+"_fail.md")
+		existingFail := filepath.Join(templatesDir, name+"_fail.md")
 		failData, err = os.ReadFile(existingFail) //nolint:gosec // known path
 		if err != nil {
 			return fmt.Errorf("read existing fail mockup: %w", err)
@@ -226,7 +231,7 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("template %q exists; use --force to overwrite", name)
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := templatesDir
 	if err := os.MkdirAll(targetDir, 0750); err != nil {
 		return fmt.Errorf("create templates directory: %w", err)
 	}

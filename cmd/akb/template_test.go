@@ -412,3 +412,68 @@ func TestTemplateDeleteCommitIsScopedToItsFiles(t *testing.T) {
 		t.Errorf("staged change lost from the index:\n%s", status)
 	}
 }
+
+// symlinkTemplatesOutOfBase replaces the templates directory of kbRoot with a
+// symlink to a directory outside the base and returns that outside directory.
+func symlinkTemplatesOutOfBase(t *testing.T, kbRoot string) string {
+	t.Helper()
+
+	outsideDir := t.TempDir()
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := os.RemoveAll(templatesDir); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, templatesDir, outsideDir)
+	return outsideDir
+}
+
+// TestTemplateGet_RejectsSymlinkedTemplatesDir pins that reading a template
+// rejects a templates directory that is a symlink out of the base.
+func TestTemplateGet_RejectsSymlinkedTemplatesDir(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+	symlinkTemplatesOutOfBase(t, kbRoot)
+
+	assertSymlinkEscape(t, runTemplateGet(nil, []string{"note"}))
+}
+
+// TestTemplateGet_RejectsSymlinkedMockup pins that the example read rejects a
+// mockup file that is a symlink out of the base.
+func TestTemplateGet_RejectsSymlinkedMockup(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+
+	const secret = "content outside the base"
+	outsideFile := filepath.Join(t.TempDir(), "secret.md")
+	if err := os.WriteFile(outsideFile, []byte(secret), 0600); err != nil {
+		t.Fatal(err)
+	}
+	passPath := filepath.Join(kbRoot, ".akb", "templates", "note_pass.md")
+	if err := os.Remove(passPath); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, passPath, outsideFile)
+
+	origExample := templateExample
+	templateExample = true
+	t.Cleanup(func() { templateExample = origExample })
+
+	assertSymlinkEscape(t, runTemplateGet(nil, []string{"note"}))
+}
+
+// TestTemplateList_RejectsSymlinkedTemplatesDir pins that listing templates
+// rejects a templates directory that is a symlink out of the base.
+func TestTemplateList_RejectsSymlinkedTemplatesDir(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+	symlinkTemplatesOutOfBase(t, kbRoot)
+
+	assertSymlinkEscape(t, runTemplateList(nil, nil))
+}
+
+// TestTemplateDelete_RejectsSymlinkedTemplatesDir pins that deleting a template
+// rejects a templates directory that is a symlink out of the base before the
+// force gate and before any file is removed.
+func TestTemplateDelete_RejectsSymlinkedTemplatesDir(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+	symlinkTemplatesOutOfBase(t, kbRoot)
+
+	assertSymlinkEscape(t, runTemplateDelete(nil, []string{"note"}))
+}

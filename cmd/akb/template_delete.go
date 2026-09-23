@@ -62,6 +62,9 @@ func runTemplateDelete(_ *cobra.Command, args []string) error {
 	}
 
 	tmplPath := filepath.Join(kbRoot, ".akb", "templates", name+".yaml")
+	if err := path.AssertContained(kbRoot, tmplPath); err != nil {
+		return fmt.Errorf("resolve template path: %w", err)
+	}
 	if _, err := os.Stat(tmplPath); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf("template %q not found", name)
@@ -99,7 +102,11 @@ func runTemplateDelete(_ *cobra.Command, args []string) error {
 		defer repoLock.Release()
 
 		for _, relPath := range templateCommitPaths(name) {
-			if err := os.Remove(filepath.Join(kbRoot, relPath)); err != nil && !os.IsNotExist(err) {
+			removalPath := filepath.Join(kbRoot, relPath)
+			if err := path.AssertContained(kbRoot, removalPath); err != nil {
+				return fmt.Errorf("resolve template path: %w", err)
+			}
+			if err := os.Remove(removalPath); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("delete file %s: %w", filepath.Base(relPath), err)
 			}
 		}

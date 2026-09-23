@@ -60,7 +60,11 @@ func RunLint(ctx context.Context) (*lint.LintReport, error) {
 	}
 	defer sqlDB.Close() //nolint:errcheck // DB close error non-critical on command exit
 
-	templates, err := template.LoadTemplates(filepath.Join(kbRoot, ".akb", "templates"))
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
+		return nil, fmt.Errorf("resolve templates directory: %w", err)
+	}
+	templates, err := template.LoadTemplates(templatesDir)
 	if err != nil {
 		return nil, fmt.Errorf("load templates: %w", err)
 	}

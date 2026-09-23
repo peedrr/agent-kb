@@ -1253,6 +1253,32 @@ func TestWriteRejectsSymlinkedTypeDirectoryCandidates(t *testing.T) {
 	})
 }
 
+// TestWriteRejectsSymlinkedTemplatesDir pins that a templates directory that is
+// a symlink out of the base is rejected before the write reads templates.
+func TestWriteRejectsSymlinkedTemplatesDir(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	outsideDir := t.TempDir()
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := os.RemoveAll(templatesDir); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, templatesDir, outsideDir)
+
+	content := "---\ntype: note\ntitle: Test\nsummary: test\ntags: test\n---\nContent."
+	out, err := writeRun(kbRoot, "note.md", content)
+	assertSymlinkEscapeExit(t, out, err)
+
+	entries, err := os.ReadDir(outsideDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("templates outside the base were touched: %v", entries)
+	}
+}
+
 // TestInTreeSymlinksStillWork pins that a symlink whose target stays inside the
 // base keeps resolving: only links out of the base are rejected.
 func TestInTreeSymlinksStillWork(t *testing.T) {

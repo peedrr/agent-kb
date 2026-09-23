@@ -443,3 +443,48 @@ title: ""
 		t.Errorf("staged change lost from the index:\n%s", status)
 	}
 }
+
+// TestTemplatesWrite_RejectsSymlinkedTemplatesDir pins that writing a template
+// rejects a templates directory that is a symlink out of the base before it
+// writes anything there.
+func TestTemplatesWrite_RejectsSymlinkedTemplatesDir(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	outsideDir := t.TempDir()
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := os.RemoveAll(templatesDir); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, templatesDir, outsideDir)
+
+	templatePath := filepath.Join(kbRoot, "outside-template.yaml")
+	templateBody := `name: outside
+description: A template
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+`
+	if err := os.WriteFile(templatePath, []byte(templateBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	origTemplate, origPass, origFail := twTemplate, twPass, twFail
+	twTemplate, twPass, twFail = templatePath, "", ""
+	t.Cleanup(func() { twTemplate, twPass, twFail = origTemplate, origPass, origFail })
+
+	assertSymlinkEscape(t, runTemplatesWrite(nil, []string{"outside"}))
+
+	entries, err := os.ReadDir(outsideDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("templates outside the base were written: %v", entries)
+	}
+}

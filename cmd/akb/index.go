@@ -139,7 +139,11 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 	content, err := os.ReadFile(fullPath) //nolint:gosec // path validated by ResolveKBPath
 	if err != nil {
 		// Direct path not found — try template-aware resolution
-		templates, tmplErr := template.LoadTemplates(filepath.Join(kbRoot, ".akb", "templates"))
+		templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+		if err := path.AssertContained(kbRoot, templatesDir); err != nil {
+			return fmt.Errorf("resolve templates directory: %w", err)
+		}
+		templates, tmplErr := template.LoadTemplates(templatesDir)
 		if tmplErr != nil {
 			return fmt.Errorf("read file %s: %w", entryPath, err)
 		}
