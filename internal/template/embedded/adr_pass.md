@@ -70,6 +70,7 @@ page.ast.code_blocks.all(c, c.language != "")
 ```
 
 <!-- PASSES: code_blocks_have_language rule — the one fenced block in this body is tagged cel -->
+<!-- PASSES: require_wikilink rule — the body carries a real [[templates/guard-doctrine]] wikilink -->
 
 ### Cross-field and temporal rules
 
@@ -81,6 +82,7 @@ page.ast.code_blocks.all(c, c.language != "")
 <!-- PASSES: updated_not_before_created rule — updated (2026-02-10) is after created (2026-01-05) -->
 <!-- PASSES: superseded_requires_field rule — status is "accepted", so the conditional never reaches the optional key -->
 <!-- PASSES: proposed_has_no_supersedes rule — status is "accepted", so the prohibition does not apply -->
+<!-- PASSES: superseded_requires_link rule — status is "accepted", so the conditional never reaches the link check -->
 
 ### The old_page state machine
 

@@ -38,7 +38,8 @@ stderr 'require_decision'
 stderr 'require_consequences'
 stderr 'disallow_options'
 stderr 'min_word_count'
-stderr -count=5 '^\['
+stderr 'require_wikilink'
+stderr -count=6 '^\['
 ! exists kb/decisions/missing-sections.md
 
 # === VALIDATION FAILURE: an unevaluable rule, exit 1 with an author-directed report ===
@@ -180,7 +181,7 @@ updated: "2020-01-01T00:00:00Z"
 
 ## Options
 
-An ADR that violates five validation rules at once: the three required sections, the banned Options section, and the minimum word count.
+An ADR that violates six validation rules at once: the three required sections, the banned Options section, the minimum word count, and the missing wikilink.
 
 -- unknown-type.md --
 ---

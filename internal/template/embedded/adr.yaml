@@ -163,6 +163,19 @@ validations:
     rule: 'page.frontmatter.status != "proposed" || !has(page.frontmatter.supersedes)'
     requirement: A proposed ADR must not name what it supersedes
     expect: proposed ADRs must not set supersedes
+
+  # CEL Concept: Link inspection / KB connectivity
+  - id: require_wikilink
+    rule: 'page.ast.links.exists(l, l.is_wikilink)'
+    requirement: The page must contain at least one wikilink
+    expect: page must contain at least one wikilink
+
+  # CEL Concept: Cross-reference validation between frontmatter and AST
+  # CEL Concept: has() guard
+  - id: superseded_requires_link
+    rule: 'page.frontmatter.status != "superseded" || !has(page.frontmatter.supersedes) || page.ast.links.exists(l, l.is_wikilink && l.target == page.frontmatter.supersedes)'
+    requirement: When status is superseded, the body must link the ADR it supersedes
+    expect: superseded ADRs must link the ADR named by supersedes
 lint_rules:
   # CEL Concept: Temporal drift detection (warning)
   # CEL Concept: has() guard
