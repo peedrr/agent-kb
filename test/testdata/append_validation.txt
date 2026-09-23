@@ -1,0 +1,80 @@
+# Append Validation — appending to a page runs the write-time validation pipeline
+
+# A page is validated as the append leaves it: an append whose result breaks a
+# template rule reports every failed rule, fails the command and leaves the page
+# byte-identical. The valid append path keeps its output line, and a page
+# without a type can no longer be appended to.
+
+exec akb init append-validation-kb
+cd append-validation-kb
+
+# --- A valid ADR page ---
+stdin ../adr-input.md
+exec akb write append-adr.md
+stdout 'Written to kb/decisions/append-adr.md'
+
+# --- The valid append path is unchanged ---
+stdin ../appendix.txt
+exec akb append decisions/append-adr.md
+stdout 'Appended to kb/decisions/append-adr.md'
+
+# --- An append whose result breaks two rules reports both and fails ---
+cp kb/decisions/append-adr.md ../adr-before-failed-append.md
+stdin ../options-appendix.txt
+! exec akb append decisions/append-adr.md
+stderr 'disallow_options'
+stderr 'page must not have a .## Options. heading'
+stderr 'disallow_pros_cons'
+stderr 'page must not have a .## Pros and Cons. heading'
+
+# The failed append left the page as it was
+cmp ../adr-before-failed-append.md kb/decisions/append-adr.md
+
+# --- A page without a type cannot be appended to ---
+mkdir kb/notes
+cp ../typeless-page.md kb/notes/typeless.md
+stdin ../appendix.txt
+! exec akb append notes/typeless.md
+stderr 'validate type: missing required field .type. in frontmatter'
+cmp ../typeless-page.md kb/notes/typeless.md
+
+-- adr-input.md --
+---
+type: adr
+title: Append Validation ADR
+summary: ADR for append validation
+tags: test
+status: proposed
+deciders: team
+created: '2020-01-01'
+updated: '2020-01-01'
+---
+## Context
+
+Context body.
+
+## Decision
+
+Decision body.
+
+## Consequences
+
+Consequences body.
+
+-- appendix.txt --
+Appended body line.
+
+-- options-appendix.txt --
+## Options
+
+Option A.
+
+## Pros and Cons
+
+Pros and cons.
+
+-- typeless-page.md --
+---
+title: Typeless Page
+---
+Original body.

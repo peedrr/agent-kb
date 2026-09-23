@@ -597,3 +597,143 @@ func TestAppendBareFilenameNotFound(t *testing.T) {
 		t.Errorf("output = %q, want %q", out, want)
 	}
 }
+
+// appendValidADR is a page the adr template accepts as written: it carries
+// every required field and the Context, Decision and Consequences headings the
+// template requires.
+const appendValidADR = `---
+type: adr
+title: Append Validation ADR
+summary: ADR for append validation
+tags: test
+status: proposed
+deciders: team
+created: '2020-01-01'
+updated: '2020-01-01'
+---
+## Context
+
+Context body.
+
+## Decision
+
+Decision body.
+
+## Consequences
+
+Consequences body.`
+
+// TestAppendValidationFailureReportsAllRulesAndKeepsPage pins that an append
+// runs the template's write-time rules against the page as the append leaves
+// it: every failed rule is reported, the command exits with the validation
+// exit code, and the page is left byte-identical.
+func TestAppendValidationFailureReportsAllRulesAndKeepsPage(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	if out, err := writeRun(kbRoot, "append-validation.md", appendValidADR); err != nil {
+		t.Fatalf("seed write failed: %s: %v", out, err)
+	}
+
+	pagePath := filepath.Join(kbRoot, "kb", "decisions", "append-validation.md")
+	before, err := os.ReadFile(pagePath) //nolint:gosec // test reading known temp file
+	if err != nil {
+		t.Fatalf("read page before the append: %v", err)
+	}
+
+	// Both headings are rejected by the adr template, so a report that carries
+	// only the first failure would mean the rules are not all evaluated.
+	out, err := appendRun(kbRoot, "decisions/append-validation.md",
+		"## Options\n\nOption A.\n\n## Pros and Cons\n\nPros and cons.")
+	if err == nil {
+		t.Fatalf("expected the append to fail validation, got: %s", out)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected an exit error, got %T: %v", err, err)
+	}
+	if code := exitErr.ExitCode(); code != exitFailure {
+		t.Errorf("exit code = %d, want %d; output: %s", code, exitFailure, out)
+	}
+	for _, want := range []string{
+		"disallow_options",
+		"page must not have a '## Options' heading",
+		"disallow_pros_cons",
+		"page must not have a '## Pros and Cons' heading",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output = %q, want it to report %q", out, want)
+		}
+	}
+	for _, unwanted := range []string{"internal:", "CEL engine error"} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("output = %q, want a validation failure rather than %q", out, unwanted)
+		}
+	}
+
+	after, err := os.ReadFile(pagePath) //nolint:gosec // test reading known temp file
+	if err != nil {
+		t.Fatalf("read page after the failed append: %v", err)
+	}
+	if string(after) != string(before) {
+		t.Errorf("page changed by a failed append:\nbefore: %q\nafter:  %q", before, after)
+	}
+}
+
+// TestAppendTypelessPageFailsValidation pins that a page without a type is no
+// longer appended to: the append reports the missing type and leaves the page
+// byte-identical.
+func TestAppendTypelessPageFailsValidation(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	const relPath = "kb/notes/typeless.md"
+	const typeless = "---\ntitle: Typeless Page\n---\nOriginal body."
+	writeRawPage(t, kbRoot, relPath, typeless)
+
+	out, err := appendRun(kbRoot, "notes/typeless.md", "Appended body.")
+	if err == nil {
+		t.Fatalf("expected the append of a typeless page to fail, got: %s", out)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected an exit error, got %T: %v", err, err)
+	}
+	if code := exitErr.ExitCode(); code != exitFailure {
+		t.Errorf("exit code = %d, want %d; output: %s", code, exitFailure, out)
+	}
+	if want := "validate type: missing required field 'type' in frontmatter"; !strings.Contains(out, want) {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+
+	data, err := os.ReadFile(filepath.Join(kbRoot, filepath.FromSlash(relPath))) //nolint:gosec // test reading known temp file
+	if err != nil {
+		t.Fatalf("read page after the failed append: %v", err)
+	}
+	if string(data) != typeless {
+		t.Errorf("page = %q, want it left as %q", data, typeless)
+	}
+}
+
+// TestAppendSuccessOutputLineStable pins the success line of a valid append to
+// the exact text the command has always printed on stdout.
+func TestAppendSuccessOutputLineStable(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	writePageForAppend(t, kbRoot, "output-line.md",
+		"---\ntype: note\ntitle: Output Line\nsummary: test\ntags: test\n---\nOriginal body.")
+
+	cmd := exec.Command(akbBinPath, "append", "notes/output-line.md") //nolint:gosec // test helper launching akb binary
+	cmd.Dir = kbRoot
+	cmd.Stdin = strings.NewReader("Appended body.")
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("akb append failed: %v; stderr: %s", err, stderr.String())
+	}
+	if want := "Appended to kb/notes/output-line.md\n"; stdout.String() != want {
+		t.Errorf("stdout = %q, want %q", stdout.String(), want)
+	}
+}

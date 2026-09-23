@@ -13,7 +13,10 @@ import (
 
 	yaml "github.com/goccy/go-yaml"
 	"github.com/spf13/cobra"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/text"
 
+	"github.com/peedrr/agent-kb/internal/cel"
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
@@ -21,6 +24,7 @@ import (
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/search"
 	"github.com/peedrr/agent-kb/internal/storage"
+	"github.com/peedrr/agent-kb/internal/template"
 )
 
 var appendCmd = &cobra.Command{
@@ -121,8 +125,7 @@ func runAppend(_ *cobra.Command, args []string) error {
 
 	// A page is addressed by the path it is stored at or by its bare filename,
 	// which resolves under the directory of its type. The type directories are
-	// read only when the named path holds no page, so a knowledge base whose
-	// templates cannot be read still appends to a page addressed by its path.
+	// read only when the named path holds no page.
 	fullPath, relPath, existingContent, err := resolveExistingPage(kbRoot, inputPath, typeDirsFromDisk(kbRoot))
 	if err != nil {
 		if errors.Is(err, errPageNotFound) {
@@ -134,6 +137,33 @@ func runAppend(_ *cobra.Command, args []string) error {
 	fm, body, err := frontmatter.Parse(existingContent)
 	if err != nil {
 		return fmt.Errorf("parse frontmatter: %w", err)
+	}
+
+	// Templates are read the way `akb write` reads them, so an append runs the
+	// same write-time validation pipeline as a write.
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
+		return fmt.Errorf("resolve templates directory: %w", err)
+	}
+	if err := assertTemplateFilesContained(kbRoot, templatesDir); err != nil {
+		return fmt.Errorf("resolve templates directory: %w", err)
+	}
+	templates, err := template.LoadTemplates(templatesDir)
+	if err != nil {
+		return fmt.Errorf("load templates: %w", err)
+	}
+
+	if err := frontmatter.ValidateType(fm, templates); err != nil {
+		return fmt.Errorf("validate type: %w", err)
+	}
+	if err := frontmatter.ValidateTitle(fm); err != nil {
+		return fmt.Errorf("validate title: %w", err)
+	}
+
+	// old_page comes from the on-disk page, so it keeps the pre-append state.
+	oldPage, err := cel.BuildOldPage(relPath, store)
+	if err != nil {
+		return &internalError{err: fmt.Errorf("CEL engine error: %w", err)}
 	}
 
 	// The page content changes, so stamp the update time.
@@ -158,6 +188,25 @@ func runAppend(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("re-serialize frontmatter: %w", err)
 	}
 	fullContent := "---\n" + string(yamlBytes) + "---\n" + newBody
+
+	// Validate the page as the append leaves it: the rules see the appended body
+	// and the bumped update time, while old_page holds the pre-append state.
+	tmpl, ok := templates[fm.Type]
+	if !ok {
+		return fmt.Errorf("unknown type %q", fm.Type)
+	}
+	newBodyBytes := []byte(newBody)
+	md := goldmark.New()
+	astDoc := md.Parser().Parse(text.NewReader(newBodyBytes))
+	page := cel.BuildPage(relPath, fm, newBodyBytes, astDoc, newBodyBytes)
+
+	celEnv, err := cel.NewEnv()
+	if err != nil {
+		return &internalError{err: fmt.Errorf("CEL engine error: %w", err)}
+	}
+	if err := runTemplateValidations(celEnv, tmpl, page, oldPage); err != nil {
+		return err
+	}
 
 	commitMsg := fmt.Sprintf("akb: append %s", relPath)
 	if err := store.WriteWithCommitMsg(ctx, fullPath, []byte(fullContent), commitMsg); err != nil {

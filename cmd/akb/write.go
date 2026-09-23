@@ -11,6 +11,7 @@ import (
 	"time"
 
 	yaml "github.com/goccy/go-yaml"
+	gocel "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/spf13/cobra"
 	"github.com/yuin/goldmark"
@@ -492,39 +493,8 @@ func runWrite(_ *cobra.Command, args []string) error {
 	page := cel.BuildPage(relPath, fm, body, astDoc, body)
 
 	// Run CEL validations
-	var validationErrors []cel.ValidationError
-	for _, rule := range tmpl.Validations {
-		prg, err := cel.CompileRule(celEnv, rule.Rule)
-		if err != nil {
-			return &internalError{err: fmt.Errorf("CEL engine error: compile rule %s: %w", rule.ID, err)}
-		}
-		var oldPageAny any
-		if oldPage != nil {
-			oldPageAny = oldPage
-		}
-		result, err := cel.Evaluate(context.Background(), prg, map[string]any{
-			"page":     page,
-			"old_page": oldPageAny,
-			"now":      time.Now(),
-		})
-		if err != nil {
-			return &internalError{err: fmt.Errorf("CEL engine error: evaluate rule %s: %w", rule.ID, err)}
-		}
-		if result != types.True {
-			validationErrors = append(validationErrors, cel.ValidationError{
-				RuleID:   rule.ID,
-				Message:  rule.Expect,
-				Line:     0,
-				Severity: "error",
-			})
-		}
-	}
-
-	if len(validationErrors) > 0 {
-		for _, ve := range validationErrors {
-			fmt.Fprintln(os.Stderr, ve.Error())
-		}
-		return validationFailure{}
+	if err := runTemplateValidations(celEnv, tmpl, page, oldPage); err != nil {
+		return err
 	}
 
 	// Extract tags and summary from frontmatter fields
@@ -580,4 +550,48 @@ func runWrite(_ *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// runTemplateValidations runs the write-time CEL rules of a template against a
+// page and reports every failed rule on stderr. oldPage is the page as it was
+// before the modification, nil when the page does not exist yet. A rule that
+// fails to compile or evaluate is an akb fault; a rule that evaluates to false
+// is a validation failure whose report is the rules' own messages, so the
+// caller only has to map a returned validationFailure to a validation exit.
+func runTemplateValidations(celEnv *gocel.Env, tmpl template.Template, page, oldPage map[string]any) error {
+	var validationErrors []cel.ValidationError
+	for _, rule := range tmpl.Validations {
+		prg, err := cel.CompileRule(celEnv, rule.Rule)
+		if err != nil {
+			return &internalError{err: fmt.Errorf("CEL engine error: compile rule %s: %w", rule.ID, err)}
+		}
+		var oldPageAny any
+		if oldPage != nil {
+			oldPageAny = oldPage
+		}
+		result, err := cel.Evaluate(context.Background(), prg, map[string]any{
+			"page":     page,
+			"old_page": oldPageAny,
+			"now":      time.Now(),
+		})
+		if err != nil {
+			return &internalError{err: fmt.Errorf("CEL engine error: evaluate rule %s: %w", rule.ID, err)}
+		}
+		if result != types.True {
+			validationErrors = append(validationErrors, cel.ValidationError{
+				RuleID:   rule.ID,
+				Message:  rule.Expect,
+				Line:     0,
+				Severity: "error",
+			})
+		}
+	}
+
+	if len(validationErrors) == 0 {
+		return nil
+	}
+	for _, ve := range validationErrors {
+		fmt.Fprintln(os.Stderr, ve.Error())
+	}
+	return validationFailure{}
 }
