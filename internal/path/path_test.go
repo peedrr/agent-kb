@@ -320,6 +320,414 @@ func TestResolveRawPath(t *testing.T) {
 	}
 }
 
+func TestResolveKBPathRejectsSymlinkEscapes(t *testing.T) {
+	symlinkSupport(t)
+
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.md"), []byte("secret\n"), 0600); err != nil {
+		t.Fatalf("create outside file: %v", err)
+	}
+
+	tests := []struct {
+		name  string
+		input string
+		setup func(t *testing.T, kbRoot string) string
+	}{
+		{
+			name:  "file symlink to an existing file outside",
+			input: "evil.md",
+			setup: func(t *testing.T, kbRoot string) string {
+				link := filepath.Join(kbRoot, "evil.md")
+				mustSymlink(t, filepath.Join(outside, "secret.md"), link)
+				return link
+			},
+		},
+		{
+			name:  "file symlink to a directory outside",
+			input: "evil.md",
+			setup: func(t *testing.T, kbRoot string) string {
+				link := filepath.Join(kbRoot, "evil.md")
+				mustSymlink(t, outside, link)
+				return link
+			},
+		},
+		{
+			name:  "directory symlink used as an intermediate component",
+			input: filepath.Join("evil", "secret.md"),
+			setup: func(t *testing.T, kbRoot string) string {
+				link := filepath.Join(kbRoot, "evil")
+				mustSymlink(t, outside, link)
+				return link
+			},
+		},
+		{
+			name:  "nested intermediate directory symlink",
+			input: filepath.Join("docs", "evil", "nested", "secret.md"),
+			setup: func(t *testing.T, kbRoot string) string {
+				if err := os.MkdirAll(filepath.Join(kbRoot, "docs"), 0750); err != nil {
+					t.Fatalf("create docs directory: %v", err)
+				}
+				link := filepath.Join(kbRoot, "docs", "evil")
+				mustSymlink(t, outside, link)
+				return link
+			},
+		},
+		{
+			name:  "relative symlink pointing outside",
+			input: "evil.md",
+			setup: func(t *testing.T, kbRoot string) string {
+				rel, err := filepath.Rel(kbRoot, filepath.Join(outside, "secret.md"))
+				if err != nil {
+					t.Fatalf("relative target: %v", err)
+				}
+				link := filepath.Join(kbRoot, "evil.md")
+				mustSymlink(t, rel, link)
+				return link
+			},
+		},
+		{
+			name:  "dangling symlink whose target lies outside",
+			input: "evil.md",
+			setup: func(t *testing.T, kbRoot string) string {
+				link := filepath.Join(kbRoot, "evil.md")
+				mustSymlink(t, filepath.Join(outside, "not-yet.md"), link)
+				return link
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kbRoot := t.TempDir()
+			link := tt.setup(t, kbRoot)
+
+			got, err := ResolveKBPath(kbRoot, tt.input)
+			assertSymlinkEscape(t, err, got, link)
+		})
+	}
+}
+
+func TestResolveRawPathRejectsSymlinkEscapes(t *testing.T) {
+	symlinkSupport(t)
+
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret\n"), 0600); err != nil {
+		t.Fatalf("create outside file: %v", err)
+	}
+
+	tests := []struct {
+		name  string
+		input string
+		setup func(t *testing.T, kbRoot string) string
+	}{
+		{
+			name:  "file symlink to an existing file outside",
+			input: "evil.txt",
+			setup: func(t *testing.T, kbRoot string) string {
+				if err := os.MkdirAll(filepath.Join(kbRoot, "raw"), 0750); err != nil {
+					t.Fatalf("create raw directory: %v", err)
+				}
+				link := filepath.Join(kbRoot, "raw", "evil.txt")
+				mustSymlink(t, filepath.Join(outside, "secret.txt"), link)
+				return link
+			},
+		},
+		{
+			name:  "directory symlink used as an intermediate component",
+			input: filepath.Join("raw", "evil", "secret.txt"),
+			setup: func(t *testing.T, kbRoot string) string {
+				if err := os.MkdirAll(filepath.Join(kbRoot, "raw"), 0750); err != nil {
+					t.Fatalf("create raw directory: %v", err)
+				}
+				link := filepath.Join(kbRoot, "raw", "evil")
+				mustSymlink(t, outside, link)
+				return link
+			},
+		},
+		{
+			name:  "the raw directory itself is a symlink outside",
+			input: "secret.txt",
+			setup: func(t *testing.T, kbRoot string) string {
+				link := filepath.Join(kbRoot, "raw")
+				mustSymlink(t, outside, link)
+				return link
+			},
+		},
+		{
+			name:  "dangling symlink whose target lies outside",
+			input: "evil.txt",
+			setup: func(t *testing.T, kbRoot string) string {
+				if err := os.MkdirAll(filepath.Join(kbRoot, "raw"), 0750); err != nil {
+					t.Fatalf("create raw directory: %v", err)
+				}
+				link := filepath.Join(kbRoot, "raw", "evil.txt")
+				mustSymlink(t, filepath.Join(outside, "not-yet.txt"), link)
+				return link
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kbRoot := t.TempDir()
+			link := tt.setup(t, kbRoot)
+
+			got, err := ResolveRawPath(kbRoot, tt.input)
+			assertSymlinkEscape(t, err, got, link)
+		})
+	}
+}
+
+func TestResolveKBPathKeepsSymlinksInsideTheBase(t *testing.T) {
+	symlinkSupport(t)
+
+	kbRoot := t.TempDir()
+	docs := filepath.Join(kbRoot, "docs")
+	if err := os.MkdirAll(docs, 0750); err != nil {
+		t.Fatalf("create docs directory: %v", err)
+	}
+	target := filepath.Join(docs, "target.md")
+	if err := os.WriteFile(target, []byte("body\n"), 0600); err != nil {
+		t.Fatalf("create target page: %v", err)
+	}
+
+	mustSymlink(t, target, filepath.Join(kbRoot, "absolute-link.md"))
+	mustSymlink(t, filepath.Join("docs", "target.md"), filepath.Join(kbRoot, "relative-link.md"))
+	mustSymlink(t, docs, filepath.Join(kbRoot, "alias"))
+	mustSymlink(t, filepath.Join(docs, "not-yet.md"), filepath.Join(kbRoot, "dangling-link.md"))
+
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{name: "absolute file symlink", input: "absolute-link.md"},
+		{name: "relative file symlink", input: "relative-link.md"},
+		{name: "directory symlink", input: filepath.Join("alias", "target.md")},
+		{name: "dangling symlink inside the base", input: "dangling-link.md"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ResolveKBPath(kbRoot, tt.input)
+			if err != nil {
+				t.Fatalf("ResolveKBPath(%q) rejected a symlink inside the base: %v", tt.input, err)
+			}
+			if want := filepath.Join(kbRoot, tt.input); got != want {
+				t.Fatalf("ResolveKBPath(%q) = %q, want %q", tt.input, got, want)
+			}
+		})
+	}
+}
+
+func TestResolveRawPathKeepsSymlinksInsideTheBase(t *testing.T) {
+	symlinkSupport(t)
+
+	kbRoot := t.TempDir()
+	raw := filepath.Join(kbRoot, "raw")
+	if err := os.MkdirAll(raw, 0750); err != nil {
+		t.Fatalf("create raw directory: %v", err)
+	}
+	target := filepath.Join(raw, "target.txt")
+	if err := os.WriteFile(target, []byte("body\n"), 0600); err != nil {
+		t.Fatalf("create target file: %v", err)
+	}
+
+	mustSymlink(t, target, filepath.Join(raw, "link.txt"))
+	mustSymlink(t, raw, filepath.Join(raw, "alias"))
+
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "absolute file symlink", input: "link.txt", want: filepath.Join(raw, "link.txt")},
+		{name: "directory symlink", input: filepath.Join("raw", "alias", "target.txt"), want: filepath.Join(raw, "alias", "target.txt")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ResolveRawPath(kbRoot, tt.input)
+			if err != nil {
+				t.Fatalf("ResolveRawPath(%q) rejected a symlink inside the base: %v", tt.input, err)
+			}
+			if got != tt.want {
+				t.Fatalf("ResolveRawPath(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolveKBPathRejectsEscapesDeeperUnderAContainedSymlink(t *testing.T) {
+	symlinkSupport(t)
+
+	kbRoot := t.TempDir()
+	docs := filepath.Join(kbRoot, "docs")
+	if err := os.MkdirAll(docs, 0750); err != nil {
+		t.Fatalf("create docs directory: %v", err)
+	}
+	outside := t.TempDir()
+
+	mustSymlink(t, docs, filepath.Join(kbRoot, "alias"))
+	mustSymlink(t, outside, filepath.Join(docs, "evil"))
+
+	// The link below the contained alias is named by its resolved path: the
+	// inspection continues from where the alias landed.
+	realRoot, err := filepath.EvalSymlinks(kbRoot)
+	if err != nil {
+		t.Fatalf("resolve base root: %v", err)
+	}
+
+	got, err := ResolveKBPath(kbRoot, filepath.Join("alias", "evil", "secret.md"))
+	assertSymlinkEscape(t, err, got, filepath.Join(realRoot, "docs", "evil"))
+}
+
+func TestResolveKBPathRejectsSiblingNameSharingTheRootPrefix(t *testing.T) {
+	symlinkSupport(t)
+
+	parent := t.TempDir()
+	kbRoot := filepath.Join(parent, "kb")
+	sibling := filepath.Join(parent, "kb2")
+	for _, dir := range []string{kbRoot, sibling} {
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			t.Fatalf("create %s: %v", dir, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(sibling, "secret.md"), []byte("secret\n"), 0600); err != nil {
+		t.Fatalf("create sibling file: %v", err)
+	}
+
+	link := filepath.Join(kbRoot, "evil.md")
+	mustSymlink(t, filepath.Join(sibling, "secret.md"), link)
+
+	got, err := ResolveKBPath(kbRoot, "evil.md")
+	assertSymlinkEscape(t, err, got, link)
+}
+
+func TestResolversAllowNonexistentWriteTargets(t *testing.T) {
+	kbRoot := t.TempDir()
+	for _, dir := range []string{"notes", filepath.Join("raw", "logs")} {
+		if err := os.MkdirAll(filepath.Join(kbRoot, dir), 0750); err != nil {
+			t.Fatalf("create %s: %v", dir, err)
+		}
+	}
+
+	tests := []struct {
+		name    string
+		resolve func(string, string) (string, error)
+		input   string
+		want    string
+	}{
+		{
+			name:    "new page in an existing directory",
+			resolve: ResolveKBPath,
+			input:   "notes/new-page.md",
+			want:    filepath.Join(kbRoot, "notes", "new-page.md"),
+		},
+		{
+			name:    "new nested tree",
+			resolve: ResolveKBPath,
+			input:   "brand/new/tree/page.md",
+			want:    filepath.Join(kbRoot, "brand", "new", "tree", "page.md"),
+		},
+		{
+			name:    "new raw file",
+			resolve: ResolveRawPath,
+			input:   "logs/app.log",
+			want:    filepath.Join(kbRoot, "raw", "logs", "app.log"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.resolve(kbRoot, tt.input)
+			if err != nil {
+				t.Fatalf("resolver rejected the write target %q: %v", tt.input, err)
+			}
+			if got != tt.want {
+				t.Fatalf("resolver returned %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestResolveKBPathAcceptsBaseReachedThroughASymlink(t *testing.T) {
+	symlinkSupport(t)
+
+	realRoot := filepath.Join(t.TempDir(), "kb")
+	if err := os.MkdirAll(filepath.Join(realRoot, "docs"), 0750); err != nil {
+		t.Fatalf("create docs directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(realRoot, "docs", "readme.md"), []byte("body\n"), 0600); err != nil {
+		t.Fatalf("create readme: %v", err)
+	}
+
+	linkParent := filepath.Join(t.TempDir(), "parent")
+	mustSymlink(t, filepath.Dir(realRoot), linkParent)
+	linkedRoot := filepath.Join(t.TempDir(), "kblink")
+	mustSymlink(t, realRoot, linkedRoot)
+
+	tests := []struct {
+		name   string
+		kbRoot string
+	}{
+		{name: "symlinked parent", kbRoot: filepath.Join(linkParent, filepath.Base(realRoot))},
+		{name: "symlinked base root", kbRoot: linkedRoot},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ResolveKBPath(tt.kbRoot, filepath.Join("docs", "readme.md"))
+			if err != nil {
+				t.Fatalf("ResolveKBPath rejected %q reached through a symlink: %v", tt.kbRoot, err)
+			}
+			if want := filepath.Join(tt.kbRoot, "docs", "readme.md"); got != want {
+				t.Fatalf("ResolveKBPath = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+// symlinkSupport skips a test on a platform where symlinks cannot be created,
+// which is the one capability the containment tests need.
+func symlinkSupport(t *testing.T) {
+	t.Helper()
+
+	dir := t.TempDir()
+	if err := os.Symlink(dir, filepath.Join(dir, "probe")); err != nil {
+		t.Skipf("symlinks are not supported here: %v", err)
+	}
+}
+
+// mustSymlink creates a symlink or fails the test.
+func mustSymlink(t *testing.T, target, link string) {
+	t.Helper()
+
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatalf("symlink %s -> %s: %v", link, target, err)
+	}
+}
+
+// assertSymlinkEscape pins the rejection of a path that leaves the base
+// through the symlink at link: a GuardError matching ErrSymlinkEscape whose
+// message names that link.
+func assertSymlinkEscape(t *testing.T, err error, got, link string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatalf("expected the symlink at %s to be rejected, got %q", link, got)
+	}
+	var guardErr *GuardError
+	if !errors.As(err, &guardErr) {
+		t.Fatalf("expected a GuardError, got %T: %v", err, err)
+	}
+	if !errors.Is(err, ErrSymlinkEscape) {
+		t.Fatalf("expected ErrSymlinkEscape, got %v", err)
+	}
+	if !strings.Contains(err.Error(), link) {
+		t.Errorf("error %q does not name the offending symlink %q", err.Error(), link)
+	}
+}
+
 func TestKBRoot(t *testing.T) {
 	t.Run("reports a directory that holds .akb", func(t *testing.T) {
 		root := t.TempDir()
