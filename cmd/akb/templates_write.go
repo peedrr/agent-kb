@@ -60,6 +60,9 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	}
 
 	templateYAMLPath := filepath.Join(templatesDir, name+".yaml")
+	if err := path.AssertContained(kbRoot, templateYAMLPath); err != nil {
+		return fmt.Errorf("resolve template path: %w", err)
+	}
 	templateExists := false
 	if _, err := os.Stat(templateYAMLPath); err == nil {
 		templateExists = true
@@ -120,6 +123,9 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		}
 	case templateExists:
 		existingPass := filepath.Join(templatesDir, name+"_pass.md")
+		if err := path.AssertContained(kbRoot, existingPass); err != nil {
+			return fmt.Errorf("resolve pass mockup path: %w", err)
+		}
 		passData, err = os.ReadFile(existingPass) //nolint:gosec // known path
 		if err != nil {
 			return fmt.Errorf("read existing pass mockup: %w", err)
@@ -164,6 +170,9 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		}
 	case templateExists:
 		existingFail := filepath.Join(templatesDir, name+"_fail.md")
+		if err := path.AssertContained(kbRoot, existingFail); err != nil {
+			return fmt.Errorf("resolve fail mockup path: %w", err)
+		}
 		failData, err = os.ReadFile(existingFail) //nolint:gosec // known path
 		if err != nil {
 			return fmt.Errorf("read existing fail mockup: %w", err)
@@ -268,6 +277,10 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	finalPass := filepath.Join(targetDir, name+"_pass.md")
 	finalFail := filepath.Join(targetDir, name+"_fail.md")
 
+	// The atomic swap replaces the destination directory entry, so a final*
+	// path that is a symlink is replaced rather than followed and the rename
+	// cannot write through a link. A future switch to writing the files in
+	// place must re-check containment first.
 	if err := os.Rename(tmpYAML, finalYAML); err != nil {
 		return fmt.Errorf("write template file: %w", err)
 	}

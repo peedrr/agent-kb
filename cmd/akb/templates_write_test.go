@@ -488,3 +488,63 @@ validations:
 		t.Errorf("templates outside the base were written: %v", entries)
 	}
 }
+
+// TestTemplatesWrite_RejectsSymlinkedMockup pins that a mockup read back from
+// the templates directory is rejected when it is a symlink out of the base:
+// the outside content is neither validated nor echoed.
+func TestTemplatesWrite_RejectsSymlinkedMockup(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	const outsideSecret = "OUTSIDE_PASS_SECRET"
+	outsidePass := filepath.Join(t.TempDir(), "store_pass.md")
+	outsideContent := "---\ntype: store\ntitle: \"\"\n---\n" + outsideSecret + "\n"
+	if err := os.WriteFile(outsidePass, []byte(outsideContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	templatePath := filepath.Join(kbRoot, "store.yaml")
+	templateBody := `name: store
+description: Stored template
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+`
+	if err := os.WriteFile(templatePath, []byte(templateBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := os.WriteFile(filepath.Join(templatesDir, "store.yaml"), []byte(templateBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, filepath.Join(templatesDir, "store_pass.md"), outsidePass)
+
+	origTemplate, origPass, origFail := twTemplate, twPass, twFail
+	twTemplate, twPass, twFail = templatePath, "", ""
+	t.Cleanup(func() { twTemplate, twPass, twFail = origTemplate, origPass, origFail })
+
+	var runErr error
+	out := captureStdout(t, func() { runErr = runTemplatesWrite(nil, []string{"store"}) })
+
+	assertSymlinkEscape(t, runErr)
+	if strings.Contains(out, outsideSecret) {
+		t.Errorf("outside mockup content reached stdout: %q", out)
+	}
+	if strings.Contains(runErr.Error(), outsideSecret) {
+		t.Errorf("outside mockup content reached the error report: %q", runErr)
+	}
+
+	data, err := os.ReadFile(outsidePass) //nolint:gosec // test reading a known temp file
+	if err != nil {
+		t.Fatalf("read the outside file: %v", err)
+	}
+	if string(data) != outsideContent {
+		t.Errorf("outside file = %q, want it untouched by templates write", string(data))
+	}
+}
