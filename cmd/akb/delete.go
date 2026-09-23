@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -231,9 +230,7 @@ func deletePage(ctx context.Context, kbRoot string, dbConn *sql.DB, relPath, ful
 		fmt.Fprintf(os.Stderr, "warning: failed to log deletion: %v — check that kb/log.md exists\n", err)
 	}
 
-	gitAdd := exec.Command("git", "add", "kb/index.md", "kb/log.md")
-	gitAdd.Dir = kbRoot
-	if err := gitAdd.Run(); err != nil {
+	if err := storage.StageFiles(kbRoot, "kb/index.md", "kb/log.md"); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to stage index.md/log.md for commit: %v\n", err)
 	}
 

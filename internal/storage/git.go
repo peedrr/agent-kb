@@ -334,7 +334,7 @@ func CommitFiles(kbRoot, commitMsg string, paths ...string) error {
 		return fmt.Errorf("git commit: nothing to commit")
 	}
 
-	if err := stagePaths(kbRoot, recorded); err != nil {
+	if err := StageFiles(kbRoot, recorded...); err != nil {
 		return err
 	}
 
@@ -369,9 +369,10 @@ func recordablePaths(kbRoot string, paths []string) ([]string, error) {
 	return recorded, nil
 }
 
-// stagePaths stages the given KB-relative paths, including the deletions of
-// paths that are gone from the worktree.
-func stagePaths(kbRoot string, paths []string) error {
+// StageFiles stages the given KB-relative paths, including the deletions of
+// paths that are gone from the worktree. Like the other git writes, it retries
+// while another process holds the repository index lock.
+func StageFiles(kbRoot string, paths ...string) error {
 	args := append([]string{"add", "-A", "--"}, paths...)
 	_, err := runGit(kbRoot, "git add", args...)
 	return err

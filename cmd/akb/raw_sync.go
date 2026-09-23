@@ -16,7 +16,7 @@ import (
 var rawSyncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Synchronize raw file manifest with filesystem",
-	Long:  `Reconcile the manifest with the actual files on disk. Adds untracked files, updates modified files, and removes missing files from the manifest.`,
+	Long:  `Reconcile the manifest with the actual files on disk. Adds untracked files, updates modified files, and removes missing files from the manifest. The commit records the raw/ pathspec, so raw/ changes another tool staged are included in it by design.`,
 	Example: `  # Sync manifest with filesystem
   akb raw sync`,
 	Args: cobra.NoArgs,
