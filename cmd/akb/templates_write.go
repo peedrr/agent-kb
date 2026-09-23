@@ -376,7 +376,15 @@ func optionalKeysSuppliedByMockup(tmpl *template.Template, fm *frontmatter.Parse
 }
 
 // frontmatterKeyPresent reports whether the parsed frontmatter sets key.
+// Parse routes type and title into dedicated fields instead of Fields, so both
+// are checked before the Fields lookup.
 func frontmatterKeyPresent(fm *frontmatter.ParsedFrontmatter, key string) bool {
+	switch key {
+	case "type":
+		return fm.Type != ""
+	case "title":
+		return fm.Title != ""
+	}
 	_, ok := fm.Fields[key]
 	return ok
 }

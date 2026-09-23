@@ -847,6 +847,40 @@ func TestOptionalKeysSuppliedByMockup(t *testing.T) {
 	}
 }
 
+// TestFrontmatterKeyPresent pins that presence covers the keys Parse routes
+// into dedicated fields: a non-empty type or title counts as present, while
+// every other key is looked up in Fields.
+func TestFrontmatterKeyPresent(t *testing.T) {
+	fm := &frontmatter.ParsedFrontmatter{
+		Type:   "unit",
+		Title:  "Hello",
+		Fields: map[string]any{"summary": "A page"},
+	}
+	empty := &frontmatter.ParsedFrontmatter{Fields: map[string]any{}}
+
+	cases := []struct {
+		name string
+		fm   *frontmatter.ParsedFrontmatter
+		key  string
+		want bool
+	}{
+		{name: "type", fm: fm, key: "type", want: true},
+		{name: "title", fm: fm, key: "title", want: true},
+		{name: "fields key", fm: fm, key: "summary", want: true},
+		{name: "absent key", fm: fm, key: "absent", want: false},
+		{name: "empty type", fm: empty, key: "type", want: false},
+		{name: "empty title", fm: empty, key: "title", want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := frontmatterKeyPresent(tc.fm, tc.key); got != tc.want {
+				t.Errorf("frontmatterKeyPresent(%q) = %v, want %v", tc.key, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestTemplatesWrite_AcceptsSchemaOptionalTitleAndType pins that type and title
 // are never stripped: cel.BuildPage always injects both keys, so a rule reading
 // either holds even when the schema declares it optional.
