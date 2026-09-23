@@ -1,5 +1,13 @@
+# Guard doctrine this template demonstrates:
+#   page.frontmatter.<required> — read UNGUARDED: akb write refuses a page that leaves out a
+#     schema-required field before any rule runs, so the key is always present here.
+#   page.frontmatter.<optional> — ALWAYS guarded with has(): a valid page may omit it.
+#   old_page.* — ALWAYS guarded: nil on create, and the on-disk page may predate the presence
+#     check or never have been written by akb write at all (git pull, index rebuild ingestion).
+#   lint_rules — guard EVERYTHING except type and title: the sweep evaluates pages that never
+#     passed akb write.
 name: adr
-description: Architecture Decision Record
+description: Architecture Decision Record — showcase exercising the full CEL validation surface; copy and adapt
 dir: decisions
 schema:
   frontmatter:
@@ -39,17 +47,41 @@ schema:
       type: string
       required: false
 validations:
-  # CEL Concept: Basic field presence and non-empty check
+  # CEL Concept: Guaranteed key presence (schema-required key, so unguarded)
   - id: require_title
     rule: 'page.frontmatter.title != ""'
     requirement: Title must not be empty
     expect: frontmatter title must be non-empty
 
-  # CEL Concept: List membership / enum validation
+  # CEL Concept: String suffix predicate
+  - id: title_no_period
+    rule: '!page.frontmatter.title.endsWith(".")'
+    requirement: Title must not end with a period
+    expect: title must not end with "."
+
+  # CEL Concept: Regex match plus string size
+  - id: title_style
+    rule: 'page.frontmatter.title.matches("^[A-Z]") && size(page.frontmatter.title) <= 80'
+    requirement: Title must start with a capital letter and stay within 80 characters
+    expect: title must start with an uppercase letter and be at most 80 characters
+
+  # CEL Concept: List membership / enum validation (schema-required key, so unguarded)
   - id: valid_status
-    rule: '!has(page.frontmatter.status) || page.frontmatter.status in ["proposed", "accepted", "deprecated", "superseded"]'
+    rule: 'page.frontmatter.status in ["proposed", "accepted", "deprecated", "superseded"]'
     requirement: Status must be a valid ADR status
     expect: status must be one of proposed, accepted, deprecated, superseded
+
+  # CEL Concept: List size
+  - id: tags_nonempty
+    rule: 'size(page.frontmatter.tags) > 0'
+    requirement: At least one tag is required
+    expect: tags must hold at least one entry
+
+  # CEL Concept: List quantifier with a per-item regex
+  - id: tags_format
+    rule: 'page.frontmatter.tags.all(t, t.matches("^[a-z0-9-]+$"))'
+    requirement: Tags must be lowercase alphanumeric words joined by hyphens
+    expect: every tag must match ^[a-z0-9-]+$
 
   # CEL Concept: AST collection existence check
   - id: require_context
@@ -81,29 +113,53 @@ validations:
     requirement: Must not include H2 'Pros and Cons' section
     expect: page must not have a '## Pros and Cons' heading
 
+  # CEL Concept: Content metric
+  - id: min_word_count
+    rule: 'page.content.word_count >= 50'
+    requirement: Body must carry at least 50 words
+    expect: body must hold at least 50 words
+
+  # CEL Concept: Universal quantifier over AST code blocks
+  - id: code_blocks_have_language
+    rule: 'page.ast.code_blocks.all(c, c.language != "")'
+    requirement: Every fenced code block must declare a language
+    expect: every code block must carry a language tag
+
   # CEL Concept: State machine with old_page / has() guard
   - id: valid_state_transition
-    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.status) || !has(page.frontmatter.status) || old_page.frontmatter.status == page.frontmatter.status || (old_page.frontmatter.status == "proposed" && page.frontmatter.status == "accepted") || (old_page.frontmatter.status == "accepted" && page.frontmatter.status == "deprecated") || (old_page.frontmatter.status == "accepted" && page.frontmatter.status == "superseded")'
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.status) || old_page.frontmatter.status == page.frontmatter.status || (old_page.frontmatter.status == "proposed" && page.frontmatter.status == "accepted") || (old_page.frontmatter.status == "accepted" && page.frontmatter.status == "deprecated") || (old_page.frontmatter.status == "accepted" && page.frontmatter.status == "superseded")'
     requirement: Status transitions must follow the ADR lifecycle
     expect: only proposed->accepted, accepted->deprecated, accepted->superseded transitions are allowed
 
-  # CEL Concept: Conditional requirement / logical implication
-  - id: superseded_requires_field
-    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "superseded" || (has(page.frontmatter.supersedes) && page.frontmatter.supersedes != "")'
-    requirement: When status is superseded, supersedes field must be set
-    expect: superseded ADRs must specify what they supersede
+  # CEL Concept: old_page immutability
+  - id: created_immutable
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.created) || old_page.frontmatter.created == page.frontmatter.created'
+    requirement: Created date must never change
+    expect: created must equal the on-disk page's created date
 
-  # CEL Concept: Cross-reference validation between frontmatter and AST
-  - id: superseded_requires_link
-    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "superseded" || page.ast.links.exists(l, l.is_wikilink && l.target == page.frontmatter.supersedes)'
-    requirement: When status is superseded, body must contain wikilink to superseded ADR
-    expect: superseded ADRs must link to the ADR they supersede
+  # CEL Concept: Cross-field temporal ordering
+  - id: updated_not_before_created
+    rule: 'timestamp(page.frontmatter.updated) >= timestamp(page.frontmatter.created)'
+    requirement: Updated date must not precede the created date
+    expect: updated must be at or after created
 
   # CEL Concept: Temporal comparison with timestamp() and now
   - id: temporal_created
-    rule: '!has(page.frontmatter.created) || timestamp(page.frontmatter.created) <= now'
+    rule: 'timestamp(page.frontmatter.created) <= now'
     requirement: Created date must not be in the future
     expect: created timestamp must be less than or equal to current time
+
+  # CEL Concept: Conditional requirement / logical implication
+  - id: superseded_requires_field
+    rule: 'page.frontmatter.status != "superseded" || (has(page.frontmatter.supersedes) && page.frontmatter.supersedes != "")'
+    requirement: When status is superseded, supersedes field must be set
+    expect: superseded ADRs must specify what they supersede
+
+  # CEL Concept: Conditional prohibition
+  - id: proposed_has_no_supersedes
+    rule: 'page.frontmatter.status != "proposed" || !has(page.frontmatter.supersedes)'
+    requirement: A proposed ADR must not name what it supersedes
+    expect: proposed ADRs must not set supersedes
 lint_rules:
   # CEL Concept: Temporal drift detection (warning)
   - id: adr_stale
@@ -116,3 +172,9 @@ lint_rules:
     rule: '!has(page.frontmatter.status) || page.frontmatter.status != "deprecated" || !has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("720h")'
     severity: error
     expect: Deprecated ADRs must be updated within 30 days
+
+  # CEL Concept: Temporal conditional enforcement (warning)
+  - id: proposed_too_long
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "proposed" || !has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("2160h")'
+    severity: warning
+    expect: Proposed ADRs must be revisited within 90 days

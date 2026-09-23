@@ -1,5 +1,5 @@
 name: note
-description: General knowledge note
+description: General knowledge note — minimal-template counterpoint to the adr showcase
 dir: notes
 schema:
   frontmatter:
