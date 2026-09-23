@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -452,5 +454,187 @@ func TestApproveAllDraftsRejectsSymlinkedPage(t *testing.T) {
 	}
 	if string(data) != outsideContent {
 		t.Errorf("outside file = %q, want it untouched by approve", string(data))
+	}
+}
+
+// gitLogOneline returns the commit subjects of the repository at kbRoot,
+// newest first.
+func gitLogOneline(t *testing.T, kbRoot string) string {
+	t.Helper()
+	cmd := exec.Command( //nolint:gosec // test helper reading the repository log
+		"git", "log", "--oneline")
+	cmd.Dir = kbRoot
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("git log failed: %v", err)
+	}
+	return string(out)
+}
+
+// approveDraftsFixture writes each name as a draft page through akb write and
+// returns the base-relative path of every page. Each body carries an
+// annotation, so an approval is observable on disk as a rewrite that strips the
+// annotation and sets is_draft: false.
+func approveDraftsFixture(t *testing.T, kbRoot string, names ...string) []string {
+	t.Helper()
+
+	paths := make([]string, 0, len(names))
+	for _, name := range names {
+		content := fmt.Sprintf("---\ntype: note\ntitle: %s\nsummary: test\ntags: test\n---\n<!-- olw-auto: action=review -->\nContent of %s.", name, name)
+		if out, err := writeRun(kbRoot, name, content); err != nil {
+			t.Fatalf("write draft %s: %s: %v", name, out, err)
+		}
+
+		relPath := "kb/notes/" + name
+		data, err := os.ReadFile(filepath.Join(kbRoot, filepath.FromSlash(relPath))) //nolint:gosec // test reading a known temp file
+		if err != nil {
+			t.Fatalf("read draft %s: %v", relPath, err)
+		}
+		if !strings.Contains(string(data), "olw-auto") {
+			t.Fatalf("draft %s carries no annotation, so approval is not observable: %s", relPath, string(data))
+		}
+
+		paths = append(paths, relPath)
+	}
+	return paths
+}
+
+// assertPagesUnchanged fails unless every base-relative path still holds the
+// content it held before the batch ran.
+func assertPagesUnchanged(t *testing.T, kbRoot string, before map[string]string) {
+	t.Helper()
+	for relPath, want := range before {
+		data, err := os.ReadFile(filepath.Join(kbRoot, filepath.FromSlash(relPath))) //nolint:gosec // test reading a known temp file
+		if err != nil {
+			t.Fatalf("read %s: %v", relPath, err)
+		}
+		if string(data) != want {
+			t.Errorf("%s was rewritten although the batch failed:\ngot:  %q\nwant: %q", relPath, string(data), want)
+		}
+	}
+}
+
+// snapshotPages reads the content of every base-relative path.
+func snapshotPages(t *testing.T, kbRoot string, relPaths []string) map[string]string {
+	t.Helper()
+
+	pages := make(map[string]string, len(relPaths))
+	for _, relPath := range relPaths {
+		data, err := os.ReadFile(filepath.Join(kbRoot, filepath.FromSlash(relPath))) //nolint:gosec // test reading a known temp file
+		if err != nil {
+			t.Fatalf("read %s: %v", relPath, err)
+		}
+		pages[relPath] = string(data)
+	}
+	return pages
+}
+
+// TestApproveAllDraftsApprovesNothingWhenACandidateFails pins the batch approve
+// as all-or-nothing: when one candidate in the draft set is rejected, no draft
+// is approved and no approval commit lands. The rejected candidate is an
+// escaping symlink that sorts after the drafts, so a walk that approves as it
+// goes would already have rewritten and committed them.
+func TestApproveAllDraftsApprovesNothingWhenACandidateFails(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	before := snapshotPages(t, kbRoot, approveDraftsFixture(t, kbRoot, "alpha.md", "beta.md"))
+
+	const outsideContent = "---\ntype: note\ntitle: Secret\nis_draft: true\n---\ncontent outside the base"
+	outsideFile := filepath.Join(t.TempDir(), "secret.md")
+	if err := os.WriteFile(outsideFile, []byte(outsideContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, filepath.Join(kbRoot, "kb", "zz-evil.md"), outsideFile)
+
+	out, err := approveAllDraftsRun(kbRoot)
+	if err == nil {
+		t.Fatalf("expected approve --all-drafts to reject the symlinked candidate, got: %s", out)
+	}
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("failure %v is not an exit error", err)
+	}
+	if exitErr.ExitCode() != exitFault {
+		t.Errorf("exit code = %d, want %d; output: %s", exitErr.ExitCode(), exitFault, out)
+	}
+
+	assertPagesUnchanged(t, kbRoot, before)
+
+	if log := gitLogOneline(t, kbRoot); strings.Contains(log, "akb: approve") {
+		t.Errorf("git log carries an approval commit although the run failed:\n%s", log)
+	}
+
+	data, err := os.ReadFile(outsideFile) //nolint:gosec // test reading a known temp file
+	if err != nil {
+		t.Fatalf("read the outside file: %v", err)
+	}
+	if string(data) != outsideContent {
+		t.Errorf("outside file = %q, want it untouched by approve", string(data))
+	}
+}
+
+// TestApproveAllDraftsApprovesNothingWhenFrontmatterDoesNotParse pins the other
+// validation the batch runs over its candidates: a page whose frontmatter does
+// not parse fails the run before any draft is approved.
+func TestApproveAllDraftsApprovesNothingWhenFrontmatterDoesNotParse(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	before := snapshotPages(t, kbRoot, approveDraftsFixture(t, kbRoot, "alpha.md"))
+	writeRawPage(t, kbRoot, "kb/zz-broken.md", "---\ntype: [unclosed\n---\nbroken frontmatter")
+
+	out, err := approveAllDraftsRun(kbRoot)
+	if err == nil {
+		t.Fatalf("expected approve --all-drafts to reject the unparseable candidate, got: %s", out)
+	}
+	if !strings.Contains(out, "zz-broken.md") {
+		t.Errorf("output = %q, want it to name the rejected page", out)
+	}
+
+	assertPagesUnchanged(t, kbRoot, before)
+
+	if log := gitLogOneline(t, kbRoot); strings.Contains(log, "akb: approve") {
+		t.Errorf("git log carries an approval commit although the run failed:\n%s", log)
+	}
+}
+
+// TestApproveAllDraftsApprovesEveryValidDraft pins that a draft set which
+// validates fully is still approved page by page: every draft is rewritten with
+// is_draft: false and its annotation stripped, each approval lands its own
+// commit, and the run reports the count.
+func TestApproveAllDraftsApprovesEveryValidDraft(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	paths := approveDraftsFixture(t, kbRoot, "alpha.md", "beta.md")
+
+	out, err := approveAllDraftsRun(kbRoot)
+	if err != nil {
+		t.Fatalf("approve --all-drafts failed: %s: %v", out, err)
+	}
+	if !strings.Contains(out, "Approved 2 drafts") {
+		t.Errorf("output = %q, want the approval count", out)
+	}
+
+	for _, relPath := range paths {
+		data, err := os.ReadFile(filepath.Join(kbRoot, filepath.FromSlash(relPath))) //nolint:gosec // test reading a known temp file
+		if err != nil {
+			t.Fatalf("read %s: %v", relPath, err)
+		}
+		if !strings.Contains(string(data), "is_draft: false") {
+			t.Errorf("%s = %q, want is_draft: false after approval", relPath, string(data))
+		}
+		if strings.Contains(string(data), "olw-auto") {
+			t.Errorf("%s = %q, want the annotation stripped", relPath, string(data))
+		}
+	}
+
+	log := gitLogOneline(t, kbRoot)
+	for _, page := range []string{"notes/alpha.md", "notes/beta.md"} {
+		if !strings.Contains(log, "akb: approve "+page) {
+			t.Errorf("git log is missing the approval commit of %s:\n%s", page, log)
+		}
 	}
 }

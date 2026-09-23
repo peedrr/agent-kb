@@ -175,9 +175,53 @@ func approvePage(ctx context.Context, dbConn *sql.DB, kbRoot, fullPath, inputPat
 	return true, nil
 }
 
+// draftCandidate is a page the batch approve validated and is ready to approve:
+// the page's full path and the base-relative path that names it in the approval
+// commit and in the approval report.
+type draftCandidate struct {
+	fullPath string
+	relPath  string
+}
+
+// approveAllDraftPages approves every draft page of the base in two phases. The
+// first phase collects every draft candidate and validates it, and reports the
+// first failure before anything is approved. Only a candidate set that passed
+// validation reaches the second phase, which approves each candidate through
+// approvePage. A rejected candidate therefore cannot leave the base
+// half-approved with approval commits already landed.
 func approveAllDraftPages(ctx context.Context, dbConn *sql.DB, kbRoot string) error {
-	kbDir := filepath.Join(kbRoot, "kb")
+	candidates, err := collectDraftCandidates(ctx, kbRoot)
+	if err != nil {
+		return err
+	}
+
 	var approvedCount int
+	for _, candidate := range candidates {
+		approved, err := approvePage(ctx, dbConn, kbRoot, candidate.fullPath, candidate.relPath)
+		if err != nil {
+			return err
+		}
+		if approved {
+			approvedCount++
+		}
+	}
+
+	fmt.Printf("Approved %d drafts\n", approvedCount)
+	return nil
+}
+
+// collectDraftCandidates walks the pages of the base and returns the drafts
+// among them, in walk order. Every page it reads must pass the checks the
+// approval of that page relies on: the path stays inside the base once the
+// filesystem follows symlinks, the file is readable, and its frontmatter
+// parses. The first page that fails any check fails the whole collection, so
+// the caller approves nothing and no page is left half-approved. A page that is
+// already approved is not a candidate and is skipped.
+func collectDraftCandidates(ctx context.Context, kbRoot string) ([]draftCandidate, error) {
+	kbDir := filepath.Join(kbRoot, "kb")
+	store := storage.NewGitProvider(kbRoot, noCommit)
+
+	var candidates []draftCandidate
 
 	err := filepath.WalkDir(kbDir, func(fullPath string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -199,19 +243,25 @@ func approveAllDraftPages(ctx context.Context, dbConn *sql.DB, kbRoot string) er
 			return fmt.Errorf("check page path: %w", err)
 		}
 
-		approved, err := approvePage(ctx, dbConn, kbRoot, fullPath, relPath)
+		content, err := store.Read(ctx, fullPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("read page %s: %w", relPath, err)
 		}
-		if approved {
-			approvedCount++
+
+		fm, _, err := frontmatter.Parse(content)
+		if err != nil {
+			return fmt.Errorf("parse frontmatter of %s: %w", relPath, err)
 		}
+		if !frontmatter.IsDraft(fm.Fields) {
+			return nil
+		}
+
+		candidates = append(candidates, draftCandidate{fullPath: fullPath, relPath: relPath})
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("walk kb directory: %w", err)
+		return nil, fmt.Errorf("walk kb directory: %w", err)
 	}
 
-	fmt.Printf("Approved %d drafts\n", approvedCount)
-	return nil
+	return candidates, nil
 }
