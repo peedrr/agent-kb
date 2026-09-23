@@ -816,12 +816,14 @@ title: Hello
 }
 
 // TestOptionalKeysSuppliedByMockup pins that only schema-optional keys the
-// mockup actually sets get a stripped variant, in a stable order.
+// mockup actually sets get a stripped variant, in a stable order, and that
+// type and title never do even when the schema declares them optional.
 func TestOptionalKeysSuppliedByMockup(t *testing.T) {
 	tmpl := template.Template{
 		Name: "unit",
 		Schema: template.Schema{Frontmatter: map[string]template.FieldSchema{
-			"title":  {Type: "string", Required: true},
+			"type":   {Type: "string"},
+			"title":  {Type: "string"},
 			"zeta":   {Type: "string"},
 			"alpha":  {Type: "string"},
 			"absent": {Type: "string"},
@@ -837,6 +839,56 @@ func TestOptionalKeysSuppliedByMockup(t *testing.T) {
 	want := []string{"alpha", "zeta"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("optionalKeysSuppliedByMockup = %v, want %v", got, want)
+	}
+}
+
+// TestTemplatesWrite_AcceptsSchemaOptionalTitleAndType pins that type and title
+// are never stripped: cel.BuildPage always injects both keys, so a rule reading
+// either holds even when the schema declares it optional.
+func TestTemplatesWrite_AcceptsSchemaOptionalTitleAndType(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	writeTemplatesWriteFixture(t, kbRoot, "loose",
+		`name: loose
+description: Template declaring type and title schema-optional
+schema:
+  frontmatter:
+    type:
+      type: string
+      required: false
+    title:
+      type: string
+      required: false
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+  - id: has_type
+    rule: 'page.frontmatter.type != ""'
+    expect: type must not be empty
+`,
+		`---
+type: loose
+title: Hello
+---
+# Hello
+`,
+		`---
+type: loose
+title: ""
+---
+# Empty
+`)
+
+	if err := runTemplatesWrite(nil, []string{"loose"}); err != nil {
+		t.Fatalf("expected success, got error: %v", err)
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"loose.yaml", "loose_pass.md", "loose_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); os.IsNotExist(err) {
+			t.Errorf("expected file %s to exist", f)
+		}
 	}
 }
 

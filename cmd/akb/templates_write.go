@@ -348,10 +348,15 @@ func evaluateValidations(env *gocel.Env, rules []template.ValidationRule, page, 
 }
 
 // optionalKeysSuppliedByMockup returns the schema-optional frontmatter keys the
-// mockup sets, sorted for a stable evaluation order.
+// mockup sets, sorted for a stable evaluation order. type and title are never
+// enumerated: cel.BuildPage always injects both keys, so removing them cannot
+// produce an absent-key variant.
 func optionalKeysSuppliedByMockup(tmpl *template.Template, fm *frontmatter.ParsedFrontmatter) []string {
 	var keys []string
 	for key, field := range tmpl.Schema.Frontmatter {
+		if key == "type" || key == "title" {
+			continue
+		}
 		if field.Required || !frontmatterKeyPresent(fm, key) {
 			continue
 		}
@@ -361,18 +366,10 @@ func optionalKeysSuppliedByMockup(tmpl *template.Template, fm *frontmatter.Parse
 	return keys
 }
 
-// frontmatterKeyPresent reports whether the parsed frontmatter sets key. The
-// type and title fields live outside the generic field map.
+// frontmatterKeyPresent reports whether the parsed frontmatter sets key.
 func frontmatterKeyPresent(fm *frontmatter.ParsedFrontmatter, key string) bool {
-	switch key {
-	case "type":
-		return fm.Type != ""
-	case "title":
-		return fm.Title != ""
-	default:
-		_, ok := fm.Fields[key]
-		return ok
-	}
+	_, ok := fm.Fields[key]
+	return ok
 }
 
 // withoutFrontmatterKey returns a copy of fm with key removed, so the mockup
@@ -387,12 +384,6 @@ func withoutFrontmatterKey(fm *frontmatter.ParsedFrontmatter, key string) *front
 		if k != key {
 			stripped.Fields[k] = v
 		}
-	}
-	switch key {
-	case "type":
-		stripped.Type = ""
-	case "title":
-		stripped.Title = ""
 	}
 	return stripped
 }
