@@ -465,8 +465,9 @@ func runWrite(_ *cobra.Command, args []string) error {
 				oldPage, err = cel.BuildOldPage(relPath, store)
 				if err != nil {
 					// On-disk page state that does not parse is a page error the
-					// caller can act on, not an akb fault.
-					return err
+					// caller can act on, not an akb fault; the wrap keeps that
+					// classification while satisfying wrapcheck.
+					return fmt.Errorf("build old_page: %w", err)
 				}
 			}
 
