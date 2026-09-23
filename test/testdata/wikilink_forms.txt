@@ -1,0 +1,193 @@
+# Wikilink Forms — all four forms through write, links, and lint
+
+# A wikilink has two readers: CEL builds `page.ast.links` at write time, and the
+# link graph records a row per target when the page is indexed. Both must report
+# the same target for every form. The probe template carries one rule — the body
+# must link the target named by `expect_target` — so a page writes only when CEL
+# read the target the link graph is about to record.
+
+# --- Setup ---
+
+exec akb init wk-kb
+cd wk-kb
+
+# init seeds no templates: copy the note template for the linked-to page, and
+# the probe template whose rule pins the CEL view of a wikilink target.
+exec akb template get note --full --examples
+cp stdout .akb/templates/note.yaml
+cp ../probe-template.yaml .akb/templates/probe.yaml
+exec git add .akb/templates
+exec git commit -m 'seed note and probe templates'
+
+stdin ../target-note.md
+exec akb write notes/probe-target.md
+stdout 'Written to kb/notes/probe-target.md'
+
+# --- FORM 1: [[target]] — target and display are both "probe-target" ---
+
+stdin ../plain.md
+exec akb write probes/plain.md
+stdout 'Written to kb/probes/plain.md'
+
+exec akb links probes/plain.md
+stdout 'Outbound:'
+stdout '  probe-target -> kb/notes/probe-target.md'
+stdout 'Broken:'
+
+# --- FORM 2: [[target|display]] — the pipe display is never the target ---
+
+stdin ../display.md
+exec akb write probes/display.md
+stdout 'Written to kb/probes/display.md'
+
+exec akb links probes/display.md
+stdout '  probe-target -> kb/notes/probe-target.md'
+
+# --- FORM 3: [[target#heading]] — the heading is never the target ---
+
+stdin ../heading.md
+exec akb write probes/heading.md
+stdout 'Written to kb/probes/heading.md'
+
+exec akb links probes/heading.md
+stdout '  probe-target -> kb/notes/probe-target.md'
+
+# --- FORM 4: [[display]](dest) — the destination beats the bracket label ---
+
+# CEL reports the destination as written (notes/probe-target.md); the link
+# graph stores the normalized destination (notes/probe-target) and resolves it
+# to the same page.
+stdin ../explicit.md
+exec akb write probes/explicit.md
+stdout 'Written to kb/probes/explicit.md'
+
+exec akb links probes/explicit.md
+stdout '  notes/probe-target -> kb/notes/probe-target.md'
+
+# --- CEL refuses a declared target the body does not link ---
+
+stdin ../mismatch.md
+! exec akb write probes/mismatch.md
+stderr 'link_target_matches_expect_target'
+stderr 'body must link the target named by expect_target'
+! exists kb/probes/mismatch.md
+
+# --- LINT: the four forms leave no broken link behind ---
+
+# Every issue here is a warning (orphans, index_consistency), so lint still
+# exits 0 — what matters is that no broken_links issue is among them.
+exec akb lint
+! stdout 'broken_links'
+
+# --- LINT: the target CEL matched is the target lint reports broken ---
+
+stdin ../broken.md
+exec akb write probes/broken.md
+stdout 'Written to kb/probes/broken.md'
+
+exec akb links probes/broken.md
+stdout 'Broken:'
+stdout '  missing-target'
+
+! exec akb lint
+stdout 'broken_links'
+stdout 'broken link to \[\[missing-target\]\]'
+
+-- probe-template.yaml --
+name: probe
+description: Wikilink probe — one rule pinning the CEL view of a wikilink target
+dir: probes
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    type:
+      type: string
+      required: true
+    expect_target:
+      type: string
+      required: true
+validations:
+  - id: link_target_matches_expect_target
+    rule: 'page.ast.links.exists(l, l.is_wikilink && l.target == page.frontmatter.expect_target)'
+    requirement: The body must link the target named by expect_target
+    expect: body must link the target named by expect_target
+
+-- target-note.md --
+---
+type: note
+title: Probe Target
+summary: The page every wikilink form resolves to
+---
+
+# Probe Target
+
+A page for the four wikilink forms to resolve to.
+
+-- plain.md --
+---
+type: probe
+title: Plain wikilink
+expect_target: probe-target
+---
+
+# Plain wikilink
+
+The bare form links [[probe-target]] by name.
+
+-- display.md --
+---
+type: probe
+title: Display wikilink
+expect_target: probe-target
+---
+
+# Display wikilink
+
+The piped form links [[probe-target|Probe Target]] and names its own display text.
+
+-- heading.md --
+---
+type: probe
+title: Heading wikilink
+expect_target: probe-target
+---
+
+# Heading wikilink
+
+The heading form links [[probe-target#Rationale]] and names its own heading.
+
+-- explicit.md --
+---
+type: probe
+title: Explicit destination wikilink
+expect_target: notes/probe-target.md
+---
+
+# Explicit destination wikilink
+
+The explicit-destination form links [[Probe Target]](notes/probe-target.md): the
+bracket carries the label, the parens carry the destination.
+
+-- mismatch.md --
+---
+type: probe
+title: Mismatched target
+expect_target: some-other-target
+---
+
+# Mismatched target
+
+The link and the declared target disagree: [[probe-target]].
+
+-- broken.md --
+---
+type: probe
+title: Broken wikilink
+expect_target: missing-target
+---
+
+# Broken wikilink
+
+The link has no page behind it: [[missing-target]].
