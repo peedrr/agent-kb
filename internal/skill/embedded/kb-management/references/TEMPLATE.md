@@ -82,7 +82,7 @@ Every rule that reads an optional frontmatter key must guard the access with `ha
 
 `akb template write` proves the pass mockup three ways: as given, once with each schema-optional key the mockup supplies removed, and once with `old_page` set to the mockup itself (a no-op update). A rule that only works at create time fails the write instead of the first real page.
 
-**Known limit:** the stripped variants enumerate schema-declared optional keys only. A rule reading an **undeclared** key is not caught by them — deliberately, because an undeclared-but-guarded read is a legitimate pattern (open frontmatter, cross-cutting convention fields). An unguarded read of an undeclared key fails loudly and precisely at first use: exit 1 at write time naming the rule, and a `cel_lint` issue at sweep time.
+**Known limit:** the stripped variants enumerate schema-declared optional keys only. A rule reading an **undeclared** key is not caught by them — deliberately, because an undeclared-but-guarded read is a legitimate pattern (open frontmatter, cross-cutting convention fields). An unguarded read of an undeclared key fails loudly and precisely at first use: exit 1 at write time naming the rule. The lint sweep evaluates only template `lint_rules`, so the same read surfaces as a `cel_lint` issue at sweep time only when it appears in a `lint_rules` entry.
 
 ## Workflow: Create a New Template
 
