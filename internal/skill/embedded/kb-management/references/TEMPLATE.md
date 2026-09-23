@@ -74,11 +74,28 @@ Key variables:
 Inspectable fields:
 - `page.frontmatter.<field>` — frontmatter values
 - `page.ast.headings` — list of `{level, text, line}`
-- `page.ast.links` — list of `{target, text, is_wikilink, line}`
+- `page.ast.links` — list of `{target, text, is_wikilink, line}`; `is_wikilink` is true for every wikilink form
 - `page.ast.code_blocks` — list of `{language, line}`
 - `page.content.word_count`, `page.content.char_count`
 
 Any frontmatter string that parses as RFC3339 or a date-only `2006-01-02` is auto-converted to a timestamp for CEL `timestamp()` and duration math.
+
+### Wikilinks in `page.ast.links`
+
+`is_wikilink` is true for all four wikilink forms, so a rule can inspect KB links without catching plain markdown links:
+
+| Form | `target` | `text` |
+|------|----------|--------|
+| `[[target]]` | `target` | `target` |
+| `[[target\|display]]` | `target` | `display` |
+| `[[target#heading]]` | `target` | `heading` |
+| `[[display]](dest)` | `dest` as written | `[display]` |
+
+- **Adjacency:** the explicit-destination form needs `(` immediately after `]]`, with no whitespace. `[[Paris]] (the city)` stays a plain wikilink.
+- **Precedence:** the destination beats the bracket label — `[[a|b]](concepts/a.md)` has target `concepts/a.md` and display `b`. A `#heading` in the bracket part is discarded when a destination is present.
+- **Normalization:** the destination a page is *resolved* through is normalized — surrounding whitespace and angle brackets, a leading `./`, and a trailing `.md` are stripped — so `[[Paris]](concepts/paris.md)` resolves to `concepts/paris`. The CEL `target` is not that normalized value: it is the destination as written (`concepts/paris.md` keeps its `.md`), and for this form `text` is the rendered link label `[Paris]`.
+- **Empty destinations:** `[[g]]()`, `[[g]](   )`, and `[[g]](<>)` are plain wikilinks whose target is the bracket target.
+- Every wikilink yields exactly one entry, so `.all()` and `.exists()` over `page.ast.links` see each token once.
 
 ### Guarding frontmatter reads with has()
 

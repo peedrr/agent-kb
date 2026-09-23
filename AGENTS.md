@@ -152,7 +152,7 @@ nix develop                     # Dev shell (Go, gopls, delve, golangci-lint)
 ## NOTES
 
 - WIP: APIs may change between commits
-- Wikilink resolution: exact → namespace prefix → basename match
+- Wikilink resolution: exact → namespace prefix → basename match; `[[display]](dest)` is the explicit-destination form (bracket = label, paren = destination, which wins) and its `dest` is normalized — surrounding whitespace and angle brackets, a leading `./`, and a trailing `.md` are stripped — before resolving
 - FTS5 query escaping strips FTS5 operators (OR, AND, NOT) and special chars
 - Templates embedded in binary via `//go:embed embedded/*` (includes `.yaml` + `_pass.md` + `_fail.md`)
 - Skills embedded in binary via `//go:embed embedded/*`
