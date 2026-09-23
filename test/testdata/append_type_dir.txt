@@ -1,0 +1,58 @@
+# Appending to a page stored under the directory of its type
+
+# A page is addressed either by the path it is stored at or by its bare
+# filename, which resolves under the directory of its type. Both append paths
+# accept either form, and a page that is nowhere keeps the not-found report of
+# the command that ran.
+
+exec akb init type-dir-kb
+cd type-dir-kb
+
+stdin ../note-input.md
+exec akb write type-dir-note.md
+stdout 'Written to kb/notes/type-dir-note.md'
+
+# akb append resolves the bare filename through the type directory
+stdin ../first-appendix.txt
+exec akb append type-dir-note.md
+stdout 'Appended to kb/notes/type-dir-note.md'
+
+# akb write --append resolves it the same way
+stdin ../second-appendix.txt
+exec akb write --append type-dir-note.md
+stdout 'Appended to kb/notes/type-dir-note.md'
+
+exec akb read notes/type-dir-note.md
+stdout 'First appended line.'
+stdout 'Second appended line.'
+
+# The page was addressed by its bare filename and stays where it was
+exists kb/notes/type-dir-note.md
+! exists kb/type-dir-note.md
+
+# An absent page keeps each command's own not-found report
+stdin ../first-appendix.txt
+! exec akb append absent-note.md
+stderr 'page not found: absent-note.md. Use .akb write. to create'
+
+stdin ../first-appendix.txt
+! exec akb write --append absent-note.md
+stderr 'page does not exist; use .akb write. without --append to create'
+
+! exists kb/notes/absent-note.md
+! exists kb/absent-note.md
+
+-- note-input.md --
+---
+type: note
+title: Bare Name Note
+summary: Note addressed by its bare filename
+tags: test
+---
+Bare name note body.
+
+-- first-appendix.txt --
+First appended line.
+
+-- second-appendix.txt --
+Second appended line.

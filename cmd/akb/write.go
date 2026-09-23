@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -161,12 +162,6 @@ func runWrite(_ *cobra.Command, args []string) error {
 			return &usageError{msg: "cannot write log.md; it is a managed file"}
 		}
 
-		// Reject .. and absolute paths via ResolveKBPath
-		fullPath, err = path.ResolveKBPath(kbRoot, inputPath)
-		if err != nil {
-			return fmt.Errorf("resolve path: %w", err)
-		}
-
 		// Hold the repository lock from the read of the existing page through the
 		// commit and the search and link-graph updates that follow it: the update
 		// is assembled from the page as it is at commit time, so concurrent
@@ -177,29 +172,13 @@ func runWrite(_ *cobra.Command, args []string) error {
 		}
 		defer pageLock.Release()
 
-		// Try to find the existing file
-		candidates := []string{fullPath}
-		for _, tmpl := range templates {
-			if tmpl.Dir != "" {
-				candidates = append(candidates, filepath.Join(kbRoot, "kb", tmpl.Dir, cleanPath))
-			}
-		}
-
 		var existingContent []byte
-		var found bool
-		for _, candidate := range candidates {
-			if err := path.AssertContained(kbRoot, candidate); err != nil {
-				return fmt.Errorf("resolve path: %w", err)
+		fullPath, relPath, existingContent, err = resolveExistingPage(kbRoot, inputPath, typeDirsFromTemplates(templates))
+		if err != nil {
+			if errors.Is(err, errPageNotFound) {
+				return fmt.Errorf("page does not exist; use 'akb write' without --frontmatter to create")
 			}
-			existingContent, err = os.ReadFile(candidate) //nolint:gosec // candidate is checked against the KB root by AssertContained above
-			if err == nil {
-				fullPath = candidate
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("page does not exist; use 'akb write' without --frontmatter to create")
+			return err
 		}
 
 		fm, body, err = frontmatter.Parse(existingContent)
@@ -213,9 +192,6 @@ func runWrite(_ *cobra.Command, args []string) error {
 		if err := frontmatter.ValidateTitle(fm); err != nil {
 			return fmt.Errorf("validate title: %w", err)
 		}
-
-		// Compute relative path for output and indexing
-		relPath = filepath.ToSlash(strings.TrimPrefix(fullPath, kbRoot+string(filepath.Separator)))
 
 		// Build old_page from pre-modification state
 		oldPage, err = cel.BuildOldPage(relPath, store)
@@ -310,12 +286,6 @@ func runWrite(_ *cobra.Command, args []string) error {
 				return &usageError{msg: "cannot write log.md; it is a managed file"}
 			}
 
-			// Reject .. and absolute paths via ResolveKBPath
-			fullPath, err = path.ResolveKBPath(kbRoot, inputPath)
-			if err != nil {
-				return fmt.Errorf("resolve path: %w", err)
-			}
-
 			// Hold the repository lock from the read of the existing page through
 			// the commit and the search and link-graph updates that follow it, so
 			// concurrent appends cannot overwrite each other's content.
@@ -325,13 +295,13 @@ func runWrite(_ *cobra.Command, args []string) error {
 			}
 			defer pageLock.Release()
 
-			if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-				return fmt.Errorf("page does not exist; use 'akb write' without --append to create")
-			}
-
-			existingContent, err := os.ReadFile(fullPath) //nolint:gosec // fullPath is resolved by ResolveKBPath, which rejects paths outside the KB root
+			var existingContent []byte
+			fullPath, relPath, existingContent, err = resolveExistingPage(kbRoot, inputPath, typeDirsFromTemplates(templates))
 			if err != nil {
-				return fmt.Errorf("read existing page: %w", err)
+				if errors.Is(err, errPageNotFound) {
+					return fmt.Errorf("page does not exist; use 'akb write' without --append to create")
+				}
+				return err
 			}
 
 			fm, body, err = frontmatter.Parse(existingContent)
@@ -348,9 +318,6 @@ func runWrite(_ *cobra.Command, args []string) error {
 			if err := frontmatter.ValidateTitle(fm); err != nil {
 				return fmt.Errorf("validate title: %w", err)
 			}
-
-			// Compute relative path
-			relPath = filepath.ToSlash(filepath.Join("kb", cleanPath))
 
 			// Build old_page from pre-modification state
 			oldPage, err = cel.BuildOldPage(relPath, store)
@@ -479,6 +446,17 @@ func runWrite(_ *cobra.Command, args []string) error {
 			// existing page always gets a fresh `updated`, while a new page only
 			// defaults it and keeps an explicit value from stdin.
 			_, statErr := os.Stat(fullPath)
+
+			// old_page is nil only when the page does not exist yet. An overwrite
+			// is built from the on-disk page before the update time moves on, so
+			// a rule comparing old_page against page sees the pre-write state.
+			if statErr == nil {
+				oldPage, err = cel.BuildOldPage(relPath, store)
+				if err != nil {
+					return &internalError{err: fmt.Errorf("CEL engine error: %w", err)}
+				}
+			}
+
 			_, hasUpdated := fm.Fields["updated"]
 			if statErr == nil || !hasUpdated {
 				fm.Fields["updated"] = time.Now().UTC().Format(time.RFC3339)
@@ -499,9 +477,6 @@ func runWrite(_ *cobra.Command, args []string) error {
 				}
 				writeContent = []byte("---\n" + string(yamlBytes) + "---\n" + string(body))
 			}
-
-			// old_page is nil for new stdin writes
-			oldPage = nil
 		}
 	}
 

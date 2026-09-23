@@ -543,3 +543,57 @@ func TestAppendLinkFailureRollsBackSearchIndex(t *testing.T) {
 		t.Errorf("appended link rows after the failed link step = %d, want 0", got)
 	}
 }
+
+// TestAppendBareFilenameReachesTypeDir pins that akb append addresses a page
+// stored under the directory of its type by its bare filename, and reports it
+// by its stored path.
+func TestAppendBareFilenameReachesTypeDir(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	const relPath = "kb/notes/bare-name.md"
+	content := "---\ntype: note\ntitle: Bare Name\nsummary: test\ntags: test\n---\nOriginal body."
+	writePageForAppend(t, kbRoot, "bare-name.md", content)
+
+	out, err := appendRun(kbRoot, "bare-name.md", "Appended body.")
+	if err != nil {
+		t.Fatalf("akb append by bare filename failed: %s: %v", out, err)
+	}
+	if !strings.Contains(out, "Appended to "+relPath) {
+		t.Errorf("output = %q, want the page reported by its stored path", out)
+	}
+
+	data, err := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "bare-name.md")) //nolint:gosec // test reading known temp file
+	if err != nil {
+		t.Fatalf("read written file: %v", err)
+	}
+	if !strings.Contains(string(data), "Appended body.") {
+		t.Errorf("page = %q, want the appended content", string(data))
+	}
+	if _, statErr := os.Stat(filepath.Join(kbRoot, "kb", "bare-name.md")); !os.IsNotExist(statErr) {
+		t.Errorf("the append reached a second page at the KB root: %v", statErr)
+	}
+
+	indexed, ok := searchDBDocumentBody(t, kbRoot, relPath)
+	if !ok {
+		t.Fatalf("expected the appended page indexed at %s", relPath)
+	}
+	if !strings.Contains(indexed, "Appended body.") {
+		t.Errorf("indexed body = %q, want the appended content", indexed)
+	}
+}
+
+// TestAppendBareFilenameNotFound pins the not-found report for a page that is
+// under no type directory.
+func TestAppendBareFilenameNotFound(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	out, err := appendRun(kbRoot, "absent-note.md", "Some content.")
+	if err == nil {
+		t.Fatalf("expected the append of an absent page to fail, got: %s", out)
+	}
+	if want := "page not found: absent-note.md. Use `akb write` to create"; !strings.Contains(out, want) {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+}

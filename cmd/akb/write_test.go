@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -861,6 +862,87 @@ validations:
 	assertRecentTimestamp(t, frontmatterString(t, fm, "updated"))
 }
 
+// TestWriteOverwriteCELOldPageSeesOnDiskState pins that a full stdin overwrite
+// hands a write-time CEL rule the page as it is on disk: a rule comparing
+// old_page against page sees the pre-overwrite value instead of null.
+func TestWriteOverwriteCELOldPageSeesOnDiskState(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	tmplData := `name: approval
+description: old_page state probe
+dir: approvals
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: approval_advances
+    rule: 'old_page != null && old_page.frontmatter.status == "draft" && page.frontmatter.status == "accepted"'
+    expect: status must move from the on-disk draft to accepted
+`
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "approval.yaml"), []byte(tmplData), 0600); err != nil {
+		t.Fatalf("write probe template: %v", err)
+	}
+
+	writeRawPage(t, kbRoot, "kb/approvals/probe.md",
+		"---\ntype: approval\ntitle: Probe\nstatus: draft\n---\nDraft body.")
+
+	accepted := "---\ntype: approval\ntitle: Probe\nstatus: accepted\n---\nAccepted body."
+	if out, err := writeRun(kbRoot, "approvals/probe.md", accepted); err != nil {
+		t.Fatalf("overwriting a draft page failed under the old_page state rule: %s: %v", out, err)
+	}
+
+	// The page on disk is accepted now, so the same overwrite no longer finds a
+	// draft in old_page and the rule fails.
+	out, err := writeRun(kbRoot, "approvals/probe.md", accepted)
+	if err == nil {
+		t.Fatalf("expected the second overwrite to fail the old_page state rule, got: %s", out)
+	}
+	if !strings.Contains(out, "status must move from the on-disk draft to accepted") {
+		t.Errorf("output = %q, want the failed rule report", out)
+	}
+}
+
+// TestWriteNewPageCELOldPageIsNull pins that a page akb write creates sees a
+// null old_page, while overwriting that page does not.
+func TestWriteNewPageCELOldPageIsNull(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	tmplData := `name: newest
+description: old_page absence probe
+dir: newest
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: page_is_new
+    rule: 'old_page == null'
+    expect: old_page must be null for a page that does not exist yet
+`
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "newest.yaml"), []byte(tmplData), 0600); err != nil {
+		t.Fatalf("write probe template: %v", err)
+	}
+
+	content := "---\ntype: newest\ntitle: Newest\nsummary: test\ntags: test\n---\nBody."
+	if out, err := writeRun(kbRoot, "newest/probe.md", content); err != nil {
+		t.Fatalf("akb write of a new page failed under the old_page absence rule: %s: %v", out, err)
+	}
+
+	overwrite := "---\ntype: newest\ntitle: Newest\nsummary: test\ntags: test\n---\nOverwritten body."
+	out, err := writeRun(kbRoot, "newest/probe.md", overwrite)
+	if err == nil {
+		t.Fatalf("expected the overwrite to fail the old_page absence rule, got: %s", out)
+	}
+	if !strings.Contains(out, "old_page must be null for a page that does not exist yet") {
+		t.Errorf("output = %q, want the failed rule report", out)
+	}
+}
+
 func TestApproveDoesNotBumpUpdated(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)
@@ -1317,6 +1399,274 @@ func TestInTreeSymlinksStillWork(t *testing.T) {
 		}
 		if _, err := os.Stat(filepath.Join(kbRoot, "kb", "real-notes", "aliased.md")); err != nil {
 			t.Errorf("expected the page behind the alias, got: %v", err)
+		}
+	})
+}
+
+// resolvePageFixture lays out a page fixture: a KB root holding the pages given
+// as KB-relative paths, so a test can drive page resolution without the CLI.
+func resolvePageFixture(t *testing.T, pages map[string]string) string {
+	t.Helper()
+
+	kbRoot := t.TempDir()
+	for relPath, content := range pages {
+		fullPath := filepath.Join(kbRoot, filepath.FromSlash(relPath))
+		if err := os.MkdirAll(filepath.Dir(fullPath), 0750); err != nil {
+			t.Fatalf("create directory for %s: %v", relPath, err)
+		}
+		if err := os.WriteFile(fullPath, []byte(content), 0600); err != nil {
+			t.Fatalf("write page %s: %v", relPath, err)
+		}
+	}
+	return kbRoot
+}
+
+// typeDirProviderStub supplies fixed type directories, for tests that drive the
+// candidate order of page resolution directly.
+func typeDirProviderStub(dirs ...string) typeDirsProvider {
+	return func() ([]string, error) { return dirs, nil }
+}
+
+// TestResolveExistingPageCandidateOrder pins where the shared page resolution
+// looks for a page: the path the input names first, then the type directories
+// in ascending order, and the first readable candidate wins.
+func TestResolveExistingPageCandidateOrder(t *testing.T) {
+	const (
+		baseBody      = "---\ntype: note\ntitle: Base\n---\nbase body"
+		notesBody     = "---\ntype: note\ntitle: Notes\n---\nnotes body"
+		decisionsBody = "---\ntype: adr\ntitle: Decisions\n---\ndecisions body"
+	)
+
+	cases := []struct {
+		name        string
+		pages       map[string]string
+		inputPath   string
+		dirs        []string
+		wantPath    string
+		wantRelPath string
+		wantContent string
+	}{
+		{
+			name:        "the named path wins over a type directory",
+			pages:       map[string]string{"kb/shared.md": baseBody, "kb/notes/shared.md": notesBody},
+			inputPath:   "shared.md",
+			dirs:        []string{"notes"},
+			wantPath:    "kb/shared.md",
+			wantRelPath: "kb/shared.md",
+			wantContent: baseBody,
+		},
+		{
+			name:        "the type directory holds a page addressed by its filename",
+			pages:       map[string]string{"kb/notes/shared.md": notesBody},
+			inputPath:   "shared.md",
+			dirs:        []string{"notes"},
+			wantPath:    "kb/notes/shared.md",
+			wantRelPath: "kb/notes/shared.md",
+			wantContent: notesBody,
+		},
+		{
+			name:        "type directories are tried in ascending order",
+			pages:       map[string]string{"kb/notes/shared.md": notesBody, "kb/decisions/shared.md": decisionsBody},
+			inputPath:   "shared.md",
+			dirs:        []string{"notes", "decisions"},
+			wantPath:    "kb/decisions/shared.md",
+			wantRelPath: "kb/decisions/shared.md",
+			wantContent: decisionsBody,
+		},
+		{
+			name:        "a type directory that holds no page is passed over",
+			pages:       map[string]string{"kb/notes/shared.md": notesBody},
+			inputPath:   "shared.md",
+			dirs:        []string{"decisions", "notes"},
+			wantPath:    "kb/notes/shared.md",
+			wantRelPath: "kb/notes/shared.md",
+			wantContent: notesBody,
+		},
+		{
+			name:        "a named path with a directory keeps that directory",
+			pages:       map[string]string{"kb/notes/shared.md": notesBody},
+			inputPath:   "notes/shared.md",
+			dirs:        []string{"notes"},
+			wantPath:    "kb/notes/shared.md",
+			wantRelPath: "kb/notes/shared.md",
+			wantContent: notesBody,
+		},
+		{
+			name:        "the kb prefix of the input does not change the candidates",
+			pages:       map[string]string{"kb/notes/shared.md": notesBody},
+			inputPath:   "kb/shared.md",
+			dirs:        []string{"notes"},
+			wantPath:    "kb/notes/shared.md",
+			wantRelPath: "kb/notes/shared.md",
+			wantContent: notesBody,
+		},
+		{
+			name:        "without a type directory the named path is the only candidate",
+			pages:       map[string]string{"kb/shared.md": baseBody},
+			inputPath:   "shared.md",
+			dirs:        nil,
+			wantPath:    "kb/shared.md",
+			wantRelPath: "kb/shared.md",
+			wantContent: baseBody,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			kbRoot := resolvePageFixture(t, tc.pages)
+
+			fullPath, relPath, content, err := resolveExistingPage(kbRoot, tc.inputPath, typeDirProviderStub(tc.dirs...))
+			if err != nil {
+				t.Fatalf("resolve %q: %v", tc.inputPath, err)
+			}
+
+			if want := filepath.Join(kbRoot, filepath.FromSlash(tc.wantPath)); fullPath != want {
+				t.Errorf("path = %q, want %q", fullPath, want)
+			}
+			if relPath != tc.wantRelPath {
+				t.Errorf("relative path = %q, want %q", relPath, tc.wantRelPath)
+			}
+			if string(content) != tc.wantContent {
+				t.Errorf("content = %q, want %q", string(content), tc.wantContent)
+			}
+		})
+	}
+}
+
+// TestResolveExistingPageReportsAbsentPage pins that a page no candidate holds
+// reports the not-found sentinel rather than an error.
+func TestResolveExistingPageReportsAbsentPage(t *testing.T) {
+	kbRoot := resolvePageFixture(t, map[string]string{"kb/notes/other.md": "---\ntype: note\ntitle: Other\n---\nbody"})
+
+	_, _, _, err := resolveExistingPage(kbRoot, "missing.md", typeDirProviderStub("notes", "decisions"))
+	if !errors.Is(err, errPageNotFound) {
+		t.Errorf("resolve of an absent page = %v, want errPageNotFound", err)
+	}
+}
+
+// TestResolveExistingPageRejectsEscapingTypeDir pins that a type directory
+// candidate is checked against the KB root before the page below it is read.
+func TestResolveExistingPageRejectsEscapingTypeDir(t *testing.T) {
+	kbRoot := resolvePageFixture(t, map[string]string{"kb/keep.md": "---\ntype: note\ntitle: Keep\n---\nbody"})
+
+	outsideDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outsideDir, "escape.md"), []byte("---\ntype: note\ntitle: Outside\n---\noutside body"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, filepath.Join(kbRoot, "kb", "notes"), outsideDir)
+
+	_, _, _, err := resolveExistingPage(kbRoot, "escape.md", typeDirProviderStub("notes"))
+	assertSymlinkEscape(t, err)
+}
+
+// TestTypeDirsFromTemplates pins the directories the provider reads from loaded
+// templates: one per template that declares one.
+func TestTypeDirsFromTemplates(t *testing.T) {
+	templates := map[string]template.Template{
+		"note": {Name: "note", Dir: "notes"},
+		"adr":  {Name: "adr", Dir: "decisions"},
+		"sink": {Name: "sink"},
+	}
+
+	dirs, err := typeDirsFromTemplates(templates)()
+	if err != nil {
+		t.Fatalf("type dirs of the loaded templates: %v", err)
+	}
+
+	sort.Strings(dirs)
+	if got := strings.Join(dirs, ","); got != "decisions,notes" {
+		t.Errorf("type dirs = %q, want %q", got, "decisions,notes")
+	}
+}
+
+// TestWriteNotFoundMessages pins the not-found report each branch of akb write
+// gives for a page that is under no type directory, byte for byte.
+func TestWriteNotFoundMessages(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "frontmatter update",
+			args: []string{"--frontmatter", "title=Updated"},
+			want: "page does not exist; use 'akb write' without --frontmatter to create",
+		},
+		{
+			name: "append",
+			args: []string{"--append"},
+			want: "page does not exist; use 'akb write' without --append to create",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			kbRoot := writeSetupTestKB(t)
+			defer writeCleanup(kbRoot)
+
+			out, err := writeRun(kbRoot, "absent-note.md", "Appended body.", tc.args...)
+			if err == nil {
+				t.Fatalf("expected the update of an absent page to fail, got: %s", out)
+			}
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("output = %q, want %q", out, tc.want)
+			}
+			if _, statErr := os.Stat(filepath.Join(kbRoot, "kb", "notes", "absent-note.md")); !os.IsNotExist(statErr) {
+				t.Errorf("the failed command created a page: %v", statErr)
+			}
+		})
+	}
+}
+
+// TestWriteBareFilenameReachesTypeDir pins that both update branches of akb
+// write address a page stored under the directory of its type by its bare
+// filename, and report it by its stored path.
+func TestWriteBareFilenameReachesTypeDir(t *testing.T) {
+	t.Run("frontmatter update", func(t *testing.T) {
+		kbRoot := writeSetupTestKB(t)
+		defer writeCleanup(kbRoot)
+
+		writeRawPage(t, kbRoot, "kb/notes/bare-frontmatter.md",
+			"---\ntype: note\ntitle: Bare Frontmatter\nsummary: before\ntags: test\n---\nBody.")
+
+		out, err := writeRun(kbRoot, "bare-frontmatter.md", "", "--frontmatter", "summary=changed")
+		if err != nil {
+			t.Fatalf("akb write --frontmatter by bare filename failed: %s: %v", out, err)
+		}
+		if !strings.Contains(out, "Updated frontmatter for kb/notes/bare-frontmatter.md") {
+			t.Errorf("output = %q, want the page reported by its stored path", out)
+		}
+		if got := frontmatterString(t, pageFrontmatter(t, filepath.Join(kbRoot, "kb", "notes", "bare-frontmatter.md")), "summary"); got != "changed" {
+			t.Errorf("summary = %q, want the requested update", got)
+		}
+	})
+
+	t.Run("append", func(t *testing.T) {
+		kbRoot := writeSetupTestKB(t)
+		defer writeCleanup(kbRoot)
+
+		const relPath = "kb/notes/bare-append.md"
+		seed := "---\ntype: note\ntitle: Bare Append\nsummary: test\ntags: test\n---\nOriginal body."
+		if out, err := writeRun(kbRoot, "bare-append.md", seed); err != nil {
+			t.Fatalf("seed write failed: %s: %v", out, err)
+		}
+
+		out, err := writeRun(kbRoot, "bare-append.md", "Appended body.", "--append")
+		if err != nil {
+			t.Fatalf("akb write --append by bare filename failed: %s: %v", out, err)
+		}
+		if !strings.Contains(out, "Appended to "+relPath) {
+			t.Errorf("output = %q, want the page reported by its stored path", out)
+		}
+		if _, statErr := os.Stat(filepath.Join(kbRoot, "kb", "bare-append.md")); !os.IsNotExist(statErr) {
+			t.Errorf("the append reached a second page at the KB root: %v", statErr)
+		}
+		indexed, ok := searchDBDocumentBody(t, kbRoot, relPath)
+		if !ok {
+			t.Fatalf("expected the appended page indexed at %s", relPath)
+		}
+		if !strings.Contains(indexed, "Appended body.") {
+			t.Errorf("indexed body = %q, want the appended content", indexed)
 		}
 	})
 }

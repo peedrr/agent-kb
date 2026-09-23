@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -106,19 +107,6 @@ func runAppend(_ *cobra.Command, args []string) error {
 		return &usageError{msg: "cannot append to log.md; it is a managed file"}
 	}
 
-	fullPath, err := path.ResolveKBPath(kbRoot, inputPath)
-	if err != nil {
-		return fmt.Errorf("resolve path: %w", err)
-	}
-
-	exists, err := fileExists(fullPath)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return fmt.Errorf("page not found: %s. Use `akb write` to create", inputPath)
-	}
-
 	store := storage.NewGitProvider(kbRoot, noCommit)
 	ctx := context.Background()
 
@@ -131,9 +119,16 @@ func runAppend(_ *cobra.Command, args []string) error {
 	}
 	defer repoLock.Release()
 
-	existingContent, err := store.Read(ctx, fullPath)
+	// A page is addressed by the path it is stored at or by its bare filename,
+	// which resolves under the directory of its type. The type directories are
+	// read only when the named path holds no page, so a knowledge base whose
+	// templates cannot be read still appends to a page addressed by its path.
+	fullPath, relPath, existingContent, err := resolveExistingPage(kbRoot, inputPath, typeDirsFromDisk(kbRoot))
 	if err != nil {
-		return fmt.Errorf("read page: %w", err)
+		if errors.Is(err, errPageNotFound) {
+			return fmt.Errorf("page not found: %s. Use `akb write` to create", inputPath)
+		}
+		return err
 	}
 
 	fm, body, err := frontmatter.Parse(existingContent)
@@ -164,7 +159,6 @@ func runAppend(_ *cobra.Command, args []string) error {
 	}
 	fullContent := "---\n" + string(yamlBytes) + "---\n" + newBody
 
-	relPath := filepath.ToSlash(filepath.Join("kb", cleanPath))
 	commitMsg := fmt.Sprintf("akb: append %s", relPath)
 	if err := store.WriteWithCommitMsg(ctx, fullPath, []byte(fullContent), commitMsg); err != nil {
 		return fmt.Errorf("write page: %w", err)
