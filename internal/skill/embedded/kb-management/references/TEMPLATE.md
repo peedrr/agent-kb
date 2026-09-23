@@ -82,7 +82,7 @@ Any frontmatter string that parses as RFC3339 or a date-only `2006-01-02` is aut
 
 Every rule that reads an optional frontmatter key must guard the access with `has()`, e.g. `!has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("2160h")`. An absent key makes the rule vacuously true; reading the key unguarded fails the rule instead of skipping it. `type` and `title` need no guard — every page write guarantees both.
 
-`akb template write` proves the pass mockup three ways: as given, once with each schema-optional key the mockup supplies removed, and once with `old_page` set to the mockup itself (a no-op update). A rule that only works at create time fails the write instead of the first real page.
+`akb template write` proves the pass mockup three ways: as given, once with each schema-optional key the mockup supplies removed (`type` and `title` excepted — every write guarantees both), and once with `old_page` set to the mockup itself (a no-op update). A rule that only works at create time fails the write instead of the first real page.
 
 **Known limit:** the stripped variants enumerate schema-declared optional keys only. A rule reading an **undeclared** key is not caught by them — deliberately, because an undeclared-but-guarded read is a legitimate pattern (open frontmatter, cross-cutting convention fields). An unguarded read of an undeclared key fails loudly and precisely at first use: exit 1 at write time naming the rule. The lint sweep evaluates only template `lint_rules`, so the same read surfaces as a `cel_lint` issue at sweep time only when it appears in a `lint_rules` entry.
 
