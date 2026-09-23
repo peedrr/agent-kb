@@ -2,12 +2,14 @@ package lint
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/cel-go/common/types"
-	"github.com/peedrr/agent-kb/internal/cel"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/text"
+
+	"github.com/peedrr/agent-kb/internal/cel"
 )
 
 // CELLintChecker evaluates CEL lint_rules from templates against pages.
@@ -35,7 +37,7 @@ func (c *CELLintChecker) Name() string {
 func (c *CELLintChecker) Check(ctx context.Context, kb *KB) ([]LintIssue, error) {
 	env, err := cel.NewEnv()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create CEL environment: %w", err)
 	}
 
 	var issues []LintIssue
@@ -58,7 +60,7 @@ func (c *CELLintChecker) Check(ctx context.Context, kb *KB) ([]LintIssue, error)
 		for _, rule := range tmpl.LintRules {
 			prg, err := cel.CompileRule(env, rule.Rule)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("compile lint rule %s: %w", rule.ID, err)
 			}
 
 			result, err := cel.Evaluate(ctx, prg, map[string]any{
@@ -66,7 +68,7 @@ func (c *CELLintChecker) Check(ctx context.Context, kb *KB) ([]LintIssue, error)
 				"now":  now,
 			})
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("evaluate lint rule %s: %w", rule.ID, err)
 			}
 
 			if result != types.True {

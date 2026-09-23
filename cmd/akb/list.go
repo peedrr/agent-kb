@@ -93,7 +93,7 @@ func listPages(kbRoot string) ([]pageInfo, error) {
 			return nil
 		}
 
-		content, err := os.ReadFile(path)
+		content, err := os.ReadFile(path) //nolint:gosec // path is produced by walking the kb directory
 		if err != nil {
 			return fmt.Errorf("read file %s: %w", path, err)
 		}

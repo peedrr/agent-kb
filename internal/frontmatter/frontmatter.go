@@ -24,11 +24,9 @@ type ParsedFrontmatter struct {
 // Parse extracts frontmatter from markdown content.
 func Parse(content []byte) (*ParsedFrontmatter, []byte, error) {
 	yamlFmt := frontmatter.Format{
-		Name:  "YAML",
-		Delim: '-',
-		Unmarshal: func(data []byte, v any) error {
-			return yaml.Unmarshal(data, v)
-		},
+		Name:      "YAML",
+		Delim:     '-',
+		Unmarshal: yaml.Unmarshal,
 	}
 
 	md := goldmark.New(

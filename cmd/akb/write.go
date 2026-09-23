@@ -9,11 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	yaml "github.com/goccy/go-yaml"
 	"github.com/google/cel-go/common/types"
+	"github.com/spf13/cobra"
 	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
 
 	"github.com/peedrr/agent-kb/internal/cel"
@@ -189,7 +188,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 			if err := path.AssertContained(kbRoot, candidate); err != nil {
 				return fmt.Errorf("resolve path: %w", err)
 			}
-			existingContent, err = os.ReadFile(candidate)
+			existingContent, err = os.ReadFile(candidate) //nolint:gosec // candidate is checked against the KB root by AssertContained above
 			if err == nil {
 				fullPath = candidate
 				found = true
@@ -229,11 +228,12 @@ func runWrite(_ *cobra.Command, args []string) error {
 			}
 			key := parts[0]
 			value := parts[1]
-			if key == "type" {
+			switch key {
+			case "type":
 				fm.Type = value
-			} else if key == "title" {
+			case "title":
 				fm.Title = value
-			} else {
+			default:
 				if key == "updated" {
 					explicitUpdated = true
 				}
@@ -326,7 +326,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 				return fmt.Errorf("page does not exist; use 'akb write' without --append to create")
 			}
 
-			existingContent, err := os.ReadFile(fullPath)
+			existingContent, err := os.ReadFile(fullPath) //nolint:gosec // fullPath is resolved by ResolveKBPath, which rejects paths outside the KB root
 			if err != nil {
 				return fmt.Errorf("read existing page: %w", err)
 			}
@@ -510,8 +510,7 @@ func runWrite(_ *cobra.Command, args []string) error {
 
 	// Build page map from post-modification state
 	md := goldmark.New()
-	var astDoc ast.Node
-	astDoc = md.Parser().Parse(text.NewReader(body))
+	astDoc := md.Parser().Parse(text.NewReader(body))
 	page := cel.BuildPage(relPath, fm, body, astDoc, body)
 
 	// Run CEL validations
@@ -592,11 +591,12 @@ func runWrite(_ *cobra.Command, args []string) error {
 	}
 
 	// Output
-	if len(writeFrontmatter) > 0 {
+	switch {
+	case len(writeFrontmatter) > 0:
 		fmt.Printf("Updated frontmatter for %s\n", relPath)
-	} else if writeAppend {
+	case writeAppend:
 		fmt.Printf("Appended to %s\n", relPath)
-	} else {
+	default:
 		fmt.Printf("Written to %s\n", relPath)
 		fmt.Printf("Don't forget to update the index! `akb index add %s <summary>`\n", relPath)
 	}

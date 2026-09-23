@@ -3,16 +3,18 @@ package cel
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/peedrr/agent-kb/internal/frontmatter"
-	"github.com/peedrr/agent-kb/internal/storage"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
+
+	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/storage"
 )
 
 // convertDateField converts ISO-8601 date strings to time.Time for CEL compatibility.
@@ -85,7 +87,7 @@ func BuildOldPage(relPath string, store storage.Provider) (map[string]any, error
 
 	exists, err := store.Exists(ctx, relPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("check existing page: %w", err)
 	}
 	if !exists {
 		return nil, nil
@@ -93,12 +95,12 @@ func BuildOldPage(relPath string, store storage.Provider) (map[string]any, error
 
 	data, err := store.Read(ctx, relPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read existing page: %w", err)
 	}
 
 	fm, body, err := frontmatter.Parse(data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse existing frontmatter: %w", err)
 	}
 
 	md := goldmark.New()
@@ -119,7 +121,7 @@ func offsetToLine(source []byte, offset int) int {
 
 func extractText(n ast.Node, source []byte) string {
 	var text []byte
-	ast.Walk(n, func(child ast.Node, entering bool) (ast.WalkStatus, error) {
+	_ = ast.Walk(n, func(child ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
@@ -133,7 +135,7 @@ func extractText(n ast.Node, source []byte) string {
 
 func flattenHeadings(doc ast.Node, source []byte) []map[string]any {
 	var headings []map[string]any
-	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
@@ -153,7 +155,7 @@ func flattenHeadings(doc ast.Node, source []byte) []map[string]any {
 
 func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 	var links []map[string]any
-	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
@@ -176,7 +178,7 @@ func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 
 func flattenCodeBlocks(doc ast.Node, source []byte) []map[string]any {
 	var blocks []map[string]any
-	ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}

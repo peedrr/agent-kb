@@ -51,24 +51,24 @@ validations:
 	}
 
 	passPath := filepath.Join(kbRoot, "new_pass.md")
-	passData := `---
+	validData := `---
 type: new
 title: Hello
 ---
 # Hello
 `
-	if err := os.WriteFile(passPath, []byte(passData), 0600); err != nil {
+	if err := os.WriteFile(passPath, []byte(validData), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	failPath := filepath.Join(kbRoot, "new_fail.md")
-	failData := `---
+	invalidData := `---
 type: new
 title: ""
 ---
 # Empty
 `
-	if err := os.WriteFile(failPath, []byte(failData), 0600); err != nil {
+	if err := os.WriteFile(failPath, []byte(invalidData), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -114,24 +114,24 @@ validations:
 	}
 
 	passPath := filepath.Join(kbRoot, "bad_pass.md")
-	passData := `---
+	validData := `---
 type: bad
 title: Hello
 ---
 # Hello
 `
-	if err := os.WriteFile(passPath, []byte(passData), 0600); err != nil {
+	if err := os.WriteFile(passPath, []byte(validData), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	failPath := filepath.Join(kbRoot, "bad_fail.md")
-	failData := `---
+	invalidData := `---
 type: bad
 title: ""
 ---
 # Empty
 `
-	if err := os.WriteFile(failPath, []byte(failData), 0600); err != nil {
+	if err := os.WriteFile(failPath, []byte(invalidData), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -181,24 +181,24 @@ validations:
 	}
 
 	passPath := filepath.Join(kbRoot, "badpass_pass.md")
-	passData := `---
+	validData := `---
 type: badpass
 title: ""
 ---
 # Empty
 `
-	if err := os.WriteFile(passPath, []byte(passData), 0600); err != nil {
+	if err := os.WriteFile(passPath, []byte(validData), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	failPath := filepath.Join(kbRoot, "badpass_fail.md")
-	failData := `---
+	invalidData := `---
 type: badpass
 title: Hello
 ---
 # Hello
 `
-	if err := os.WriteFile(failPath, []byte(failData), 0600); err != nil {
+	if err := os.WriteFile(failPath, []byte(invalidData), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -248,24 +248,24 @@ validations:
 	}
 
 	passPath := filepath.Join(kbRoot, "badfail_pass.md")
-	passData := `---
+	validData := `---
 type: badfail
 title: Hello
 ---
 # Hello
 `
-	if err := os.WriteFile(passPath, []byte(passData), 0600); err != nil {
+	if err := os.WriteFile(passPath, []byte(validData), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	failPath := filepath.Join(kbRoot, "badfail_fail.md")
-	failData := `---
+	invalidData := `---
 type: badfail
 title: Hello
 ---
 # Hello
 `
-	if err := os.WriteFile(failPath, []byte(failData), 0600); err != nil {
+	if err := os.WriteFile(failPath, []byte(invalidData), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -315,24 +315,24 @@ validations:
 	}
 
 	passPath := filepath.Join(kbRoot, "atomic_pass.md")
-	passData := `---
+	validData := `---
 type: atomic
 title: ""
 ---
 # Empty
 `
-	if err := os.WriteFile(passPath, []byte(passData), 0600); err != nil {
+	if err := os.WriteFile(passPath, []byte(validData), 0600); err != nil {
 		t.Fatal(err)
 	}
 
 	failPath := filepath.Join(kbRoot, "atomic_fail.md")
-	failData := `---
+	invalidData := `---
 type: atomic
 title: Hello
 ---
 # Hello
 `
-	if err := os.WriteFile(failPath, []byte(failData), 0600); err != nil {
+	if err := os.WriteFile(failPath, []byte(invalidData), 0600); err != nil {
 		t.Fatal(err)
 	}
 

@@ -1,14 +1,16 @@
+// Package cel compiles and evaluates CEL rules against page data for
+// write-time validation and for template-driven lint checks.
 package cel
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
-	"sync"
 )
 
 // MaxCostLimit is the evaluation cost budget applied to every rule program
@@ -21,11 +23,15 @@ var programCache = sync.Map{}
 // context evaluation. AST elements are passed as plain maps so that CEL
 // field access works at runtime without native type adapter overhead.
 func NewEnv() (*cel.Env, error) {
-	return cel.NewEnv(
+	env, err := cel.NewEnv(
 		cel.Variable("page", cel.MapType(cel.StringType, cel.DynType)),
 		cel.Variable("old_page", cel.NullableType(cel.MapType(cel.StringType, cel.DynType))),
 		cel.Variable("now", cel.TimestampType),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("create CEL environment: %w", err)
+	}
+	return env, nil
 }
 
 // CompileRule parses and compiles a CEL expression into an executable program
@@ -39,12 +45,12 @@ func CompileRule(env *cel.Env, expr string) (cel.Program, error) {
 
 	ast, issues := env.Compile(expr)
 	if issues != nil && issues.Err() != nil {
-		return nil, issues.Err()
+		return nil, fmt.Errorf("compile rule: %w", issues.Err())
 	}
 
 	prg, err := env.Program(ast, cel.CostLimit(MaxCostLimit))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("build rule program: %w", err)
 	}
 
 	programCache.Store(expr, prg)
@@ -60,21 +66,21 @@ func Evaluate(ctx context.Context, prg cel.Program, vars map[string]any) (ref.Va
 	var evalErr error
 
 	func() {
-			defer func() {
-				if r := recover(); r != nil {
-					rerr, ok := r.(error)
-					if !ok {
-						evalErr = fmt.Errorf("internal CEL error")
-						return
-					}
-					var cancelled interpreter.EvalCancelledError
-					if errors.As(rerr, &cancelled) {
-						evalErr = fmt.Errorf("exceeded compute budget")
-						return
-					}
+		defer func() {
+			if r := recover(); r != nil {
+				rerr, ok := r.(error)
+				if !ok {
 					evalErr = fmt.Errorf("internal CEL error")
+					return
 				}
-			}()
+				var cancelled interpreter.EvalCancelledError
+				if errors.As(rerr, &cancelled) {
+					evalErr = fmt.Errorf("exceeded compute budget")
+					return
+				}
+				evalErr = fmt.Errorf("internal CEL error")
+			}
+		}()
 
 		result, _, evalErr = prg.ContextEval(ctx, vars)
 	}()

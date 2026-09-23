@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/google/cel-go/common/types"
-	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/text"
+
+	"github.com/peedrr/agent-kb/internal/frontmatter"
 )
 
 type mockStore struct {
@@ -24,8 +25,8 @@ func (m *mockStore) Exists(_ context.Context, path string) (bool, error) {
 	return m.exists[path], nil
 }
 
-func (m *mockStore) Write(_ context.Context, _ string, _ []byte) error   { return nil }
-func (m *mockStore) Delete(_ context.Context, _ string) error            { return nil }
+func (m *mockStore) Write(_ context.Context, _ string, _ []byte) error     { return nil }
+func (m *mockStore) Delete(_ context.Context, _ string) error              { return nil }
 func (m *mockStore) List(_ context.Context, _, _ string) ([]string, error) { return nil, nil }
 
 func TestBuildPage(t *testing.T) {

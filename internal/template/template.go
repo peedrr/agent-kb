@@ -69,6 +69,7 @@ func init() {
 func detectOldFormat(raw map[string]any, filename string) error {
 	for _, key := range []string{"required", "optional", "body"} {
 		if _, ok := raw[key]; ok {
+			//nolint:revive,staticcheck // message is user-visible and asserted by integration tests
 			return fmt.Errorf("parse %s: Template format has changed. Please update to the new schema.", filename)
 		}
 	}

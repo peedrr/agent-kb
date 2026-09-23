@@ -189,7 +189,7 @@ func approveAllDraftPages(ctx context.Context, dbConn *sql.DB, kbRoot string) er
 
 		relPath, err := filepath.Rel(kbDir, fullPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("relativize %s: %w", fullPath, err)
 		}
 		if relPath == "index.md" || relPath == "log.md" {
 			return nil
@@ -205,7 +205,7 @@ func approveAllDraftPages(ctx context.Context, dbConn *sql.DB, kbRoot string) er
 		return nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("walk kb directory: %w", err)
 	}
 
 	fmt.Printf("Approved %d drafts\n", approvedCount)

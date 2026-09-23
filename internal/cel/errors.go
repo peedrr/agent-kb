@@ -2,6 +2,8 @@ package cel
 
 import "fmt"
 
+// ValidationError describes a CEL rule failure reported at write time or by a
+// lint sweep.
 type ValidationError struct {
 	RuleID   string
 	Message  string

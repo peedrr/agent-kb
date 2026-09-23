@@ -50,7 +50,7 @@ lint_rules:
 		t.Fatal(err)
 	}
 
-	notePass := `---
+	noteMock := `---
 type: note
 title: Test Note
 summary: Test summary
@@ -61,7 +61,7 @@ tags: [test]
 
 This is a valid note.
 `
-	if err := os.WriteFile(filepath.Join(templatesDir, "note_pass.md"), []byte(notePass), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(templatesDir, "note_pass.md"), []byte(noteMock), 0600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -89,7 +89,7 @@ validations:
 		t.Fatal(err)
 	}
 
-	adrPass := `---
+	adrMock := `---
 type: adr
 title: Test ADR
 summary: Test summary
@@ -103,7 +103,7 @@ status: proposed
 
 This is the context.
 `
-	if err := os.WriteFile(filepath.Join(templatesDir, "adr_pass.md"), []byte(adrPass), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(templatesDir, "adr_pass.md"), []byte(adrMock), 0600); err != nil {
 		t.Fatal(err)
 	}
 
