@@ -28,7 +28,7 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 | approve | `approve.go` | Strip annotations and provenance markers, set `is_draft: false`, commit, then reindex the search index and link graph in one transaction |
 | skill | `skill.go` | `skill install` — extract embedded skill |
 | template | `template.go` | `template get <name>` (Writer/Mockup/Maintainer views, `--example` validates mockup), `template list` |
-| templates write | `templates_write.go` | Overwrite protection (diff + page count), mockup reuse, `--force`, stale mockup rejection |
+| template write | `templates_write.go` | Overwrite protection (diff + page count), mockup reuse, `--force`, stale mockup rejection |
 | template delete | `template_delete.go` | Delete template with impact analysis (page count), `--force`, auto-lint after |
 | raw | `raw.go` | Parent command for raw namespace |
 | raw write | `raw_write.go` | Write raw file with SHA-256 manifest |
@@ -56,7 +56,7 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 - `template get <name>` returns Writer View (schema + requirements only)
 - `template get <name> --example` returns `_pass.md` content
 - `template get <name> --full` returns complete YAML with CEL rules
-- `templates write` validates CEL syntax, pass mockup passes all validations, fail mockup fails at least one
+- `template write` validates CEL syntax, pass mockup passes all validations, fail mockup fails at least one
 
 ## KEY DEPENDENCIES
 

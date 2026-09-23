@@ -61,6 +61,10 @@ If the request matches multiple triggers, prefer the one higher in the table.
 3. Neither — the command fails with a usage error (exit 2) that lists the
    knowledge bases found near the working directory, nearest first.
 
+The selected path must hold the `.akb/.akb.yaml` config file that marks a base
+— a regular file, not a directory. A path without it fails with a usage error
+(exit 2) that names the missing marker and points at `akb discover`.
+
 A path may be absolute, relative to the working directory, or start with `~`.
 
 ```bash
@@ -127,8 +131,8 @@ Every command below is shown without its selection: pass `--kb <path>` or set
 | Template get (schema + requirements) | `akb template get <name>` |
 | Template get (example page) | `akb template get <name> --example` |
 | Template get (full YAML) | `akb template get <name> --full` |
-| Template write (new) | `akb templates write <name> --template <yaml> --pass <md> --fail <md>` |
-| Template write (update) | `akb templates write <name> --template <yaml> [--pass <md>] [--fail <md>] --force` |
+| Template write (new) | `akb template write <name> --template <yaml> --pass <md> --fail <md>` |
+| Template write (update) | `akb template write <name> --template <yaml> [--pass <md>] [--fail <md>] --force` |
 | Template delete | `akb template delete <name> [--force]` |
 | Raw write | `akb raw write <path>` |
 | Raw sync | `akb raw sync` |

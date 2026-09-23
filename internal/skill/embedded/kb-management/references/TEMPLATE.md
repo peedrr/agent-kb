@@ -92,7 +92,7 @@ Creating a template is a **design act**. You are defining what "correct" means f
 6. **Write the template:**
 
 ```bash
-akb templates write <name> \
+akb template write <name> \
   --template <name>.yaml \
   --pass <name>_pass.md \
   --fail <name>_fail.md
@@ -138,7 +138,7 @@ akb template get <name> --full > /tmp/<name>.yaml
 ### 2. Write without --force (see impact)
 
 ```bash
-akb templates write <name> --template /tmp/<name>.yaml \
+akb template write <name> --template /tmp/<name>.yaml \
   --pass <name>_pass.md --fail <name>_fail.md
 ```
 
@@ -155,7 +155,7 @@ The diff shows exactly what will change. The page count shows how many existing 
 ### 4. Overwrite with --force
 
 ```bash
-akb templates write <name> --template /tmp/<name>.yaml \
+akb template write <name> --template /tmp/<name>.yaml \
   --pass <name>_pass.md --fail <name>_fail.md --force
 ```
 
@@ -163,7 +163,7 @@ akb templates write <name> --template /tmp/<name>.yaml \
 
 ```bash
 # Reuse existing mockups (when rules are unchanged)
-akb templates write <name> --template /tmp/<name>.yaml --force
+akb template write <name> --template /tmp/<name>.yaml --force
 ```
 
 ### 5. Lint affected pages

@@ -25,7 +25,7 @@ pages(path, title, summary)
 
 ## QUERY ESCAPING
 
-`escapeFTS5Query()` strips FTS5 operators (OR, AND, NOT) and special chars (`"'()*`).
+`escapeFTS5Query()` strips FTS5 operators (OR, AND, NOT) and special chars (`"`, `'`, `(`, `)`, `*`, `:`), then wraps each remaining whitespace-separated token in double quotes. Inside the quotes punctuation stays literal — the hyphen in `event-driven` matches as written instead of being read as query syntax — and the stripped `:` plus the per-token quoting leave no operator or column filter for a caller to inject. A query that is empty after stripping is rejected with `search query must not be empty`.
 
 ## REBUILDINDEX
 

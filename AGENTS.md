@@ -48,7 +48,7 @@ agent-kb/
 | CEL engine | `internal/cel/engine.go` | Environment builder, rule compiler, evaluator with panic recovery |
 | CEL page builder | `internal/cel/pagebuilder.go` | Builds `page`/`old_page` maps; walks the Goldmark AST into `page.ast` (headings, links, code blocks) |
 | Template loader | `internal/template/template.go` | TemplateV2 with schema, validations, lint_rules |
-| Template commands | `cmd/akb/template.go`, `templates_write.go`, `template_delete.go` | `template get/list`, `templates write`, `template delete` |
+| Template commands | `cmd/akb/template.go`, `templates_write.go`, `template_delete.go` | `template get/list/write/delete` |
 | Template delete | `cmd/akb/template_delete.go` | Impact analysis (page count), `--force`, path traversal prevention |
 | Git integration | `internal/storage/git.go` | Auto-commit, merge conflict detection |
 | DB schema | `internal/db/db.go` | documents, pages, links tables + FTS5 |
@@ -96,7 +96,7 @@ agent-kb/
 | BuildPage | func | internal/cel/pagebuilder.go:45 | Assembles page map from frontmatter + AST |
 | BuildOldPage | func | internal/cel/pagebuilder.go:85 | Reads on-disk page, builds old_page map |
 | IndexEntry | struct | internal/index/index.go:16 | Page in index |
-| ParsedFrontmatter | struct | internal/frontmatter/frontmatter.go:18 | Type, Title, Fields, IsDraft |
+| ParsedFrontmatter | struct | internal/frontmatter/frontmatter.go:18 | Type, Title, Fields; draft state lives in Fields and is read via `frontmatter.IsDraft()` |
 | Wikilink | struct | internal/markdown/wikilink.go:9 | Target, Display, Heading |
 | Annotation | struct | internal/markdown/annotation.go:10 | olw-auto HTML comment parser |
 | ProvenanceMarker | struct | internal/markdown/provenance.go:9 | ^[type] marker parser |
@@ -107,7 +107,7 @@ agent-kb/
 
 ## CONVENTIONS (THIS PROJECT)
 
-- **KB root**: Selected per invocation by the `--kb <path>` flag, falling back to the `AKB_KB` environment variable; with neither, commands fail with a usage error that lists the bases discovered nearby. No registry and no stored default (`akb use`/`akb registry` are removed; `akb discover` only reports). A relative path resolves against the working directory and `~` expands to the home directory (`internal/path.ResolveKB()`).
+- **KB root**: Selected per invocation by the `--kb <path>` flag, falling back to the `AKB_KB` environment variable; with neither, commands fail with a usage error that lists the bases discovered nearby. The resolved path must hold the `.akb/.akb.yaml` config file that marks a base — a regular file, not a directory; without it the command fails with a usage error (exit 2) naming the missing marker and pointing at `akb discover`. No registry and no stored default (`akb use`/`akb registry` are removed; `akb discover` only reports). A relative path resolves against the working directory and `~` expands to the home directory (`internal/path.ResolveKB()`).
 - **Paths**: Always relative to KB root; `kb/` prefix stripped
 - **Managed files**: `index.md`, `log.md` cannot be written directly
 - **Raw access**: `raw/` prefix → separate storage; use `akb raw` commands
@@ -136,7 +136,7 @@ agent-kb/
 - Do NOT use `gopkg.in/yaml.v3` (replaced by `github.com/goccy/go-yaml`)
 - Do NOT construct `old_page` from in-memory modified state (must read on-disk)
 - Do NOT inject `old_page` for lint sweeps (lint is sweep-time, not write-time)
-- Do NOT use `--force` to bypass mockup validation on `templates write` (stale mockups rejected regardless)
+- Do NOT use `--force` to bypass mockup validation on `template write` (stale mockups rejected regardless)
 
 ## COMMANDS
 
@@ -163,7 +163,7 @@ nix develop                     # Dev shell (Go, gopls, delve, golangci-lint)
 - `akb template get <name>` returns Writer View (schema + requirements only)
 - `akb template get <name> --example` returns `_pass.md` content (validates against current CEL rules; warns on stderr if stale, still displays mockup)
 - `akb template get <name> --full` returns complete YAML with CEL rules
-- `akb templates write` validates CEL syntax and test-driven mockups; overwrite: shows diff + page count, reuses existing mockups, `--force` bypasses existence warning only
+- `akb template write` validates CEL syntax and test-driven mockups; overwrite: shows diff + page count, reuses existing mockups, `--force` bypasses existence warning only
 - All-errors aggregation on write: ALL failed rules reported, file NOT written if any fail
-- Exit codes: 0=success; 1=the command ran but produced a result to act on (failed page validation, raw drift); 2=the command could not do its work — bad invocations print a `usage:` prefix, akb faults an `internal:` prefix
+- Exit codes: 0=success; 1=the command ran but produced a result to act on (failed page validation, raw drift); 2=the command could not do its work — bad invocations print a `usage:` prefix, akb faults an `internal:` prefix. Command failures that are neither — a git error, for example — exit 1 with an `Error: ` prefix (`classifyExit` in `cmd/akb/main.go`)
 - `akb template delete <name>` impact analysis: counts pages using the type before deletion; auto-runs lint after

@@ -53,6 +53,11 @@ drafts; `akb approve` publishes them.
 3. Neither — the command fails with a usage error (exit 2) that lists the bases
    discovered near the working directory, nearest first.
 
+The resolved path must hold the `.akb/.akb.yaml` config file that marks a
+knowledge base — a regular file, not a directory. A path without it is a usage
+error (exit 2) whose report names the missing marker and points at
+`akb discover` for the bases nearby.
+
 A path may be absolute, relative to the working directory, or start with `~`:
 
 ```bash
