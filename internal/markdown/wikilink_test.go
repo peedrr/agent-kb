@@ -1,6 +1,7 @@
 package markdown
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -270,6 +271,185 @@ func TestParseWikilinks(t *testing.T) {
 		}
 		if wl.Display != "Introduction" {
 			t.Errorf("Display = %q, want %q", wl.Display, "Introduction")
+		}
+	})
+}
+
+func TestParseWikilinksExplicitDestination(t *testing.T) {
+	t.Run("[[display]](dest) uses the dest as target", func(t *testing.T) {
+		links := ParseWikilinks("See [[My Page]](pages/my-page).")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "pages/my-page" {
+			t.Errorf("Target = %q, want %q", wl.Target, "pages/my-page")
+		}
+		if wl.Display != "My Page" {
+			t.Errorf("Display = %q, want %q", wl.Display, "My Page")
+		}
+		if wl.Destination != "pages/my-page" {
+			t.Errorf("Destination = %q, want %q", wl.Destination, "pages/my-page")
+		}
+		if wl.HasHeading {
+			t.Error("HasHeading = true, want false")
+		}
+	})
+
+	t.Run("pipe display wins over bracket target with explicit dest", func(t *testing.T) {
+		links := ParseWikilinks("[[a|b]](dest)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "dest" {
+			t.Errorf("Target = %q, want %q", wl.Target, "dest")
+		}
+		if wl.Display != "b" {
+			t.Errorf("Display = %q, want %q", wl.Display, "b")
+		}
+	})
+
+	t.Run("explicit dest wins over a heading in the bracket part", func(t *testing.T) {
+		links := ParseWikilinks("[[label#section]](dest)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "dest" {
+			t.Errorf("Target = %q, want %q", wl.Target, "dest")
+		}
+		if wl.Destination != "dest" {
+			t.Errorf("Destination = %q, want %q", wl.Destination, "dest")
+		}
+	})
+
+	t.Run("adjacent parens are required", func(t *testing.T) {
+		content := "[[Paris]] (the city)"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "Paris" {
+			t.Errorf("Target = %q, want %q", wl.Target, "Paris")
+		}
+		if wl.Destination != "" {
+			t.Errorf("Destination = %q, want empty string", wl.Destination)
+		}
+		if wantEnd := len("[[Paris]]"); wl.End != wantEnd {
+			t.Errorf("End = %d, want %d", wl.End, wantEnd)
+		}
+	})
+
+	t.Run("angle brackets around the dest are stripped", func(t *testing.T) {
+		links := ParseWikilinks("[[My Page]](<my page.md>)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "my page" {
+			t.Errorf("Target = %q, want %q", wl.Target, "my page")
+		}
+		if wl.Display != "My Page" {
+			t.Errorf("Display = %q, want %q", wl.Display, "My Page")
+		}
+	})
+
+	t.Run("empty parens leave a plain wikilink", func(t *testing.T) {
+		content := "[[a]]()"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "a" || wl.Destination != "" {
+			t.Errorf("Target = %q, Destination = %q, want %q and empty string", wl.Target, wl.Destination, "a")
+		}
+		if wantEnd := len("[[a]]"); wl.End != wantEnd {
+			t.Errorf("End = %d, want %d (ignored parens are not part of the token)", wl.End, wantEnd)
+		}
+	})
+
+	t.Run("path dest with .md suffix keeps the path", func(t *testing.T) {
+		links := ParseWikilinks("[[Guide]](concepts/guide.md)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "concepts/guide" {
+			t.Errorf("Target = %q, want %q", wl.Target, "concepts/guide")
+		}
+	})
+
+	t.Run("leading ./ is stripped from the dest", func(t *testing.T) {
+		links := ParseWikilinks("[[Guide]](./notes/daily/2024-01-01.md)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/daily/2024-01-01" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/daily/2024-01-01")
+		}
+	})
+
+	t.Run("spans cover the whole token including the dest", func(t *testing.T) {
+		content := "before [[a]](dest) after"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		wantStart := strings.Index(content, "[[a]](dest)")
+		wantEnd := wantStart + len("[[a]](dest)")
+		if wl.Start != wantStart || wl.End != wantEnd {
+			t.Errorf("span = [%d,%d), want [%d,%d)", wl.Start, wl.End, wantStart, wantEnd)
+		}
+	})
+
+	t.Run("spans cover only the brackets for a plain wikilink", func(t *testing.T) {
+		content := "before [[a]] after"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		wantStart := strings.Index(content, "[[a]]")
+		wantEnd := wantStart + len("[[a]]")
+		if wl.Start != wantStart || wl.End != wantEnd {
+			t.Errorf("span = [%d,%d), want [%d,%d)", wl.Start, wl.End, wantStart, wantEnd)
+		}
+	})
+
+	t.Run("unclosed dest parens leave a plain wikilink", func(t *testing.T) {
+		links := ParseWikilinks("[[a]](unclosed")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "a" || wl.Destination != "" {
+			t.Errorf("Target = %q, Destination = %q, want %q and empty string", wl.Target, wl.Destination, "a")
+		}
+	})
+
+	t.Run("explicit dest inside inline code is still excluded", func(t *testing.T) {
+		content := "Use `[[a]](dest)` to link, but [[valid]] works."
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "valid" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "valid")
+		}
+	})
+
+	t.Run("explicit dest inside a fenced code block is still excluded", func(t *testing.T) {
+		content := "```\n[[a]](dest)\n```\n[[valid]]"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "valid" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "valid")
 		}
 	})
 }
