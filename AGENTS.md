@@ -89,12 +89,12 @@ agent-kb/
 | Schema | struct | internal/template/template.go:15 | Frontmatter schema definition |
 | ValidationRule | struct | internal/template/template.go:27 | Write-time CEL validation rule |
 | LintRule | struct | internal/template/template.go:35 | Sweep-time CEL lint rule |
-| NewEnv | func | internal/cel/engine.go:23 | Creates CEL env with page/old_page/now variables |
-| CompileRule | func | internal/cel/engine.go:35 | Parses/compiles CEL expr with the cost limit, caches programs |
-| Evaluate | func | internal/cel/engine.go:58 | Evaluates CEL program with panic recovery |
-| ValidationError | struct | internal/cel/errors.go:5 | RuleID/Message/Line/Severity |
-| BuildPage | func | internal/cel/pagebuilder.go:43 | Assembles page map from frontmatter + AST |
-| BuildOldPage | func | internal/cel/pagebuilder.go:83 | Reads on-disk page, builds old_page map |
+| NewEnv | func | internal/cel/engine.go:25 | Creates CEL env with page/old_page/now variables |
+| CompileRule | func | internal/cel/engine.go:41 | Parses/compiles CEL expr with the cost limit, caches programs |
+| Evaluate | func | internal/cel/engine.go:64 | Evaluates CEL program with panic recovery |
+| ValidationError | struct | internal/cel/errors.go:7 | RuleID/Message/Line/Severity |
+| BuildPage | func | internal/cel/pagebuilder.go:45 | Assembles page map from frontmatter + AST |
+| BuildOldPage | func | internal/cel/pagebuilder.go:85 | Reads on-disk page, builds old_page map |
 | IndexEntry | struct | internal/index/index.go:16 | Page in index |
 | ParsedFrontmatter | struct | internal/frontmatter/frontmatter.go:18 | Type, Title, Fields, IsDraft |
 | Wikilink | struct | internal/markdown/wikilink.go:9 | Target, Display, Heading |
@@ -104,7 +104,6 @@ agent-kb/
 | Manager | struct | internal/manifest/manifest.go:24 | Read/Write/Add/Remove/Update entries |
 | Skill | struct | internal/skill/skill.go:17 | Name, Files map |
 | Config | struct | internal/config/config.go:14 | .akb.yaml |
-| DB | struct | internal/db/db.go:13 | Wrapper around sql.DB |
 
 ## CONVENTIONS (THIS PROJECT)
 
