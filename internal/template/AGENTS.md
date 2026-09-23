@@ -10,7 +10,7 @@ TemplateV2 loader for typed page templates with CEL validations and lint rules. 
 
 | File | Purpose |
 |------|---------|
-| `template.go` | TemplateV2 struct, loader, old-format detection, `AllowedFields()` |
+| `template.go` | TemplateV2 struct, loader, old-format detection, embedded defaults |
 | `embedded/adr.yaml` | Default ADR template with validations + lint_rules |
 | `embedded/adr_pass.md` | Valid ADR mockup |
 | `embedded/adr_fail.md` | Invalid ADR mockup (fails require_context) |
@@ -57,15 +57,13 @@ lint_rules:
 | Function | Purpose |
 |----------|---------|
 | `LoadTemplates(dir)` | Reads `.yaml` files from directory; rejects old format |
-| `LoadTemplatesFromFS(fsys)` | Reads from `embed.FS` or `fs.FS` |
 | `CopyDefaults(targetDir)` | Extracts embedded defaults (`.yaml` + `_pass.md` + `_fail.md`) |
-| `AllowedFields()` | Returns schema keys + built-in `is_draft` |
+| `DefaultFS` / `DefaultTemplates` | Embedded defaults (`//go:embed embedded/*`) that `CopyDefaults` reads |
 
 ## NOTES
 
 - Old format detection: rejects YAML with `required`, `optional`, or `body` keys
 - `//go:embed embedded/*` includes `.yaml` and `.md` mockup files
-- `AllowedFields()` derives from `Schema.Frontmatter` keys + `is_draft`
 - Templates loaded from `.akb/templates/` per KB
 - `get --example` validates mockup against current CEL rules at read-time; warns on stderr if stale rules found (still displays mockup, exit 0)
 - `templates write --force` bypasses existence warning only; stale mockups rejected with full content in error

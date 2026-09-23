@@ -10,8 +10,8 @@ SQLite FTS5 full-text search with BM25 ranking. Replaces former NoOp stub.
 
 | File | Purpose |
 |------|---------|
-| `searcher.go` | Interface: `Searcher` with `IndexPage/RemovePage/Search/RebuildIndex` (line 27) |
-| `sqlite.go` | `SQLiteFTS5Searcher` implementation (259 lines) |
+| `searcher.go` | Interfaces: `Searcher` (IndexPage/RemovePage/Search/RebuildIndex, line 33) and `TxSearcher` (IndexPageTx/RemovePageTx) |
+| `sqlite.go` | `SQLiteFTS5Searcher` implementation (316 lines) |
 | `noop.go` | No-op stub for testing |
 | `sqlite_test.go` | Unit tests |
 
@@ -32,4 +32,5 @@ pages(path, title, summary)
 - Walks `kb/` directory
 - Parses frontmatter from each `.md` file
 - Drops/recreates `pages_fts` table (handles schema migration)
+- Runs in one transaction: a failure mid-walk rolls back to the prior index
 - Rebuilds `kb/index.md` via `index.RebuildIndex()`

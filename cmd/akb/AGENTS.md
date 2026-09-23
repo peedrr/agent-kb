@@ -23,10 +23,9 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 | backlinks | `links.go` | Inbound links only |
 | orphans | `links.go` | Pages with zero inbound links |
 | status | `status.go` | KB name, path, page count, git status |
+| discover | `discover.go` | List nearby knowledge bases (read-only, `--json`) |
 | lint | `lint.go` | Run all lint checks; `RunLint(ctx)` helper extracted |
-| registry | `registry.go` | List registered KBs |
-| use | `use.go` | Set default KB in registry |
-| approve | `approve.go` | Strip annotations, set `is_draft: false`, commit |
+| approve | `approve.go` | Strip annotations and provenance markers, set `is_draft: false`, commit, then reindex the search index and link graph in one transaction |
 | skill | `skill.go` | `skill install` — extract embedded skill |
 | template | `template.go` | `template get <name>` (Writer/Mockup/Maintainer views, `--example` validates mockup), `template list` |
 | templates write | `templates_write.go` | Overwrite protection (diff + page count), mockup reuse, `--force`, stale mockup rejection |
@@ -43,7 +42,7 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 
 - `noCommit` flag: `RootCmd.PersistentFlags().BoolVar(&noCommit, "no-commit", false, ...)`
 - Commands validate stdin with `os.Stdin.Stat()` checking `ModeCharDevice`
-- KB root resolved via `path.KBRoot()` at start of each command
+- KB root resolved via `path.ResolveKB(kbFlag)` at the start of each command; a missing or non-KB selection is a usage error (exit 2)
 - DB opened via `db.OpenKB(kbRoot)` for search/linkgraph/lint operations
 - `approve` strips provenance markers via `markdown.StripProvenanceMarkers()`; `--all-drafts` for batch approval
 - `raw delete` scans KB pages for frontmatter `sources` referencing the deleted file
@@ -63,8 +62,8 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 
 ```go
 // Typical command structure
-kbRoot, err := path.KBRoot()           // Find KB
-dbConn, err := db.OpenKB(kbRoot)       // Open search DB
+kbRoot, err := path.ResolveKB(kbFlag)   // --kb or AKB_KB selection
+dbConn, err := db.OpenKB(kbRoot)        // Open search DB
 store := storage.NewGitProvider(...)    // Git-backed storage
 searcher := search.NewSQLiteFTS5Searcher(dbConn)
 updater := linkgraph.NewSQLiteLinkGraph(dbConn)

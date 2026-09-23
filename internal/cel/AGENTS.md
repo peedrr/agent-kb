@@ -30,7 +30,7 @@ CEL expression evaluation engine for template-based page validation and linting.
 |----------|---------|
 | `NewEnv()` | Creates CEL env with `page`, `old_page`, `now` variables |
 | `CompileRule(env, expr)` | Parses/compiles CEL expression; caches result in `sync.Map` |
-| `Evaluate(ctx, prg, vars, costLimit)` | Runs compiled program; recovers from panics; converts cost-limit-exceeded to "exceeded compute budget" error |
+| `Evaluate(ctx, prg, vars)` | Runs compiled program; recovers from panics; converts cost-limit-exceeded to "exceeded compute budget" error |
 | `BuildPage(relPath, fm, body, astDoc, source)` | Assembles `page` map: `file`, `frontmatter`, `content`, `ast`, `akb` |
 | `BuildOldPage(relPath, store)` | Reads on-disk file, returns `page` map or `nil` for new files |
 
@@ -64,8 +64,8 @@ page.akb.annotations
 ## NOTES
 
 - Programs cached in `sync.Map` keyed by expression string
-- Cost limit: 100000 (hardcoded)
+- Cost budget: `MaxCostLimit` (100000), applied when `CompileRule` compiles the program
 - Panic recovery catches `interpreter.EvalCancelledError` (cost exceeded) and unknown panics
 - `old_page` is nil for new files; `has(old_page)` returns `false` in CEL
-- Date fields (`created`, `updated`) auto-converted from ISO-8601 strings to `time.Time`
-- Inlined markdown parsing in `pagebuilder.go` to avoid import cycle (internal/markdown imports internal/cel for types)
+- Any frontmatter string that parses as RFC3339 or date-only `2006-01-02` is converted to `time.Time`
+- `pagebuilder.go` walks the Goldmark AST itself to build `page.ast`

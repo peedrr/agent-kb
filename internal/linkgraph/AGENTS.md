@@ -10,8 +10,8 @@ SQLite-backed wikilink tracking. Tracks `[[wikilink]]` references between pages.
 
 | File | Purpose |
 |------|---------|
-| `updater.go` | Interface: `Updater` with `UpdatePageLinks/RemovePage` |
-| `sqlite.go` | `SQLiteLinkGraph` implementation (313 lines) |
+| `updater.go` | Interfaces: `Updater` (`UpdatePageLinks`/`RemovePage`) and `TxUpdater` (`UpdatePageLinksTx`/`RemovePageTx`) |
+| `sqlite.go` | `SQLiteLinkGraph` implementation (379 lines) |
 | `noop.go` | No-op stub |
 | `sqlite_test.go` | Unit tests |
 
@@ -37,9 +37,9 @@ idx_links_resolved ON links(resolved_to)
 
 | Function | Purpose |
 |----------|---------|
-| `UpdatePageLinks()` | Parse wikilinks, resolve targets, store links |
-| `RemovePage()` | Delete page + all links (outbound + inbound) |
-| `RebuildLinks()` | Walk kb/, update all pages |
+| `UpdatePageLinks()` | Parse wikilinks (deduped by raw target), resolve targets, store links; `UpdatePageLinksTx()` writes on a caller transaction |
+| `RemovePage()` | Delete page + all links (outbound + inbound); `RemovePageTx()` writes on a caller transaction |
+| `RebuildLinks()` | Walk kb/, update all pages in one transaction |
 | `GetOutboundLinks()` | Links FROM a page |
 | `GetInboundLinks()` | Links TO a page |
 | `GetOrphans()` | Pages with no inbound links |
