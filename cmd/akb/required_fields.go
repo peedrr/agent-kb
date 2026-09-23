@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/template"
@@ -20,4 +22,11 @@ func checkRequiredFields(tmpl template.Template, fm *frontmatter.ParsedFrontmatt
 	}
 	sort.Strings(missing)
 	return missing
+}
+
+// requiredFieldsMessage reports the required fields checkRequiredFields found
+// unset, naming the template that declares them.
+func requiredFieldsMessage(tmpl template.Template, missing []string) string {
+	return fmt.Sprintf("missing required frontmatter field(s): %s (declared required by template %q)",
+		strings.Join(missing, ", "), tmpl.Name)
 }

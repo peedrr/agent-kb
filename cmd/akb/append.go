@@ -204,6 +204,15 @@ func runAppend(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return &internalError{err: fmt.Errorf("CEL engine error: %w", err)}
 	}
+
+	// A field the schema marks required must be present before the rules run:
+	// the rules guard on key presence, so an absent key would make them
+	// vacuously true.
+	if missing := checkRequiredFields(tmpl, fm); len(missing) > 0 {
+		fmt.Fprintln(os.Stderr, requiredFieldsMessage(tmpl, missing))
+		return validationFailure{}
+	}
+
 	if err := runTemplateValidations(celEnv, tmpl, page, oldPage); err != nil {
 		return err
 	}

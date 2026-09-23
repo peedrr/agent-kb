@@ -116,7 +116,7 @@ agent-kb/
 - **Git identity**: A commit is authored by the repository's configured `user.name`; a repository without one gets the per-invocation fallback `-c user.name=akb -c user.email=akb@local`. Repository config is never written, except by `akb init` (`ensureGitConfig`)
 - **DB path**: `.akb/search.db` with WAL mode, single connection
 - **is_draft**: Auto-managed frontmatter field; new pages are implicit drafts; `akb approve` sets `is_draft: false`
-- **Type enforcement**: All pages MUST declare `type` in frontmatter matching a template in `.akb/templates/`
+- **Type enforcement**: All pages MUST declare `type` in frontmatter matching a template in `.akb/templates/`. `akb write` and `akb append` also refuse a page that leaves out a field the template marks `required: true` (exit 1, every missing field listed) before the CEL rules run; `akb template write` requires its PASS mockup to carry every required field
 - **Build output**: Always `-o bin/akb` (never project root)
 - **Template format**: TemplateV2 uses `schema.frontmatter`, `validations[]`, `lint_rules[]` (old `required[]`/`optional[]`/`body` rejected)
 - **CEL variables**: `page` (map), `old_page` (nullable map), `now` (timestamp) injected at evaluation time

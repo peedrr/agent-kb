@@ -55,9 +55,11 @@ lint_rules:           # Checked during akb lint sweeps — monitor health over t
     expect: <description>
 ```
 
+A field marked `required: true` must be present in a page's frontmatter: `akb write` and `akb append` refuse a page that leaves one out (exit 1, every missing field named) before any validation rule runs. Presence is all the schema enforces there — a value's type and enum constraints stay with the validation rules.
+
 Every template also requires two mockup files:
 
-- **Pass mockup** (`<name>_pass.md`) — a page that passes all validations (proves rules are satisfiable)
+- **Pass mockup** (`<name>_pass.md`) — a page that carries every required field and passes all validations (proves rules are satisfiable)
 - **Fail mockup** (`<name>_fail.md`) — a page that fails at least one validation (proves rules catch errors)
 
 ## CEL Concepts
@@ -91,7 +93,7 @@ Creating a template is a **design act**. You are defining what "correct" means f
 1. **Define schema** — decide required vs optional fields, types, and enums
 2. **Write validations** — express what makes a page valid at write-time
 3. **Write lint rules** — express what makes a page healthy over time
-4. **Create pass mockup** — a page that passes all validations
+4. **Create pass mockup** — a page that carries every required field and passes all validations
 5. **Create fail mockup** — a page that fails at least one validation
 6. **Write the template:**
 

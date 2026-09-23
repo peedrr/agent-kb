@@ -1,14 +1,17 @@
-# An ADR whose frontmatter omits the `status` key writes successfully: the
-# status rules guard on key presence, so an absent key makes them vacuously
-# true. A present-but-invalid value still fails validation; the invalid-enum
-# ADR case is covered in lint_tests.txt.
+# An ADR whose frontmatter omits a schema-required field is refused at write
+# time, before any validation rule runs: the presence check reports every
+# missing field. A page with a present-but-invalid value still reaches the
+# rules; the invalid-enum ADR case is covered in lint_tests.txt.
 
 exec akb init adr-write-kb
 cd adr-write-kb
 
 stdin ../adr-missing-status.md
-exec akb write bad-adr.md
-stdout 'Written to kb/decisions/bad-adr.md'
+exec bash -c 'akb write bad-adr.md; echo "akb-exit=$?"'
+stdout 'akb-exit=1$'
+stderr 'missing required frontmatter field\(s\): status'
+stderr 'declared required by template "adr"'
+! exists kb/decisions/bad-adr.md
 
 -- adr-missing-status.md --
 ---

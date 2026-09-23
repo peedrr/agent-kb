@@ -178,17 +178,22 @@ validations:
   - id: has_title
     rule: 'page.frontmatter.title != ""'
     expect: title must not be empty
+  - id: title_not_hello
+    rule: 'page.frontmatter.title != "Hello"'
+    expect: title must not be Hello
 `
 	if err := os.WriteFile(tmplPath, []byte(tmplData), 0600); err != nil {
 		t.Fatal(err)
 	}
 
+	// The pass mockup carries every required field, so it is a failed rule that
+	// rejects the write.
 	passPath := filepath.Join(kbRoot, "badpass_pass.md")
 	validData := `---
 type: badpass
-title: ""
+title: Hello
 ---
-# Empty
+# Hello
 `
 	if err := os.WriteFile(passPath, []byte(validData), 0600); err != nil {
 		t.Fatal(err)
@@ -197,9 +202,9 @@ title: ""
 	failPath := filepath.Join(kbRoot, "badpass_fail.md")
 	invalidData := `---
 type: badpass
-title: Hello
+title: ""
 ---
-# Hello
+# Empty
 `
 	if err := os.WriteFile(failPath, []byte(invalidData), 0600); err != nil {
 		t.Fatal(err)
@@ -218,8 +223,8 @@ title: Hello
 	if err == nil {
 		t.Fatal("expected error when pass mockup fails rules, got nil")
 	}
-	if !strings.Contains(err.Error(), "pass mockup") {
-		t.Errorf("expected pass mockup error, got: %v", err)
+	if want := "pass mockup no longer validates: [title_not_hello]"; !strings.Contains(err.Error(), want) {
+		t.Errorf("expected the failed-rule rejection, got: %v", err)
 	}
 
 	targetDir := filepath.Join(kbRoot, ".akb", "templates")
@@ -1000,6 +1005,111 @@ updated: 2024-01-01
 	for _, f := range []string{"noop.yaml", "noop_pass.md", "noop_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
 			t.Errorf("expected file %s to NOT exist", f)
+		}
+	}
+}
+
+// TestTemplatesWrite_RejectsPassMockupMissingRequiredField pins that the pass
+// mockup must carry every schema-required field: the write is refused, the
+// missing fields are named, and no template file is written.
+func TestTemplatesWrite_RejectsPassMockupMissingRequiredField(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	writeTemplatesWriteFixture(t, kbRoot, "exemplar",
+		`name: exemplar
+description: Template with two required fields
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    status:
+      type: string
+      required: true
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+`,
+		`---
+type: exemplar
+title: Hello
+---
+# Hello
+`,
+		`---
+type: exemplar
+title: ""
+---
+# Empty
+`)
+
+	err := runTemplatesWrite(nil, []string{"exemplar"})
+	if err == nil {
+		t.Fatal("expected the pass mockup's missing required field to refuse the write, got nil")
+	}
+	for _, want := range []string{
+		"pass mockup",
+		`missing required frontmatter field(s): status (declared required by template "exemplar")`,
+		"Provide updated mockup with --pass <path>",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not contain %q", err.Error(), want)
+		}
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"exemplar.yaml", "exemplar_pass.md", "exemplar_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
+			t.Errorf("expected file %s to NOT exist", f)
+		}
+	}
+}
+
+// TestTemplatesWrite_FailMockupIsExemptFromRequiredFields pins that the fail
+// mockup is not held to the schema's required fields: it only has to fail a
+// rule.
+func TestTemplatesWrite_FailMockupIsExemptFromRequiredFields(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+
+	writeTemplatesWriteFixture(t, kbRoot, "exempt",
+		`name: exempt
+description: Template with a required status
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    status:
+      type: string
+      required: true
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+`,
+		`---
+type: exempt
+title: Hello
+status: active
+---
+# Hello
+`,
+		`---
+type: exempt
+title: ""
+---
+# Empty
+`)
+
+	if err := runTemplatesWrite(nil, []string{"exempt"}); err != nil {
+		t.Fatalf("expected the fail mockup's missing required fields to be exempt, got: %v", err)
+	}
+
+	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	for _, f := range []string{"exempt.yaml", "exempt_pass.md", "exempt_fail.md"} {
+		if _, err := os.Stat(filepath.Join(targetDir, f)); os.IsNotExist(err) {
+			t.Errorf("expected file %s to exist", f)
 		}
 	}
 }

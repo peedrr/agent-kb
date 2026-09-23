@@ -1944,3 +1944,121 @@ func TestCheckRequiredFields(t *testing.T) {
 		})
 	}
 }
+
+// adrMissingStatus is an adr page that leaves out the schema-required status
+// field, planted on disk so the update branches read it as an existing page.
+const adrMissingStatus = `---
+type: adr
+title: Planted ADR
+summary: Planted ADR without the required status field
+tags: test
+deciders: team
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+## Context
+
+Context body.
+
+## Decision
+
+Decision body.
+
+## Consequences
+
+Consequences body.`
+
+// TestWriteMissingRequiredFieldsFailsValidation pins that a write of a page
+// whose frontmatter leaves out schema-required fields is a validation failure:
+// exit 1, every missing field named, and no page written.
+func TestWriteMissingRequiredFieldsFailsValidation(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	content := "---\ntype: adr\ntitle: Missing Fields\nsummary: ADR without status and deciders\ntags: test\ncreated: '2026-01-01'\nupdated: '2026-09-01'\n---\n## Context\n\nContext body.\n\n## Decision\n\nDecision body.\n\n## Consequences\n\nConsequences body."
+	out, err := writeRun(kbRoot, "missing-fields.md", content)
+	if err == nil {
+		t.Fatalf("expected the write to fail, got: %s", out)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected an exit error, got %T: %v", err, err)
+	}
+	if code := exitErr.ExitCode(); code != exitFailure {
+		t.Errorf("exit code = %d, want %d; output: %s", code, exitFailure, out)
+	}
+	if want := `missing required frontmatter field(s): deciders, status (declared required by template "adr")`; !strings.Contains(out, want) {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+	if _, statErr := os.Stat(filepath.Join(kbRoot, "kb", "decisions", "missing-fields.md")); !os.IsNotExist(statErr) {
+		t.Errorf("the failed write created a page: %v", statErr)
+	}
+}
+
+// TestWriteFrontmatterUpdateMissingRequiredFieldFailsValidation pins that the
+// --frontmatter branch refuses a page that leaves out a schema-required field,
+// and leaves the page byte-identical.
+func TestWriteFrontmatterUpdateMissingRequiredFieldFailsValidation(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const relPath = "kb/decisions/planted.md"
+	writeRawPage(t, kbRoot, relPath, adrMissingStatus)
+
+	out, err := writeRun(kbRoot, "decisions/planted.md", "", "--frontmatter", "summary=changed")
+	if err == nil {
+		t.Fatalf("expected the frontmatter update to fail, got: %s", out)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected an exit error, got %T: %v", err, err)
+	}
+	if code := exitErr.ExitCode(); code != exitFailure {
+		t.Errorf("exit code = %d, want %d; output: %s", code, exitFailure, out)
+	}
+	if want := `missing required frontmatter field(s): status (declared required by template "adr")`; !strings.Contains(out, want) {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+
+	data, readErr := os.ReadFile(filepath.Join(kbRoot, filepath.FromSlash(relPath))) //nolint:gosec // test reading a known temp file
+	if readErr != nil {
+		t.Fatalf("read the planted page: %v", readErr)
+	}
+	if string(data) != adrMissingStatus {
+		t.Errorf("page changed by the failed update:\nbefore: %q\nafter:  %q", adrMissingStatus, data)
+	}
+}
+
+// TestWriteAppendMissingRequiredFieldFailsValidation pins that the --append
+// branch refuses a page that leaves out a schema-required field, and leaves the
+// page byte-identical.
+func TestWriteAppendMissingRequiredFieldFailsValidation(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const relPath = "kb/decisions/planted-append.md"
+	writeRawPage(t, kbRoot, relPath, adrMissingStatus)
+
+	out, err := writeRun(kbRoot, "decisions/planted-append.md", "Appended body.", "--append")
+	if err == nil {
+		t.Fatalf("expected the append to fail, got: %s", out)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected an exit error, got %T: %v", err, err)
+	}
+	if code := exitErr.ExitCode(); code != exitFailure {
+		t.Errorf("exit code = %d, want %d; output: %s", code, exitFailure, out)
+	}
+	if want := `missing required frontmatter field(s): status (declared required by template "adr")`; !strings.Contains(out, want) {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+
+	data, readErr := os.ReadFile(filepath.Join(kbRoot, filepath.FromSlash(relPath))) //nolint:gosec // test reading a known temp file
+	if readErr != nil {
+		t.Fatalf("read the planted page: %v", readErr)
+	}
+	if string(data) != adrMissingStatus {
+		t.Errorf("page changed by the failed append:\nbefore: %q\nafter:  %q", adrMissingStatus, data)
+	}
+}

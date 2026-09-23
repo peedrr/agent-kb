@@ -140,6 +140,15 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("parse pass mockup frontmatter: %w", err)
 	}
+
+	// The pass mockup is the exemplar every page of the type is written from,
+	// so it must carry every field the schema marks required. The fail mockup
+	// is exempt: it exists to fail a rule, not to model a valid page.
+	if missing := checkRequiredFields(tmpl, passFM); len(missing) > 0 {
+		return fmt.Errorf("pass mockup %s\n\n--- pass mockup ---\n%s\n\nProvide updated mockup with --pass <path>",
+			requiredFieldsMessage(tmpl, missing), string(passData))
+	}
+
 	passPage := buildTestPage(fmt.Sprintf("kb/%s_pass.md", name), passFM, passBody)
 
 	passFailed, _, err := evaluateValidations(celEnv, tmpl.Validations, passPage, nil)

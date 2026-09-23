@@ -737,3 +737,37 @@ func TestAppendSuccessOutputLineStable(t *testing.T) {
 		t.Errorf("stdout = %q, want %q", stdout.String(), want)
 	}
 }
+
+// TestAppendMissingRequiredFieldFailsValidation pins that an append to a page
+// that leaves out a schema-required field is a validation failure: exit 1, the
+// missing field named, and the page left byte-identical.
+func TestAppendMissingRequiredFieldFailsValidation(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	const relPath = "kb/decisions/planted.md"
+	writeRawPage(t, kbRoot, relPath, adrMissingStatus)
+
+	out, err := appendRun(kbRoot, "decisions/planted.md", "Appended body.")
+	if err == nil {
+		t.Fatalf("expected the append to fail, got: %s", out)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected an exit error, got %T: %v", err, err)
+	}
+	if code := exitErr.ExitCode(); code != exitFailure {
+		t.Errorf("exit code = %d, want %d; output: %s", code, exitFailure, out)
+	}
+	if want := `missing required frontmatter field(s): status (declared required by template "adr")`; !strings.Contains(out, want) {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+
+	data, readErr := os.ReadFile(filepath.Join(kbRoot, filepath.FromSlash(relPath))) //nolint:gosec // test reading known temp file
+	if readErr != nil {
+		t.Fatalf("read page after the failed append: %v", readErr)
+	}
+	if string(data) != adrMissingStatus {
+		t.Errorf("page changed by the failed append:\nbefore: %q\nafter:  %q", adrMissingStatus, data)
+	}
+}
