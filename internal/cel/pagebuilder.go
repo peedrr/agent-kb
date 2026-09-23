@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/yuin/goldmark/text"
 
 	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/markdown"
 	"github.com/peedrr/agent-kb/internal/storage"
 )
 
@@ -109,8 +111,9 @@ func BuildOldPage(relPath string, store storage.Provider) (map[string]any, error
 	return BuildPage(relPath, fm, body, doc, body), nil
 }
 
-// The following functions are inlined from internal/markdown to avoid an
-// import cycle (internal/markdown already imports internal/cel for types).
+// The exclusion helpers below duplicate internal/markdown's unexported
+// equivalents (fenced code block, inline code, and HTML comment ranges) for
+// the provenance-marker and annotation parsers.
 
 func offsetToLine(source []byte, offset int) int {
 	if offset < 0 || offset > len(source) {
@@ -153,26 +156,91 @@ func flattenHeadings(doc ast.Node, source []byte) []map[string]any {
 	return headings
 }
 
+// flattenLinks returns one entry per link in source. Wikilink tokens are
+// merged in from markdown.ParseWikilinks because goldmark yields no ast.Link
+// node for a bare [[...]]. Entries are sorted by source offset so CEL
+// evaluation order is deterministic.
 func flattenLinks(doc ast.Node, source []byte) []map[string]any {
-	var links []map[string]any
+	type mergedLink struct {
+		offset int
+		entry  map[string]any
+	}
+
+	var goldmarkLinks []*ast.Link
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
 			return ast.WalkContinue, nil
 		}
-		l, ok := n.(*ast.Link)
-		if !ok {
-			return ast.WalkContinue, nil
+		if l, ok := n.(*ast.Link); ok {
+			goldmarkLinks = append(goldmarkLinks, l)
+		}
+		return ast.WalkContinue, nil
+	})
+
+	// Goldmark sets Link.Pos() to the opening '[' of the link text, which for
+	// the [[display]](dest) form is the wikilink token start itself, so the two
+	// spans describe the same token.
+	byOffset := make(map[int]int, len(goldmarkLinks))
+	for i, l := range goldmarkLinks {
+		byOffset[l.Pos()] = i
+	}
+
+	var merged []mergedLink
+	consumed := make([]bool, len(goldmarkLinks))
+
+	for _, wl := range markdown.ParseWikilinks(string(source)) {
+		i, matched := byOffset[wl.Start]
+		if matched {
+			consumed[i] = true
+			if wl.Destination != "" {
+				// Explicit destination: goldmark's view of this token is
+				// unchanged, now reported as a wikilink.
+				l := goldmarkLinks[i]
+				merged = append(merged, mergedLink{offset: wl.Start, entry: map[string]any{
+					"target":      string(l.Destination),
+					"text":        extractText(l, source),
+					"is_wikilink": true,
+					"line":        offsetToLine(source, wl.Start),
+				}})
+				continue
+			}
+		}
+		// Plain wikilink: bare, or followed by empty, whitespace-only, or
+		// angle-only parens that the parser ignores. Goldmark's empty-
+		// destination entry for the latter is dropped, so the token still
+		// yields exactly one entry, carrying the bracket target.
+		merged = append(merged, mergedLink{offset: wl.Start, entry: map[string]any{
+			"target":      wl.Target,
+			"text":        wl.Display,
+			"is_wikilink": true,
+			"line":        offsetToLine(source, wl.Start),
+		}})
+	}
+
+	for i, l := range goldmarkLinks {
+		if consumed[i] {
+			continue
 		}
 		pos := l.Pos()
 		isWikilink := pos+1 < len(source) && source[pos] == '[' && source[pos+1] == '['
-		links = append(links, map[string]any{
+		merged = append(merged, mergedLink{offset: pos, entry: map[string]any{
 			"target":      string(l.Destination),
 			"text":        extractText(l, source),
 			"is_wikilink": isWikilink,
 			"line":        offsetToLine(source, pos),
-		})
-		return ast.WalkContinue, nil
-	})
+		}})
+	}
+
+	if len(merged) == 0 {
+		return nil
+	}
+
+	sort.SliceStable(merged, func(i, j int) bool { return merged[i].offset < merged[j].offset })
+
+	links := make([]map[string]any, 0, len(merged))
+	for _, m := range merged {
+		links = append(links, m.entry)
+	}
 	return links
 }
 

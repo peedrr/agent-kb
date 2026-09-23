@@ -7,9 +7,11 @@ import (
 
 	"github.com/google/cel-go/common/types"
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
 
 	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/markdown"
 )
 
 type mockStore struct {
@@ -429,5 +431,301 @@ Body text.
 	headings := astMap["headings"].([]map[string]any)
 	if len(headings) != 1 || headings[0]["text"] != "Old Heading" {
 		t.Errorf("headings = %+v, want 1 heading with text Old Heading", headings)
+	}
+}
+
+func flattenLinksForTest(t *testing.T, source string) []map[string]any {
+	t.Helper()
+
+	md := goldmark.New()
+	doc := md.Parser().Parse(text.NewReader([]byte(source)))
+
+	return flattenLinks(doc, []byte(source))
+}
+
+func assertLinkEntry(t *testing.T, entry map[string]any, target, text string, isWikilink bool, line int) {
+	t.Helper()
+
+	if entry["target"] != target {
+		t.Errorf("target = %v, want %q", entry["target"], target)
+	}
+	if entry["text"] != text {
+		t.Errorf("text = %v, want %q", entry["text"], text)
+	}
+	if entry["is_wikilink"] != isWikilink {
+		t.Errorf("is_wikilink = %v, want %v", entry["is_wikilink"], isWikilink)
+	}
+	if entry["line"] != line {
+		t.Errorf("line = %v, want %d", entry["line"], line)
+	}
+}
+
+func TestFlattenLinksWikilinkForms(t *testing.T) {
+	tests := []struct {
+		name       string
+		source     string
+		wantTarget string
+		wantText   string
+		wantLine   int
+	}{
+		{
+			name:       "bare wikilink",
+			source:     "See [[notes/page]] for context.\n",
+			wantTarget: "notes/page",
+			wantText:   "notes/page",
+			wantLine:   1,
+		},
+		{
+			name:       "wikilink with display text",
+			source:     "See [[notes/page|the page]].\n",
+			wantTarget: "notes/page",
+			wantText:   "the page",
+			wantLine:   1,
+		},
+		{
+			name:       "wikilink with heading",
+			source:     "See [[notes/page#Details]].\n",
+			wantTarget: "notes/page",
+			wantText:   "Details",
+			wantLine:   1,
+		},
+		{
+			name:       "explicit destination keeps goldmark target and text",
+			source:     "See [[the page]](notes/page.md).\n",
+			wantTarget: "notes/page.md",
+			wantText:   "[the page]",
+			wantLine:   1,
+		},
+		{
+			name:       "explicit destination wins over heading",
+			source:     "See [[notes/page#Details]](other/page.md).\n",
+			wantTarget: "other/page.md",
+			wantText:   "[notes/page#Details]",
+			wantLine:   1,
+		},
+		{
+			name:       "empty destination parens stay a plain wikilink",
+			source:     "See [[notes/page]]().\n",
+			wantTarget: "notes/page",
+			wantText:   "notes/page",
+			wantLine:   1,
+		},
+		{
+			name:       "whitespace-only destination parens stay a plain wikilink",
+			source:     "See [[notes/page]](   ).\n",
+			wantTarget: "notes/page",
+			wantText:   "notes/page",
+			wantLine:   1,
+		},
+		{
+			name:       "angle-only destination parens stay a plain wikilink",
+			source:     "See [[notes/page]](<>).\n",
+			wantTarget: "notes/page",
+			wantText:   "notes/page",
+			wantLine:   1,
+		},
+		{
+			name:       "unclosed destination parens stay a plain wikilink",
+			source:     "See [[notes/page]](unclosed.\n",
+			wantTarget: "notes/page",
+			wantText:   "notes/page",
+			wantLine:   1,
+		},
+		{
+			name:       "wikilink on a later line",
+			source:     "Intro text.\n\nSee [[notes/page]].\n",
+			wantTarget: "notes/page",
+			wantText:   "notes/page",
+			wantLine:   3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			links := flattenLinksForTest(t, tt.source)
+			if len(links) != 1 {
+				t.Fatalf("links = %+v, want exactly 1 entry", links)
+			}
+			assertLinkEntry(t, links[0], tt.wantTarget, tt.wantText, true, tt.wantLine)
+		})
+	}
+}
+
+func TestFlattenLinksNonWikilinkLinksUnchanged(t *testing.T) {
+	source := "A [plain link](https://example.com) and `[[inline code]]` and:\n\n" +
+		"```\n[[fenced code]]\n```\n"
+
+	links := flattenLinksForTest(t, source)
+	if len(links) != 1 {
+		t.Fatalf("links = %+v, want only the plain markdown link", links)
+	}
+	assertLinkEntry(t, links[0], "https://example.com", "plain link", false, 1)
+}
+
+// Goldmark sets Link.Pos() to the opening '[' of the link text, so for
+// [[display]](dest) it is the wikilink token start. The merge relies on that
+// to recognise the goldmark link and the wikilink as one token; this pins the
+// behaviour of goldmark v1.8.2 that the containment check is built on.
+func TestFlattenLinksExplicitDestinationSharesGoldmarkLinkStart(t *testing.T) {
+	source := "See [[the page]](notes/page.md) for context.\n"
+
+	md := goldmark.New()
+	doc := md.Parser().Parse(text.NewReader([]byte(source)))
+
+	var goldmarkPositions []int
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		if l, ok := n.(*ast.Link); ok {
+			goldmarkPositions = append(goldmarkPositions, l.Pos())
+		}
+		return ast.WalkContinue, nil
+	})
+
+	wikilinks := markdown.ParseWikilinks(source)
+	if len(goldmarkPositions) != 1 || len(wikilinks) != 1 {
+		t.Fatalf("goldmark links = %v, wikilinks = %+v, want one of each", goldmarkPositions, wikilinks)
+	}
+	if goldmarkPositions[0] != wikilinks[0].Start {
+		t.Fatalf("goldmark Link.Pos() = %d, wikilink Start = %d, want equal", goldmarkPositions[0], wikilinks[0].Start)
+	}
+}
+
+func TestFlattenLinksSortedBySourceOffset(t *testing.T) {
+	source := "Bare [[alpha]] then a [plain](https://example.com) then [[beta|B]](notes/beta.md).\n"
+
+	links := flattenLinksForTest(t, source)
+	if len(links) != 3 {
+		t.Fatalf("links = %+v, want 3 entries", links)
+	}
+
+	want := []struct {
+		target     string
+		text       string
+		isWikilink bool
+	}{
+		{"alpha", "alpha", true},
+		{"https://example.com", "plain", false},
+		{"notes/beta.md", "[beta|B]", true},
+	}
+	for i, w := range want {
+		if links[i]["target"] != w.target {
+			t.Errorf("links[%d].target = %v, want %q", i, links[i]["target"], w.target)
+		}
+		if links[i]["text"] != w.text {
+			t.Errorf("links[%d].text = %v, want %q", i, links[i]["text"], w.text)
+		}
+		if links[i]["is_wikilink"] != w.isWikilink {
+			t.Errorf("links[%d].is_wikilink = %v, want %v", i, links[i]["is_wikilink"], w.isWikilink)
+		}
+	}
+}
+
+func TestBuildPageWikilinkLinks(t *testing.T) {
+	mdSource := []byte(`---
+type: note
+title: Wikilink Links
+---
+
+Bare [[alpha]] and [[beta|Beta]] and [[gamma#Section]] and [[display]](notes/delta.md).
+
+Also a [plain link](https://example.com).
+`)
+
+	fm, body, err := frontmatter.Parse(mdSource)
+	if err != nil {
+		t.Fatalf("parse frontmatter: %v", err)
+	}
+
+	md := goldmark.New()
+	doc := md.Parser().Parse(text.NewReader(mdSource))
+
+	page := BuildPage("kb/notes/wikilinks.md", fm, body, doc, mdSource)
+
+	astMap, ok := page["ast"].(map[string]any)
+	if !ok {
+		t.Fatalf("ast map missing")
+	}
+	links, ok := astMap["links"].([]map[string]any)
+	if !ok {
+		t.Fatalf("ast.links type mismatch")
+	}
+	if len(links) != 5 {
+		t.Fatalf("ast.links = %+v, want 5 entries", links)
+	}
+
+	want := []struct {
+		target     string
+		text       string
+		isWikilink bool
+		line       int
+	}{
+		{"alpha", "alpha", true, 6},
+		{"beta", "Beta", true, 6},
+		{"gamma", "Section", true, 6},
+		{"notes/delta.md", "[display]", true, 6},
+		{"https://example.com", "plain link", false, 8},
+	}
+	for i, w := range want {
+		assertLinkEntry(t, links[i], w.target, w.text, w.isWikilink, w.line)
+	}
+}
+
+func TestBuildPageWikilinkLinksInCELRule(t *testing.T) {
+	env, err := NewEnv()
+	if err != nil {
+		t.Fatalf("NewEnv: %v", err)
+	}
+
+	prg, err := CompileRule(env, `page.ast.links.exists(l, l.is_wikilink && l.target == "notes/alpha")`)
+	if err != nil {
+		t.Fatalf("CompileRule: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		body string
+		want bool
+	}{
+		{
+			name: "bare wikilink satisfies the rule",
+			body: "See [[notes/alpha]].\n",
+			want: true,
+		},
+		{
+			name: "wikilink with display text satisfies the rule",
+			body: "See [[notes/alpha|alpha]].\n",
+			want: true,
+		},
+		{
+			name: "plain markdown link does not",
+			body: "See [alpha](notes/alpha.md).\n",
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mdSource := []byte("---\ntype: note\ntitle: Rule Page\n---\n\n" + tt.body)
+
+			fm, body, err := frontmatter.Parse(mdSource)
+			if err != nil {
+				t.Fatalf("parse frontmatter: %v", err)
+			}
+
+			md := goldmark.New()
+			doc := md.Parser().Parse(text.NewReader(mdSource))
+
+			page := BuildPage("kb/notes/rule.md", fm, body, doc, mdSource)
+
+			result, err := Evaluate(context.Background(), prg, map[string]any{"page": page})
+			if err != nil {
+				t.Fatalf("Evaluate: %v", err)
+			}
+			if result != types.Bool(tt.want) {
+				t.Errorf("rule = %v, want %v", result, tt.want)
+			}
+		})
 	}
 }
