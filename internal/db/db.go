@@ -9,11 +9,6 @@ import (
 	_ "modernc.org/sqlite" // SQLite driver
 )
 
-// DB wraps sql.DB with custom operations.
-type DB struct {
-	*sql.DB
-}
-
 // sqliteDSN builds the DSN used for every SQLite connection of a knowledge
 // base. The 5s busy timeout makes a second process wait for a write lock
 // instead of failing immediately with SQLITE_BUSY, and immediate transactions
