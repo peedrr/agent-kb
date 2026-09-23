@@ -120,6 +120,7 @@ agent-kb/
 - **Build output**: Always `-o bin/akb` (never project root)
 - **Template format**: TemplateV2 uses `schema.frontmatter`, `validations[]`, `lint_rules[]` (old `required[]`/`optional[]`/`body` rejected)
 - **CEL variables**: `page` (map), `old_page` (nullable map), `now` (timestamp) injected at evaluation time
+- **CEL rule evaluation**: write-time CEL eval errors fail closed (exit 1, write blocked, author-directed message); lint-time eval errors degrade to per-page issues and the sweep continues. The divergence is deliberate.
 - **Date fields**: any frontmatter string value that parses as RFC3339 or date-only `2006-01-02` is converted to `time.Time` for CEL `timestamp()` and duration math
 - **Template name validation**: Names must match `^[a-zA-Z0-9_-]+$` (regex-enforced, prevents path traversal)
 - **`--force` semantics**: On template commands, bypasses existence warning only; never bypasses mockup validation

@@ -80,7 +80,20 @@ Inspectable fields:
 
 Any frontmatter string that parses as RFC3339 or a date-only `2006-01-02` is auto-converted to a timestamp for CEL `timestamp()` and duration math.
 
-Every rule that reads an optional frontmatter key must guard the access with `has()`, e.g. `!has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("2160h")`. An absent key makes the rule vacuously true; reading the key unguarded fails the rule instead of skipping it. `type` and `title` need no guard — every page write guarantees both.
+### Guarding frontmatter reads with has()
+
+`has()` is what keeps a rule working when a key it reads may be absent: an absent key makes the rule vacuously true, while reading that key unguarded fails the rule instead of skipping it. Which reads need the guard depends on who guarantees the key:
+
+- **Required keys** — schema fields marked `required: true` are read **unguarded** in validations: `akb write` refuses a page that leaves one out before any rule runs, so the key is always present. `type` and `title` are guaranteed by every write path, so they need no guard anywhere — lint rules included.
+- **Optional keys** — **always guarded** with `has()`, e.g. `!has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("2160h")`. A valid page may omit the key.
+- **`old_page`** — **always guarded**: it is nil on create, and the on-disk page may predate presence enforcement or never have passed `akb write` at all (git pull, index rebuild ingestion).
+- **Lint rules** — guard **everything except `type` and `title`**: the sweep evaluates pages that may never have passed `akb write`.
+
+An unguarded read is an evaluation error, and the three surfaces react to it differently — the divergence is deliberate:
+
+- **Write** — the rule fails, the write is blocked (exit 1), and the message names the offending rule.
+- **Lint sweep** — the error degrades to a per-page `cel_lint` issue and the sweep continues; one broken rule never aborts the run.
+- **Template write** — the optional-key-stripping variant check rejects the template, telling the author to guard the key with `has()` or mark it `required: true`.
 
 `akb template write` proves the pass mockup three ways: as given, once with each schema-optional key the mockup supplies removed (`type` and `title` excepted — every write guarantees both), and once with `old_page` set to the mockup itself (a no-op update). A rule that only works at create time fails the write instead of the first real page.
 

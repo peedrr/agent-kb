@@ -132,6 +132,7 @@ validations:
     expect: only proposed->accepted, accepted->deprecated, accepted->superseded transitions are allowed
 
   # CEL Concept: old_page immutability
+  # CEL Concept: has() guard
   - id: created_immutable
     rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.created) || old_page.frontmatter.created == page.frontmatter.created'
     requirement: Created date must never change
@@ -150,30 +151,35 @@ validations:
     expect: created timestamp must be less than or equal to current time
 
   # CEL Concept: Conditional requirement / logical implication
+  # CEL Concept: has() guard
   - id: superseded_requires_field
     rule: 'page.frontmatter.status != "superseded" || (has(page.frontmatter.supersedes) && page.frontmatter.supersedes != "")'
     requirement: When status is superseded, supersedes field must be set
     expect: superseded ADRs must specify what they supersede
 
   # CEL Concept: Conditional prohibition
+  # CEL Concept: has() guard
   - id: proposed_has_no_supersedes
     rule: 'page.frontmatter.status != "proposed" || !has(page.frontmatter.supersedes)'
     requirement: A proposed ADR must not name what it supersedes
     expect: proposed ADRs must not set supersedes
 lint_rules:
   # CEL Concept: Temporal drift detection (warning)
+  # CEL Concept: has() guard
   - id: adr_stale
     rule: '!has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("4320h")'
     severity: warning
     expect: ADR hasn't been updated in 180 days
 
   # CEL Concept: Temporal conditional enforcement (error)
+  # CEL Concept: has() guard
   - id: deprecated_flagged
     rule: '!has(page.frontmatter.status) || page.frontmatter.status != "deprecated" || !has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("720h")'
     severity: error
     expect: Deprecated ADRs must be updated within 30 days
 
   # CEL Concept: Temporal conditional enforcement (warning)
+  # CEL Concept: has() guard
   - id: proposed_too_long
     rule: '!has(page.frontmatter.status) || page.frontmatter.status != "proposed" || !has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("2160h")'
     severity: warning

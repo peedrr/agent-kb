@@ -13,7 +13,7 @@ TemplateV2 loader for typed page templates with CEL validations and lint rules. 
 | `template.go` | TemplateV2 struct, loader, old-format detection, embedded defaults |
 | `embedded/adr.yaml` | Default ADR template with validations + lint_rules |
 | `embedded/adr_pass.md` | Valid ADR mockup |
-| `embedded/adr_fail.md` | Invalid ADR mockup (fails require_context) |
+| `embedded/adr_fail.md` | Invalid ADR mockup (fails valid_status) |
 | `embedded/note.yaml` | Default note template with validations + lint_rules |
 | `embedded/note_pass.md` | Valid note mockup |
 | `embedded/note_fail.md` | Invalid note mockup |
