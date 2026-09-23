@@ -44,8 +44,11 @@ func (e *GuardError) Error() string { return e.rule.Error() }
 
 func (e *GuardError) Unwrap() error { return e.rule }
 
-// ResolveKBPath resolves a KB-relative path with guard rails.
-// It strips redundant "kb/" prefix and validates the path.
+// ResolveKBPath resolves a KB-relative path with guard rails. It strips a
+// redundant "kb/" prefix and validates the path, then returns it rooted at the
+// kb/ directory that holds the pages of the knowledge base: the page addressed
+// as "docs/readme.md" resolves to kbRoot/kb/docs/readme.md. The returned path
+// is checked for symlink escapes out of kbRoot before it is returned.
 func ResolveKBPath(kbRoot, inputPath string) (string, error) {
 	// Reject empty path
 	if strings.TrimSpace(inputPath) == "" {
@@ -80,7 +83,11 @@ func ResolveKBPath(kbRoot, inputPath string) (string, error) {
 	// separators cannot mask the target from callers.
 	cleanPath = filepath.Clean(cleanPath)
 
-	resolved := filepath.Join(kbRoot, cleanPath)
+	// Pages live in the kb/ directory of the base, so the resolved path is
+	// rooted there. The containment check runs on that path: kb/ is a component
+	// of it, so kb/ being an escaping symlink is caught before any page below it
+	// is followed.
+	resolved := filepath.Join(kbRoot, "kb", cleanPath)
 	if err := assertContained(kbRoot, resolved); err != nil {
 		return "", err
 	}
@@ -192,6 +199,16 @@ func assertContained(kbRoot, resolved string) error {
 		current = resolvedTarget
 	}
 	return nil
+}
+
+// AssertContained reports whether p stays inside kbRoot once the filesystem
+// follows symlinks. It is the exported spelling of the check the resolvers run
+// on their own results, for callers that build a path by re-joining the base
+// root. p must already be lexically clean: the check inspects the components
+// below kbRoot and reports an escaping link as a GuardError wrapping
+// ErrSymlinkEscape, but rejecting '..' is the caller's own guard.
+func AssertContained(kbRoot, p string) error {
+	return assertContained(kbRoot, p)
 }
 
 // resolveLink reports where the symlink at link lands, following its chain.

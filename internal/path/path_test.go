@@ -26,7 +26,7 @@ func TestResolveKBPath(t *testing.T) {
 		{
 			name:        "basic path resolution",
 			inputPath:   "docs/readme.md",
-			expected:    filepath.Join(kbRoot, "docs/readme.md"),
+			expected:    filepath.Join(kbRoot, "kb", "docs/readme.md"),
 			expectError: false,
 		},
 
@@ -102,13 +102,13 @@ func TestResolveKBPath(t *testing.T) {
 		{
 			name:        "kb prefix stripped",
 			inputPath:   "kb/docs/readme.md",
-			expected:    filepath.Join(kbRoot, "docs/readme.md"),
+			expected:    filepath.Join(kbRoot, "kb", "docs/readme.md"),
 			expectError: false,
 		},
 		{
 			name:        "kb prefix only",
 			inputPath:   "kb",
-			expected:    filepath.Join(kbRoot, "."),
+			expected:    filepath.Join(kbRoot, "kb", "."),
 			expectError: false,
 		},
 
@@ -116,37 +116,37 @@ func TestResolveKBPath(t *testing.T) {
 		{
 			name:        "simple filename",
 			inputPath:   "notes.txt",
-			expected:    filepath.Join(kbRoot, "notes.txt"),
+			expected:    filepath.Join(kbRoot, "kb", "notes.txt"),
 			expectError: false,
 		},
 		{
 			name:        "nested path",
 			inputPath:   "a/b/c/d.txt",
-			expected:    filepath.Join(kbRoot, "a/b/c/d.txt"),
+			expected:    filepath.Join(kbRoot, "kb", "a/b/c/d.txt"),
 			expectError: false,
 		},
 		{
 			name:        "filename with spaces",
 			inputPath:   "notes/my note.md",
-			expected:    filepath.Join(kbRoot, "notes/my note.md"),
+			expected:    filepath.Join(kbRoot, "kb", "notes/my note.md"),
 			expectError: false,
 		},
 		{
 			name:        "unicode filename",
 			inputPath:   "notes/日本語.md",
-			expected:    filepath.Join(kbRoot, "notes/日本語.md"),
+			expected:    filepath.Join(kbRoot, "kb", "notes/日本語.md"),
 			expectError: false,
 		},
 		{
 			name:        "emoji filename",
 			inputPath:   "notes/🚀-rocket.md",
-			expected:    filepath.Join(kbRoot, "notes/🚀-rocket.md"),
+			expected:    filepath.Join(kbRoot, "kb", "notes/🚀-rocket.md"),
 			expectError: false,
 		},
 		{
 			name:        "very long filename",
 			inputPath:   "notes/" + strings.Repeat("a", 255) + ".md",
-			expected:    filepath.Join(kbRoot, "notes/"+strings.Repeat("a", 255)+".md"),
+			expected:    filepath.Join(kbRoot, "kb", "notes/"+strings.Repeat("a", 255)+".md"),
 			expectError: false,
 		},
 	}
@@ -337,7 +337,7 @@ func TestResolveKBPathRejectsSymlinkEscapes(t *testing.T) {
 			name:  "file symlink to an existing file outside",
 			input: "evil.md",
 			setup: func(t *testing.T, kbRoot string) string {
-				link := filepath.Join(kbRoot, "evil.md")
+				link := filepath.Join(makeKBDir(t, kbRoot), "evil.md")
 				mustSymlink(t, filepath.Join(outside, "secret.md"), link)
 				return link
 			},
@@ -346,7 +346,7 @@ func TestResolveKBPathRejectsSymlinkEscapes(t *testing.T) {
 			name:  "file symlink to a directory outside",
 			input: "evil.md",
 			setup: func(t *testing.T, kbRoot string) string {
-				link := filepath.Join(kbRoot, "evil.md")
+				link := filepath.Join(makeKBDir(t, kbRoot), "evil.md")
 				mustSymlink(t, outside, link)
 				return link
 			},
@@ -355,7 +355,7 @@ func TestResolveKBPathRejectsSymlinkEscapes(t *testing.T) {
 			name:  "directory symlink used as an intermediate component",
 			input: filepath.Join("evil", "secret.md"),
 			setup: func(t *testing.T, kbRoot string) string {
-				link := filepath.Join(kbRoot, "evil")
+				link := filepath.Join(makeKBDir(t, kbRoot), "evil")
 				mustSymlink(t, outside, link)
 				return link
 			},
@@ -364,10 +364,11 @@ func TestResolveKBPathRejectsSymlinkEscapes(t *testing.T) {
 			name:  "nested intermediate directory symlink",
 			input: filepath.Join("docs", "evil", "nested", "secret.md"),
 			setup: func(t *testing.T, kbRoot string) string {
-				if err := os.MkdirAll(filepath.Join(kbRoot, "docs"), 0750); err != nil {
+				docs := filepath.Join(makeKBDir(t, kbRoot), "docs")
+				if err := os.MkdirAll(docs, 0750); err != nil {
 					t.Fatalf("create docs directory: %v", err)
 				}
-				link := filepath.Join(kbRoot, "docs", "evil")
+				link := filepath.Join(docs, "evil")
 				mustSymlink(t, outside, link)
 				return link
 			},
@@ -376,11 +377,12 @@ func TestResolveKBPathRejectsSymlinkEscapes(t *testing.T) {
 			name:  "relative symlink pointing outside",
 			input: "evil.md",
 			setup: func(t *testing.T, kbRoot string) string {
-				rel, err := filepath.Rel(kbRoot, filepath.Join(outside, "secret.md"))
+				pages := makeKBDir(t, kbRoot)
+				rel, err := filepath.Rel(pages, filepath.Join(outside, "secret.md"))
 				if err != nil {
 					t.Fatalf("relative target: %v", err)
 				}
-				link := filepath.Join(kbRoot, "evil.md")
+				link := filepath.Join(pages, "evil.md")
 				mustSymlink(t, rel, link)
 				return link
 			},
@@ -389,7 +391,7 @@ func TestResolveKBPathRejectsSymlinkEscapes(t *testing.T) {
 			name:  "dangling symlink whose target lies outside",
 			input: "evil.md",
 			setup: func(t *testing.T, kbRoot string) string {
-				link := filepath.Join(kbRoot, "evil.md")
+				link := filepath.Join(makeKBDir(t, kbRoot), "evil.md")
 				mustSymlink(t, filepath.Join(outside, "not-yet.md"), link)
 				return link
 			},
@@ -482,7 +484,8 @@ func TestResolveKBPathKeepsSymlinksInsideTheBase(t *testing.T) {
 	symlinkSupport(t)
 
 	kbRoot := t.TempDir()
-	docs := filepath.Join(kbRoot, "docs")
+	pages := makeKBDir(t, kbRoot)
+	docs := filepath.Join(pages, "docs")
 	if err := os.MkdirAll(docs, 0750); err != nil {
 		t.Fatalf("create docs directory: %v", err)
 	}
@@ -491,10 +494,10 @@ func TestResolveKBPathKeepsSymlinksInsideTheBase(t *testing.T) {
 		t.Fatalf("create target page: %v", err)
 	}
 
-	mustSymlink(t, target, filepath.Join(kbRoot, "absolute-link.md"))
-	mustSymlink(t, filepath.Join("docs", "target.md"), filepath.Join(kbRoot, "relative-link.md"))
-	mustSymlink(t, docs, filepath.Join(kbRoot, "alias"))
-	mustSymlink(t, filepath.Join(docs, "not-yet.md"), filepath.Join(kbRoot, "dangling-link.md"))
+	mustSymlink(t, target, filepath.Join(pages, "absolute-link.md"))
+	mustSymlink(t, filepath.Join("docs", "target.md"), filepath.Join(pages, "relative-link.md"))
+	mustSymlink(t, docs, filepath.Join(pages, "alias"))
+	mustSymlink(t, filepath.Join(docs, "not-yet.md"), filepath.Join(pages, "dangling-link.md"))
 
 	tests := []struct {
 		name  string
@@ -512,7 +515,7 @@ func TestResolveKBPathKeepsSymlinksInsideTheBase(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ResolveKBPath(%q) rejected a symlink inside the base: %v", tt.input, err)
 			}
-			if want := filepath.Join(kbRoot, tt.input); got != want {
+			if want := filepath.Join(pages, tt.input); got != want {
 				t.Fatalf("ResolveKBPath(%q) = %q, want %q", tt.input, got, want)
 			}
 		})
@@ -567,7 +570,7 @@ func TestResolveKBPathRejectsEscapesDeeperUnderAContainedSymlink(t *testing.T) {
 	}
 	outside := t.TempDir()
 
-	mustSymlink(t, docs, filepath.Join(kbRoot, "alias"))
+	mustSymlink(t, docs, filepath.Join(makeKBDir(t, kbRoot), "alias"))
 	mustSymlink(t, outside, filepath.Join(docs, "evil"))
 
 	// The link below the contained alias is named by its resolved path: the
@@ -596,7 +599,7 @@ func TestResolveKBPathRejectsSiblingNameSharingTheRootPrefix(t *testing.T) {
 		t.Fatalf("create sibling file: %v", err)
 	}
 
-	link := filepath.Join(kbRoot, "evil.md")
+	link := filepath.Join(makeKBDir(t, kbRoot), "evil.md")
 	mustSymlink(t, filepath.Join(sibling, "secret.md"), link)
 
 	got, err := ResolveKBPath(kbRoot, "evil.md")
@@ -605,7 +608,7 @@ func TestResolveKBPathRejectsSiblingNameSharingTheRootPrefix(t *testing.T) {
 
 func TestResolversAllowNonexistentWriteTargets(t *testing.T) {
 	kbRoot := t.TempDir()
-	for _, dir := range []string{"notes", filepath.Join("raw", "logs")} {
+	for _, dir := range []string{filepath.Join("kb", "notes"), filepath.Join("raw", "logs")} {
 		if err := os.MkdirAll(filepath.Join(kbRoot, dir), 0750); err != nil {
 			t.Fatalf("create %s: %v", dir, err)
 		}
@@ -621,13 +624,13 @@ func TestResolversAllowNonexistentWriteTargets(t *testing.T) {
 			name:    "new page in an existing directory",
 			resolve: ResolveKBPath,
 			input:   "notes/new-page.md",
-			want:    filepath.Join(kbRoot, "notes", "new-page.md"),
+			want:    filepath.Join(kbRoot, "kb", "notes", "new-page.md"),
 		},
 		{
 			name:    "new nested tree",
 			resolve: ResolveKBPath,
 			input:   "brand/new/tree/page.md",
-			want:    filepath.Join(kbRoot, "brand", "new", "tree", "page.md"),
+			want:    filepath.Join(kbRoot, "kb", "brand", "new", "tree", "page.md"),
 		},
 		{
 			name:    "new raw file",
@@ -654,10 +657,11 @@ func TestResolveKBPathAcceptsBaseReachedThroughASymlink(t *testing.T) {
 	symlinkSupport(t)
 
 	realRoot := filepath.Join(t.TempDir(), "kb")
-	if err := os.MkdirAll(filepath.Join(realRoot, "docs"), 0750); err != nil {
+	pages := filepath.Join(realRoot, "kb")
+	if err := os.MkdirAll(filepath.Join(pages, "docs"), 0750); err != nil {
 		t.Fatalf("create docs directory: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(realRoot, "docs", "readme.md"), []byte("body\n"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(pages, "docs", "readme.md"), []byte("body\n"), 0600); err != nil {
 		t.Fatalf("create readme: %v", err)
 	}
 
@@ -680,10 +684,116 @@ func TestResolveKBPathAcceptsBaseReachedThroughASymlink(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ResolveKBPath rejected %q reached through a symlink: %v", tt.kbRoot, err)
 			}
-			if want := filepath.Join(tt.kbRoot, "docs", "readme.md"); got != want {
+			if want := filepath.Join(tt.kbRoot, "kb", "docs", "readme.md"); got != want {
 				t.Fatalf("ResolveKBPath = %q, want %q", got, want)
 			}
 		})
+	}
+}
+
+// TestResolveKBPathRootsPagesUnderTheKBLayer pins the kb/-rooted resolver
+// contract: an escaping link below kb/ is rejected, a symlinked kb/ itself is
+// rejected before any page below it is followed, in-tree links keep resolving,
+// and a missing write target on a clean path still resolves.
+func TestResolveKBPathRootsPagesUnderTheKBLayer(t *testing.T) {
+	symlinkSupport(t)
+
+	t.Run("symlink under kb pointing outside is rejected", func(t *testing.T) {
+		kbRoot := t.TempDir()
+		outside := t.TempDir()
+		if err := os.WriteFile(filepath.Join(outside, "secret.md"), []byte("secret\n"), 0600); err != nil {
+			t.Fatalf("create outside file: %v", err)
+		}
+		link := filepath.Join(makeKBDir(t, kbRoot), "evil.md")
+		mustSymlink(t, filepath.Join(outside, "secret.md"), link)
+
+		got, err := ResolveKBPath(kbRoot, "evil.md")
+		assertSymlinkEscape(t, err, got, link)
+	})
+
+	t.Run("kb itself symlinked outside is rejected", func(t *testing.T) {
+		outside := t.TempDir()
+		for _, name := range []string{"index.md", "log.md", "page.md"} {
+			if err := os.WriteFile(filepath.Join(outside, name), []byte("outside\n"), 0600); err != nil {
+				t.Fatalf("create outside %s: %v", name, err)
+			}
+		}
+
+		kbRoot := t.TempDir()
+		link := filepath.Join(kbRoot, "kb")
+		mustSymlink(t, outside, link)
+
+		// The fixed-name joins kb/index.md and kb/log.md are covered by the same
+		// rejection: the kb/ component is refused before the page below it is
+		// reached.
+		for _, input := range []string{"index.md", "log.md", "page.md"} {
+			t.Run(input, func(t *testing.T) {
+				got, err := ResolveKBPath(kbRoot, input)
+				assertSymlinkEscape(t, err, got, link)
+			})
+		}
+	})
+
+	t.Run("in-tree symlink still resolves", func(t *testing.T) {
+		kbRoot := t.TempDir()
+		pages := makeKBDir(t, kbRoot)
+		target := filepath.Join(pages, "target.md")
+		if err := os.WriteFile(target, []byte("body\n"), 0600); err != nil {
+			t.Fatalf("create target page: %v", err)
+		}
+		mustSymlink(t, target, filepath.Join(pages, "link.md"))
+
+		got, err := ResolveKBPath(kbRoot, "link.md")
+		if err != nil {
+			t.Fatalf("ResolveKBPath rejected an in-tree symlink: %v", err)
+		}
+		if want := filepath.Join(pages, "link.md"); got != want {
+			t.Fatalf("ResolveKBPath = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("nonexistent write target resolves", func(t *testing.T) {
+		kbRoot := t.TempDir()
+
+		got, err := ResolveKBPath(kbRoot, filepath.Join("notes", "new-page.md"))
+		if err != nil {
+			t.Fatalf("ResolveKBPath rejected the write target: %v", err)
+		}
+		if want := filepath.Join(kbRoot, "kb", "notes", "new-page.md"); got != want {
+			t.Fatalf("ResolveKBPath = %q, want %q", got, want)
+		}
+	})
+}
+
+// TestAssertContained pins the exported containment entry point: it accepts a
+// path inside the base and rejects a link that leaves it, like the resolvers.
+func TestAssertContained(t *testing.T) {
+	symlinkSupport(t)
+
+	kbRoot := t.TempDir()
+	pages := makeKBDir(t, kbRoot)
+	if err := os.WriteFile(filepath.Join(pages, "page.md"), []byte("body\n"), 0600); err != nil {
+		t.Fatalf("create page: %v", err)
+	}
+
+	if err := AssertContained(kbRoot, filepath.Join(pages, "page.md")); err != nil {
+		t.Fatalf("AssertContained rejected an in-tree path: %v", err)
+	}
+
+	outside := t.TempDir()
+	link := filepath.Join(pages, "evil.md")
+	mustSymlink(t, outside, link)
+
+	err := AssertContained(kbRoot, link)
+	if err == nil {
+		t.Fatalf("AssertContained accepted the escaping symlink at %s", link)
+	}
+	var guardErr *GuardError
+	if !errors.As(err, &guardErr) {
+		t.Fatalf("expected a GuardError, got %T: %v", err, err)
+	}
+	if !errors.Is(err, ErrSymlinkEscape) {
+		t.Fatalf("expected ErrSymlinkEscape, got %v", err)
 	}
 }
 
@@ -696,6 +806,18 @@ func symlinkSupport(t *testing.T) {
 	if err := os.Symlink(dir, filepath.Join(dir, "probe")); err != nil {
 		t.Skipf("symlinks are not supported here: %v", err)
 	}
+}
+
+// makeKBDir creates the kb/ directory a knowledge base keeps its pages in and
+// returns it.
+func makeKBDir(t *testing.T, kbRoot string) string {
+	t.Helper()
+
+	dir := filepath.Join(kbRoot, "kb")
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		t.Fatalf("create kb directory: %v", err)
+	}
+	return dir
 }
 
 // mustSymlink creates a symlink or fails the test.
