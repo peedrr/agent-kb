@@ -21,8 +21,11 @@ write is committed.
 ## Quick start
 
 ```bash
-akb init my-kb                                  # directory, git repo, default templates, search index
+akb init my-kb                                  # directory, git repo, search index
 akb --kb my-kb status
+
+# init seeds no templates: install the note type before the first write
+akb template get note --full --examples > my-kb/.akb/templates/note.yaml
 
 akb --kb my-kb write notes/overview.md <<'EOF'
 ---
