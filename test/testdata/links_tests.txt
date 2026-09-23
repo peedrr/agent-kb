@@ -100,6 +100,39 @@ exec akb links notes/wikilink-note.md
 stdout 'Outbound:'
 stdout 'another-links-note'
 
+# --- Explicit destination links: [[bracket title]](dest.md) resolve to the dest ---
+
+stdin ../explicit-dest-target-input.md
+exec akb write explicit-dest-target.md
+stdout 'Written to kb/notes/explicit-dest-target.md'
+
+stdin ../explicit-dest-source-input.md
+exec akb write explicit-dest-source.md
+stdout 'Written to kb/notes/explicit-dest-source.md'
+
+# links show records the destination as the raw target and resolves it to the
+# destination page; the bracket title is display text, never a link target.
+exec akb links notes/explicit-dest-source.md
+stdout 'Outbound:'
+stdout 'notes/explicit-dest-target -> kb/notes/explicit-dest-target.md'
+stdout 'Broken:'
+stdout 'notes/missing-dest'
+! stdout 'Bracket Title'
+
+# backlinks are recorded against the destination page.
+exec akb backlinks notes/explicit-dest-target.md
+stdout 'notes/explicit-dest-source.md'
+
+# the destination page has an inbound link, so it is not an orphan.
+exec akb orphans
+! stdout 'notes/explicit-dest-target.md'
+
+# the lint sweep re-resolves the link graph; the broken explicit destination is
+# reported as the destination, not the bracket title.
+! exec akb lint
+stdout 'broken link to \[\[notes/missing-dest\]\]'
+! stdout 'Broken Bracket Title'
+
 -- note-input.md --
 ---
 type: note
@@ -161,3 +194,22 @@ Simple link: [[another-links-note]]
 Display link: [[another-links-note|alt display]]
 Heading link: [[another-links-note#Introduction]]
 Heading with display: [[another-links-note#Introduction|see intro]]
+
+-- explicit-dest-target-input.md --
+---
+type: note
+title: Explicit Destination Target
+summary: Target reached through an explicit destination link
+tags: linktest
+---
+This note is the destination of a wikilink that spells its path explicitly.
+
+-- explicit-dest-source-input.md --
+---
+type: note
+title: Explicit Destination Source
+summary: Note linking through explicit destinations
+tags: linktest
+---
+Explicit destination link: [[Bracket Title]](notes/explicit-dest-target.md)
+Broken explicit destination link: [[Broken Bracket Title]](notes/missing-dest.md)
