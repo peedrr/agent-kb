@@ -9,8 +9,7 @@ cd adr-write-kb
 stdin ../adr-missing-status.md
 exec bash -c 'akb write bad-adr.md; echo "akb-exit=$?"'
 stdout 'akb-exit=1$'
-stderr 'missing required frontmatter field\(s\): status'
-stderr 'declared required by template "adr"'
+stderr '^missing required frontmatter field\(s\): status \(declared required by template "adr"\)$'
 ! exists kb/decisions/bad-adr.md
 
 -- adr-missing-status.md --
