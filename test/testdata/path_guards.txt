@@ -58,6 +58,17 @@ stdin ../append-input.md
 ! exec akb append notes/nonexistent.md
 stderr 'page not found'
 
+# --- In-KB symlink pointing outside the KB ---
+# A page that is a symlink out of the base is an invocation mistake too: the
+# read is refused before the target is read, with the usage: prefix and the
+# escaping link named. Planting the fixture needs symlink support, so the
+# block runs only where the harness reports it.
+[symlink] symlink kb/evil.md -> ../../outside.md
+[symlink] exec bash -c 'akb read evil.md; echo "akb-exit=$?"'
+[symlink] stdout 'akb-exit=2$'
+[symlink] stderr 'usage: resolve path: path escapes the knowledge base through a symlink: '${WORK@R}'/test-kb/kb/evil\.md'
+[symlink] ! stdout 'outside the base'
+
 -- raw-prefix-input.md --
 ---
 type: note
@@ -88,3 +99,10 @@ Content
 
 -- append-input.md --
 Appended content
+
+-- outside.md --
+---
+type: note
+title: Outside
+---
+content outside the base

@@ -1,5 +1,6 @@
 # KB Addressing — flag over environment, an empty environment counts as unset,
-# relative and tilde paths, and the no-selection usage error.
+# relative and tilde paths, a selected path that is not a knowledge base, and
+# the no-selection usage error.
 
 exec akb init kb-one
 stdout 'Initialized KB .kb-one.'
@@ -30,6 +31,14 @@ stdout 'Initialized KB .kb-home.'
 cd $WORK
 exec akb --kb ~/kb-home status
 stdout 'Name: kb-home'
+
+# A selected path that exists but holds no .akb/.akb.yaml marker is an
+# invocation mistake: the command refuses to run, names the path and the
+# missing marker, and points at `akb discover`.
+mkdir not-a-kb
+exec bash -c 'akb --kb not-a-kb status; echo "akb-exit=$?"'
+stdout 'akb-exit=2$'
+stderr 'usage: resolve knowledge base: not a knowledge base: '${WORK@R}'/not-a-kb has no \.akb/\.akb\.yaml; run `akb discover` to list nearby knowledge bases'
 
 # With neither selection, the command reports a usage mistake and lists the
 # nearby bases, nearest first, with the remediation for selecting one.
