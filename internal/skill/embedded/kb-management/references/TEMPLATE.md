@@ -2,6 +2,8 @@
 
 **When:** Create, inspect, modify, or remove a page type. Triggers on: create template, define page type, add schema, design template, update template, change template, modify template, add validation rule, delete template, remove template, template list, what types exist.
 
+**Selection:** every command here picks its KB per invocation with `--kb <path>` or the `AKB_KB` environment variable; there is no stored default (`akb discover` lists nearby bases).
+
 ## The Template Mindset
 
 Templates are **contracts**, not documentation. They define what "valid" means for every page of a given type.
@@ -74,7 +76,7 @@ Inspectable fields:
 - `page.ast.code_blocks` — list of `{language, line}`
 - `page.content.word_count`, `page.content.char_count`
 
-Date fields (`created`, `updated`) are auto-converted from ISO-8601 strings to timestamps for CEL `timestamp()` and duration math.
+Any frontmatter string that parses as RFC3339 or a date-only `2006-01-02` is auto-converted to a timestamp for CEL `timestamp()` and duration math.
 
 ## Workflow: Create a New Template
 

@@ -2,6 +2,8 @@
 
 **When:** "lint", "health check", "find gaps", "what needs fixing", or after batch ingests and template changes.
 
+**Selection:** every command here picks its KB per invocation with `--kb <path>` or the `AKB_KB` environment variable; there is no stored default (`akb discover` lists nearby bases).
+
 ## Procedure
 
 1. Run all lint checks:

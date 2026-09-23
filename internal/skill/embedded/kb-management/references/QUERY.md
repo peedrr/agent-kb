@@ -2,6 +2,8 @@
 
 **When:** User asks "what do we know about X?", "compare A and B", or any domain question.
 
+**Selection:** every command here picks its KB per invocation with `--kb <path>` or the `AKB_KB` environment variable; there is no stored default (`akb discover` lists nearby bases).
+
 ## Core Rule
 
 Never answer from general knowledge. The KB is the source of truth. Search and read the wiki first.

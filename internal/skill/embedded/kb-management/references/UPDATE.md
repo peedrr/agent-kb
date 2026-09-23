@@ -2,6 +2,8 @@
 
 **When:** User wants edits, corrections, merges, or cascade updates.
 
+**Selection:** every command here picks its KB per invocation with `--kb <path>` or the `AKB_KB` environment variable; there is no stored default (`akb discover` lists nearby bases).
+
 ## Procedure
 
 1. **Read the current page:**

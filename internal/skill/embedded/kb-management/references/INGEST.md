@@ -2,6 +2,8 @@
 
 **When:** User provides documents, URLs, pasted text, or says "add this to the wiki".
 
+**Selection:** every command here picks its KB per invocation with `--kb <path>` or the `AKB_KB` environment variable; there is no stored default (`akb discover` lists nearby bases).
+
 ## Critical Rule
 
 Raw sources and KB pages are **separate**. Never store undistilled source text as a KB page.
