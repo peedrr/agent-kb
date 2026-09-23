@@ -56,6 +56,9 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
 		return fmt.Errorf("resolve templates directory: %w", err)
 	}
+	if err := assertTemplateFilesContained(kbRoot, templatesDir); err != nil {
+		return fmt.Errorf("resolve templates directory: %w", err)
+	}
 	templates, err := template.LoadTemplates(templatesDir)
 	if err != nil {
 		return fmt.Errorf("load templates: %w", err)
@@ -166,6 +169,9 @@ func runTemplateList(_ *cobra.Command, _ []string) error {
 	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
 		return fmt.Errorf("resolve templates directory: %w", err)
 	}
+	if err := assertTemplateFilesContained(kbRoot, templatesDir); err != nil {
+		return fmt.Errorf("resolve templates directory: %w", err)
+	}
 	templates, err := template.LoadTemplates(templatesDir)
 	if err != nil {
 		return fmt.Errorf("load templates: %w", err)
@@ -178,6 +184,31 @@ func runTemplateList(_ *cobra.Command, _ []string) error {
 
 	for name, tmpl := range templates {
 		fmt.Printf("%s: %s\n", name, tmpl.Description)
+	}
+	return nil
+}
+
+// assertTemplateFilesContained checks every entry below templatesDir against
+// kbRoot's symlink boundary. The directory check alone accepts a symlinked
+// template file inside a real directory, which LoadTemplates then reads. A
+// missing templates directory is not an error, matching LoadTemplates' empty
+// result for it.
+func assertTemplateFilesContained(kbRoot, templatesDir string) error {
+	entries, err := os.ReadDir(templatesDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("read templates directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if err := path.AssertContained(kbRoot, filepath.Join(templatesDir, entry.Name())); err != nil {
+			return fmt.Errorf("check template file %s: %w", entry.Name(), err)
+		}
 	}
 	return nil
 }

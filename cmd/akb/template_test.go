@@ -477,3 +477,59 @@ func TestTemplateDelete_RejectsSymlinkedTemplatesDir(t *testing.T) {
 
 	assertSymlinkEscape(t, runTemplateDelete(nil, []string{"note"}))
 }
+
+// TestTemplateGet_RejectsSymlinkedTemplateFile pins that a template file that
+// is a symlink out of the base is rejected before it is loaded, so the writer
+// view stays consistent with the checked --full read.
+func TestTemplateGet_RejectsSymlinkedTemplateFile(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+
+	const secret = "SECRET_TEMPLATE_CONTENT"
+	outsideFile := filepath.Join(t.TempDir(), "outside.yaml")
+	outsideYAML := "name: note\ndescription: " + secret + "\n"
+	if err := os.WriteFile(outsideFile, []byte(outsideYAML), 0600); err != nil {
+		t.Fatal(err)
+	}
+	notePath := filepath.Join(kbRoot, ".akb", "templates", "note.yaml")
+	if err := os.Remove(notePath); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, notePath, outsideFile)
+
+	var runErr error
+	out := captureStdout(t, func() { runErr = runTemplateGet(nil, []string{"note"}) })
+
+	assertSymlinkEscape(t, runErr)
+	if strings.Contains(out, secret) {
+		t.Errorf("outside template content reached stdout: %q", out)
+	}
+}
+
+// TestTemplateGet_AcceptsInTreeSymlinkedTemplateFile pins that a template file
+// symlinked to a target inside the base still loads.
+func TestTemplateGet_AcceptsInTreeSymlinkedTemplateFile(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+
+	const aliasYAML = `name: alias
+description: Alias template
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+`
+	aliasTarget := filepath.Join(kbRoot, "alias-src.yaml")
+	if err := os.WriteFile(aliasTarget, []byte(aliasYAML), 0600); err != nil {
+		t.Fatal(err)
+	}
+	symlinkFixture(t, filepath.Join(kbRoot, ".akb", "templates", "alias.yaml"), aliasTarget)
+
+	var runErr error
+	out := captureStdout(t, func() { runErr = runTemplateGet(nil, []string{"alias"}) })
+	if runErr != nil {
+		t.Fatalf("template get on an in-tree symlink failed: %v", runErr)
+	}
+	if !strings.Contains(out, "Alias template") {
+		t.Errorf("writer view = %q, want the alias template loaded through the in-tree link", out)
+	}
+}

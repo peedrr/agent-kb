@@ -110,6 +110,9 @@ func runWrite(_ *cobra.Command, args []string) error {
 	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
 		return fmt.Errorf("resolve templates directory: %w", err)
 	}
+	if err := assertTemplateFilesContained(kbRoot, templatesDir); err != nil {
+		return fmt.Errorf("resolve templates directory: %w", err)
+	}
 	templates, err := template.LoadTemplates(templatesDir)
 	if err != nil {
 		return fmt.Errorf("load templates: %w", err)
