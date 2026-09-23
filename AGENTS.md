@@ -1,6 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Status:** v0.16.0 — template CRUD complete (the version string is kept in lockstep with `Makefile` and `flake.nix` by `scripts/check-version-lockstep.sh`)
+**Status:** v0.17.0 — template CRUD complete (the version string is kept in lockstep with `Makefile` and `flake.nix` by `scripts/check-version-lockstep.sh`)
 
 ## OVERVIEW
 

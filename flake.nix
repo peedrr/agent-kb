@@ -7,7 +7,7 @@
     { self, ... }@inputs:
 
     let
-      akbVersion = "0.16.0";
+      akbVersion = "0.17.0";
 
       goVersion = 26; # Change this to update the whole stack
 
