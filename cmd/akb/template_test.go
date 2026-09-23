@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -371,5 +372,43 @@ func TestTemplateList_Empty(t *testing.T) {
 
 	if !strings.Contains(output, "No templates found") {
 		t.Errorf("expected 'No templates found', got: %q", output)
+	}
+}
+
+// TestTemplateDeleteCommitIsScopedToItsFiles pins that the template delete
+// commit records only the deleted template and its mockups: a change the
+// surrounding repository staged stays staged.
+func TestTemplateDeleteCommitIsScopedToItsFiles(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+	mustGitInDir(t, kbRoot, "add", "-A")
+	mustGitInDir(t, kbRoot, "commit", "-m", "initial")
+
+	foreign := filepath.Join(kbRoot, "src", "app.go")
+	if err := os.MkdirAll(filepath.Dir(foreign), 0750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(foreign, []byte("package main\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	mustGitInDir(t, kbRoot, "add", "--", "src/app.go")
+
+	origForce := tdForce
+	tdForce = true
+	t.Cleanup(func() { tdForce = origForce })
+
+	captureStdout(t, func() {
+		if err := runTemplateDelete(nil, []string{"note"}); err != nil {
+			t.Errorf("template delete failed: %v", err)
+		}
+	})
+
+	want := []string{".akb/templates/note.yaml", ".akb/templates/note_pass.md"}
+	if files := commitFilesIn(t, kbRoot); !reflect.DeepEqual(files, want) {
+		t.Errorf("commit recorded %v, want only the deleted template files", files)
+	}
+
+	status := mustGitInDir(t, kbRoot, "status", "--porcelain")
+	if !strings.Contains(status, "A  src/app.go") {
+		t.Errorf("staged change lost from the index:\n%s", status)
 	}
 }

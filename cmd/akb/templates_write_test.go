@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -357,5 +358,88 @@ title: Hello
 		if strings.HasPrefix(entry.Name(), "atomic") {
 			t.Errorf("expected no atomic files, found: %s", entry.Name())
 		}
+	}
+}
+
+// TestTemplatesWriteCommitIsScopedToItsFiles pins that the template write
+// commit records only the template and its mockups: a change the surrounding
+// repository staged stays staged.
+func TestTemplatesWriteCommitIsScopedToItsFiles(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+	mustGitInDir(t, kbRoot, "commit", "-m", "initial")
+
+	foreign := filepath.Join(kbRoot, "src", "app.go")
+	if err := os.MkdirAll(filepath.Dir(foreign), 0750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(foreign, []byte("package main\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	mustGitInDir(t, kbRoot, "add", "--", "src/app.go")
+
+	templatePath := filepath.Join(kbRoot, "scoped.yaml")
+	templateBody := `name: scoped
+description: Scoped template
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+`
+	if err := os.WriteFile(templatePath, []byte(templateBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	okMockupPath := filepath.Join(kbRoot, "scoped_ok.md")
+	okMockupBody := `---
+type: scoped
+title: Hello
+---
+# Hello
+`
+	if err := os.WriteFile(okMockupPath, []byte(okMockupBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	badMockupPath := filepath.Join(kbRoot, "scoped_bad.md")
+	badMockupBody := `---
+type: scoped
+title: ""
+---
+# Empty
+`
+	if err := os.WriteFile(badMockupPath, []byte(badMockupBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	twTemplate = templatePath
+	twPass = okMockupPath
+	twFail = badMockupPath
+	defer func() {
+		twTemplate = ""
+		twPass = ""
+		twFail = ""
+	}()
+
+	if err := runTemplatesWrite(nil, []string{"scoped"}); err != nil {
+		t.Fatalf("template write failed: %v", err)
+	}
+
+	want := []string{
+		".akb/templates/scoped.yaml",
+		".akb/templates/scoped_fail.md",
+		".akb/templates/scoped_pass.md",
+	}
+	if files := commitFilesIn(t, kbRoot); !reflect.DeepEqual(files, want) {
+		t.Errorf("commit recorded %v, want only the template files", files)
+	}
+
+	status := mustGitInDir(t, kbRoot, "status", "--porcelain")
+	if !strings.Contains(status, "A  src/app.go") {
+		t.Errorf("staged change lost from the index:\n%s", status)
 	}
 }
