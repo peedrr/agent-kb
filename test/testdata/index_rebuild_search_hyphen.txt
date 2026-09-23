@@ -1,6 +1,5 @@
-# Product finding: searching for a hyphenated term fails instead of matching it.
-# The FTS5 query is built without escaping the hyphen, so `event-driven` becomes
-# `event NOT driven` and SQLite reports `no such column: driven` (exit 1).
+# Hyphenated query terms are quoted per token, so `akb search 'event-driven'`
+# matches pages whose content contains `event-driven`.
 
 exec akb init rebuild-search-hyphen-kb
 cd rebuild-search-hyphen-kb

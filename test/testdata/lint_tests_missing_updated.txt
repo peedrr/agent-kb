@@ -1,6 +1,5 @@
-# Product finding: lint aborts when a page has no `updated` field. The cel_lint
-# checker evaluates the freshness rules without guarding for the key, so the
-# run stops with `lint: run checker cel_lint: no such key: updated` (exit 1).
+# A page whose frontmatter omits the `updated` field passes the freshness
+# rules vacuously, and the lint run completes normally.
 
 exec akb init lint-updated-kb
 cd lint-updated-kb
