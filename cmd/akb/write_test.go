@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -1845,4 +1846,101 @@ func TestWriteBareFilenameReachesTypeDir(t *testing.T) {
 			t.Errorf("indexed body = %q, want the appended content", indexed)
 		}
 	})
+}
+
+// requiredFieldsTestTemplate is the adr-shaped schema the required-field
+// checker tests drive: eight required fields plus one optional.
+func requiredFieldsTestTemplate() template.Template {
+	return template.Template{
+		Name: "unit",
+		Schema: template.Schema{Frontmatter: map[string]template.FieldSchema{
+			"title":    {Type: "string", Required: true},
+			"type":     {Type: "string", Required: true},
+			"summary":  {Type: "string", Required: true},
+			"tags":     {Type: "list", Required: true},
+			"status":   {Type: "string", Required: true},
+			"deciders": {Type: "string", Required: true},
+			"created":  {Type: "string", Required: true},
+			"updated":  {Type: "string", Required: true},
+			"sources":  {Type: "list"},
+		}},
+	}
+}
+
+// TestCheckRequiredFields pins the presence-only contract of the checker: every
+// unset required field is reported once in a stable order, a required field
+// with an empty value counts as set, and optional fields are never reported.
+func TestCheckRequiredFields(t *testing.T) {
+	tmpl := requiredFieldsTestTemplate()
+
+	complete := map[string]any{
+		"summary":  "A page",
+		"tags":     []any{"test"},
+		"status":   "accepted",
+		"deciders": "team",
+		"created":  "2026-01-01",
+		"updated":  "2026-09-01",
+	}
+	emptyStatus := make(map[string]any, len(complete))
+	for key, value := range complete {
+		emptyStatus[key] = value
+	}
+	emptyStatus["status"] = ""
+
+	cases := []struct {
+		name string
+		fm   *frontmatter.ParsedFrontmatter
+		want []string
+	}{
+		{
+			name: "missing one field",
+			fm: &frontmatter.ParsedFrontmatter{
+				Type:  "unit",
+				Title: "Hello",
+				Fields: map[string]any{
+					"summary":  "A page",
+					"tags":     []any{"test"},
+					"deciders": "team",
+					"created":  "2026-01-01",
+					"updated":  "2026-09-01",
+				},
+			},
+			want: []string{"status"},
+		},
+		{
+			name: "missing many fields lists all of them",
+			fm: &frontmatter.ParsedFrontmatter{
+				Type:   "unit",
+				Title:  "Hello",
+				Fields: map[string]any{},
+			},
+			want: []string{"created", "deciders", "status", "summary", "tags", "updated"},
+		},
+		{
+			name: "all required fields present",
+			fm: &frontmatter.ParsedFrontmatter{
+				Type:   "unit",
+				Title:  "Hello",
+				Fields: complete,
+			},
+			want: nil,
+		},
+		{
+			name: "a required field with an empty value is present",
+			fm: &frontmatter.ParsedFrontmatter{
+				Type:   "unit",
+				Title:  "Hello",
+				Fields: emptyStatus,
+			},
+			want: nil,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := checkRequiredFields(tmpl, tc.fm); !slices.Equal(got, tc.want) {
+				t.Errorf("checkRequiredFields = %v, want %v", got, tc.want)
+			}
+		})
+	}
 }
