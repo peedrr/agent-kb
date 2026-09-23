@@ -10,10 +10,8 @@ exec akb write second-rebuild-note.md
 
 exec akb index rebuild
 
-skip 'product-finding: search for a hyphenated term fails with SQL logic error: no such column: driven'
-
-# exec akb search 'event-driven'
-# stdout 'notes/second-rebuild-note.md'
+exec akb search 'event-driven'
+stdout 'notes/second-rebuild-note.md'
 
 -- note-input.md --
 ---

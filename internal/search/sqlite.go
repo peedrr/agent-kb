@@ -118,7 +118,10 @@ func (s *SQLiteFTS5Searcher) RemovePageTx(ctx context.Context, tx *sql.Tx, path 
 // fts5Operators matches FTS5 boolean operators at word boundaries.
 var fts5Operators = regexp.MustCompile(`\b(?:OR|AND|NOT)\b`)
 
-// escapeFTS5Query escapes FTS5 special characters and operators from a user query.
+// escapeFTS5Query escapes FTS5 special characters and operators from a user
+// query, then wraps each remaining whitespace-separated token in double quotes.
+// Quoting keeps punctuation inside a token (the hyphen in `event-driven`, for
+// example) literal instead of letting FTS5 parse it as query syntax.
 func escapeFTS5Query(query string) string {
 	query = fts5Operators.ReplaceAllString(query, " ")
 
@@ -129,9 +132,18 @@ func escapeFTS5Query(query string) string {
 		")", " ",
 		"*", " ",
 		":", " ",
-		" ", " ",
 	)
-	return strings.TrimSpace(replacer.Replace(query))
+
+	cleaned := strings.TrimSpace(replacer.Replace(query))
+	if cleaned == "" {
+		return ""
+	}
+
+	tokens := strings.Fields(cleaned)
+	for i, token := range tokens {
+		tokens[i] = `"` + token + `"`
+	}
+	return strings.Join(tokens, " ")
 }
 
 // Search performs a full-text search over the index using FTS5 BM25 ranking.
@@ -166,7 +178,7 @@ func (s *SQLiteFTS5Searcher) Search(ctx context.Context, query string, opts Sear
 
 	query = fmt.Sprintf(`
 		SELECT d.path, d.title, d.summary,
-		       snippet(pages_fts, 0, '→', '←', '...', 32) as snippet,
+		       snippet(pages_fts, -1, '→', '←', '...', 32) as snippet,
 		       bm25(pages_fts, 10.0, 1.0, 5.0, 3.0) as rank
 		FROM pages_fts
 		JOIN documents d ON pages_fts.rowid = d.id

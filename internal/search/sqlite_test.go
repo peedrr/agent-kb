@@ -324,6 +324,42 @@ func TestSQLiteFTS5Searcher_Search_EscapesFTS5SpecialCharacters(t *testing.T) {
 	}
 }
 
+func TestSQLiteFTS5Searcher_Search_SnippetFollowsMatchedColumn(t *testing.T) {
+	conn := setupTestDB(t)
+	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
+	s := NewSQLiteFTS5Searcher(conn)
+	ctx := context.Background()
+
+	if err := s.IndexPage(ctx, "notes/body.md", "Body Match Page", "the bodykeyword appears in this body text", "tag1", "summary", ""); err != nil {
+		t.Fatalf("IndexPage body.md failed: %v", err)
+	}
+	if err := s.IndexPage(ctx, "notes/title.md", "Titlekeyword Page", "unrelated body text", "tag2", "summary", ""); err != nil {
+		t.Fatalf("IndexPage title.md failed: %v", err)
+	}
+
+	bodyResults, err := s.Search(ctx, "bodykeyword", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search for body-only match failed: %v", err)
+	}
+	if len(bodyResults) != 1 {
+		t.Fatalf("expected 1 result for body-only match, got %d", len(bodyResults))
+	}
+	if !strings.Contains(bodyResults[0].Snippet, "bodykeyword") {
+		t.Errorf("snippet for a body-only match = %q, want body context containing %q", bodyResults[0].Snippet, "bodykeyword")
+	}
+
+	titleResults, err := s.Search(ctx, "titlekeyword", SearchOptions{Limit: 10})
+	if err != nil {
+		t.Fatalf("Search for title match failed: %v", err)
+	}
+	if len(titleResults) != 1 {
+		t.Fatalf("expected 1 result for title match, got %d", len(titleResults))
+	}
+	if !strings.Contains(titleResults[0].Snippet, "Titlekeyword") {
+		t.Errorf("snippet for a title match = %q, want title context containing %q", titleResults[0].Snippet, "Titlekeyword")
+	}
+}
+
 func TestSQLiteFTS5Searcher_Search_DefaultLimit(t *testing.T) {
 	conn := setupTestDB(t)
 	defer conn.Close() //nolint:errcheck // test cleanup — failure is non-fatal
@@ -483,17 +519,19 @@ func TestEscapeFTS5Query(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"simple word", "hello", "hello"},
-		{"multiple words", "hello world", "hello world"},
-		{"strip quotes", `"hello world"`, "hello world"},
-		{"strip single quotes", `'hello'`, "hello"},
-		{"strip AND operator", "hello AND world", "hello   world"},
-		{"strip OR operator", "hello OR world", "hello   world"},
-		{"strip NOT operator", "hello NOT world", "hello   world"},
-		{"strip parentheses", "(hello)", "hello"},
-		{"strip asterisk", "hello*", "hello"},
-		{"strip colon", "title:hello", "title hello"},
-		{"strip all special", `"hello" AND (world OR test)*`, "hello     world   test"},
+		{"simple word", "hello", `"hello"`},
+		{"multiple words", "hello world", `"hello" "world"`},
+		{"hyphenated term", "event-driven", `"event-driven"`},
+		{"mixed tokens", "event-driven architecture", `"event-driven" "architecture"`},
+		{"strip quotes", `"hello world"`, `"hello" "world"`},
+		{"strip single quotes", `'hello'`, `"hello"`},
+		{"strip AND operator", "hello AND world", `"hello" "world"`},
+		{"strip OR operator", "hello OR world", `"hello" "world"`},
+		{"strip NOT operator", "hello NOT world", `"hello" "world"`},
+		{"strip parentheses", "(hello)", `"hello"`},
+		{"strip asterisk", "hello*", `"hello"`},
+		{"strip colon", "title:hello", `"title" "hello"`},
+		{"strip all special", `"hello" AND (world OR test)*`, `"hello" "world" "test"`},
 		{"empty after strip", "***", ""},
 		{"only operators", "AND OR NOT", ""},
 	}
