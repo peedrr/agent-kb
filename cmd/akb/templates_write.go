@@ -279,8 +279,12 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 
 	// The atomic swap replaces the destination directory entry, so a final*
 	// path that is a symlink is replaced rather than followed and the rename
-	// cannot write through a link. A future switch to writing the files in
-	// place must re-check containment first.
+	// cannot write through a link. Containment for this command comes from the
+	// path.AssertContained checks above on the templates directory, the target
+	// YAML path, and the mockups read back from .akb/templates. A future
+	// refactor that writes finalYAML/finalPass/finalFail in place (os.WriteFile
+	// instead of the temp-file plus rename swap) would follow a symlinked
+	// destination rather than replace it and must re-check containment first.
 	if err := os.Rename(tmpYAML, finalYAML); err != nil {
 		return fmt.Errorf("write template file: %w", err)
 	}
