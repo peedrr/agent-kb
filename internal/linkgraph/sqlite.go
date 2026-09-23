@@ -239,12 +239,21 @@ func (g *SQLiteLinkGraph) GetInboundLinks(ctx context.Context, path string) ([]L
 	return scanLinks(rows)
 }
 
-// GetOrphans returns pages that have no inbound links from other pages.
+// GetOrphans returns pages that have no inbound links from other pages. A page
+// linking to itself does not count as an inbound link from another page, even
+// when that self-link resolved uniquely at write time.
+//
+// Resolution runs at write time, so resolved_to can go stale: a link that
+// resolved uniquely becomes ambiguous once a same-basename page is created
+// later. The stale target keeps counting as having an inbound link from the
+// linking page until that page is written again or the graph is re-resolved with
+// `akb index rebuild`.
 func (g *SQLiteLinkGraph) GetOrphans(ctx context.Context) ([]string, error) {
 	rows, err := g.db.QueryContext(ctx,
 		`SELECT path FROM pages WHERE path NOT IN (
 			SELECT resolved_to FROM links
 			WHERE resolved_to IS NOT NULL AND resolved_to NOT LIKE 'AMBIGUOUS%'
+			  AND source_page != resolved_to
 		)`,
 	)
 	if err != nil {

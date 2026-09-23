@@ -1,9 +1,7 @@
-# Product finding: an ambiguous wikilink keeps one of its candidate targets out
-# of the orphan report. `[[shared-name]]` is ambiguous between
-# kb/notes/alpha/shared-name.md and kb/notes/beta/shared-name.md, but
-# `akb orphans` reports only kb/notes/beta/shared-name.md (plus the source
-# page, which nothing links to) — alpha/shared-name.md is not reported even
-# though no page resolves to it unambiguously.
+# Ambiguous basename link: `[[shared-name]]` is ambiguous between
+# kb/notes/alpha/shared-name.md and kb/notes/beta/shared-name.md, so neither
+# candidate has an unambiguous inbound link and `akb orphans` reports both of
+# them (plus the source page, which nothing links to).
 
 exec akb init link-orphan-kb
 cd link-orphan-kb
@@ -17,11 +15,9 @@ exec akb write beta/shared-name.md
 stdin ../source-note.md
 exec akb write source-note.md
 
-skip 'product-finding: ambiguous wikilink suppresses the orphan report for one candidate target (expected alpha+beta, got beta+source)'
-
-# exec akb orphans
-# stdout 'notes/alpha/shared-name.md'
-# stdout 'notes/beta/shared-name.md'
+exec akb orphans
+stdout 'notes/alpha/shared-name.md'
+stdout 'notes/beta/shared-name.md'
 
 -- alpha-note.md --
 ---

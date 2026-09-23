@@ -433,6 +433,83 @@ func TestSQLiteLinkGraph_GetOrphans(t *testing.T) {
 	}
 }
 
+func containsPath(paths []string, want string) bool {
+	for _, p := range paths {
+		if p == want {
+			return true
+		}
+	}
+	return false
+}
+
+func TestSQLiteLinkGraph_GetOrphans_SelfLinkIsNotInbound(t *testing.T) {
+	d := setupTestDB(t)
+	g := NewSQLiteLinkGraph(d)
+	ctx := context.Background()
+
+	if err := g.UpdatePageLinks(ctx, "notes/self-note.md", "A page that links to [[self-note]] only."); err != nil {
+		t.Fatalf("UpdatePageLinks: %v", err)
+	}
+
+	// The self-link resolves to its own page while it is the only page with that
+	// basename.
+	links, err := g.GetOutboundLinks(ctx, "notes/self-note.md")
+	if err != nil {
+		t.Fatalf("GetOutboundLinks: %v", err)
+	}
+	if len(links) != 1 {
+		t.Fatalf("len(links) = %d, want 1", len(links))
+	}
+	if links[0].ResolvedTo != "notes/self-note.md" {
+		t.Fatalf("ResolvedTo = %q, want %q", links[0].ResolvedTo, "notes/self-note.md")
+	}
+
+	orphans, err := g.GetOrphans(ctx)
+	if err != nil {
+		t.Fatalf("GetOrphans: %v", err)
+	}
+	if !containsPath(orphans, "notes/self-note.md") {
+		t.Errorf("orphans = %v, want notes/self-note.md", orphans)
+	}
+}
+
+func TestSQLiteLinkGraph_GetOrphans_AmbiguousBasenameCandidates(t *testing.T) {
+	d := setupTestDB(t)
+	g := NewSQLiteLinkGraph(d)
+	ctx := context.Background()
+
+	// alpha is written first, so its [[shared-name]] link resolves to itself. The
+	// later beta page makes that basename ambiguous, but alpha's link keeps the
+	// resolution it got at write time.
+	if err := g.UpdatePageLinks(ctx, "notes/alpha/shared-name.md", "Alpha content with [[shared-name]]."); err != nil {
+		t.Fatalf("UpdatePageLinks alpha: %v", err)
+	}
+	if err := g.UpdatePageLinks(ctx, "notes/beta/shared-name.md", "Beta content with [[shared-name]]."); err != nil {
+		t.Fatalf("UpdatePageLinks beta: %v", err)
+	}
+
+	links, err := g.GetOutboundLinks(ctx, "notes/alpha/shared-name.md")
+	if err != nil {
+		t.Fatalf("GetOutboundLinks: %v", err)
+	}
+	if len(links) != 1 {
+		t.Fatalf("len(links) = %d, want 1", len(links))
+	}
+	if links[0].ResolvedTo != "notes/alpha/shared-name.md" {
+		t.Fatalf("ResolvedTo = %q, want the stale write-time resolution %q", links[0].ResolvedTo, "notes/alpha/shared-name.md")
+	}
+
+	orphans, err := g.GetOrphans(ctx)
+	if err != nil {
+		t.Fatalf("GetOrphans: %v", err)
+	}
+	for _, want := range []string{"notes/alpha/shared-name.md", "notes/beta/shared-name.md"} {
+		if !containsPath(orphans, want) {
+			t.Errorf("orphans = %v, want %s", orphans, want)
+		}
+	}
+}
+
 func TestSQLiteLinkGraph_GetBrokenLinks(t *testing.T) {
 	d := setupTestDB(t)
 	g := NewSQLiteLinkGraph(d)
