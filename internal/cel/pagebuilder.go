@@ -192,10 +192,14 @@ func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 		i, matched := byOffset[wl.Start]
 		if matched {
 			consumed[i] = true
-			if wl.Destination != "" {
-				// Explicit destination: goldmark's view of this token is
-				// unchanged, now reported as a wikilink.
-				l := goldmarkLinks[i]
+			l := goldmarkLinks[i]
+			// goldmark's destination wins whenever it is non-empty. For an
+			// explicit-destination wikilink the two parsers describe the same
+			// token; for degenerate bracket nesting such as [[[a]]](notes/x.md)
+			// the wikilink parser treats the token as plain while goldmark still
+			// parses a real inline link, so keep goldmark's destination rather
+			// than emit a bracket-fragment target.
+			if wl.Destination != "" || len(l.Destination) > 0 {
 				merged = append(merged, mergedLink{offset: wl.Start, entry: map[string]any{
 					"target":      string(l.Destination),
 					"text":        extractText(l, source),

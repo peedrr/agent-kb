@@ -504,6 +504,13 @@ func TestFlattenLinksWikilinkForms(t *testing.T) {
 			wantLine:   1,
 		},
 		{
+			name:       "degenerate nested brackets keep goldmark destination",
+			source:     "See [[[a]]](notes/x.md).\n",
+			wantTarget: "notes/x.md",
+			wantText:   "[[a]]",
+			wantLine:   1,
+		},
+		{
 			name:       "empty destination parens stay a plain wikilink",
 			source:     "See [[notes/page]]().\n",
 			wantTarget: "notes/page",
