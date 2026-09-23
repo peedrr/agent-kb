@@ -262,17 +262,13 @@ func contained(root, target string) bool {
 // is resolved against the working directory. The resolved path must hold the
 // .akb/.akb.yaml config file that marks a knowledge base; a path without it is
 // an invocation mistake, reported as a usage error. With neither selection
-// set, the command has no base to act on and ResolveKB reports a usage error,
-// noting the removed registry file when it is still on disk.
+// set, the command has no base to act on and ResolveKB reports a usage error.
 func ResolveKB(flagKB string) (string, error) {
 	selected := strings.TrimSpace(flagKB)
 	if selected == "" {
 		selected = strings.TrimSpace(os.Getenv(KBEnvVar))
 	}
 	if selected == "" {
-		if note := DeprecatedRegistryNote(); note != "" {
-			fmt.Fprintln(os.Stderr, note)
-		}
 		return "", &GuardError{rule: noKBError()}
 	}
 
@@ -327,23 +323,6 @@ func expandHome(p string) (string, error) {
 		return home, nil
 	}
 	return filepath.Join(home, p[2:]), nil
-}
-
-// DeprecatedRegistryNote returns the one-line notice printed when a command
-// ran without a knowledge base selected while the removed registry file is
-// still on disk, and when `akb discover` runs. The file is never read for
-// resolution; its presence only triggers the notice. It returns "" when there
-// is nothing to note.
-func DeprecatedRegistryNote() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	registryPath := filepath.Join(home, ".config", "agent-kb", "registry.yaml")
-	if _, err := os.Stat(registryPath); err != nil {
-		return ""
-	}
-	return fmt.Sprintf("note: %s is no longer used; select a knowledge base with --kb or the %s environment variable", registryPath, KBEnvVar)
 }
 
 // KBRoot reports the root of the knowledge base that dir belongs to: dir

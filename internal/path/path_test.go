@@ -3,7 +3,6 @@ package path
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -1059,45 +1058,6 @@ func TestResolveKB(t *testing.T) {
 			t.Fatalf("expected %q, got %q", dir, got)
 		}
 	})
-
-	t.Run("removed registry file notes deprecation on the usage-error path", func(t *testing.T) {
-		home := t.TempDir()
-		t.Setenv("HOME", home)
-		t.Setenv(KBEnvVar, "")
-
-		registryPath := filepath.Join(home, ".config", "agent-kb", "registry.yaml")
-		if err := os.MkdirAll(filepath.Dir(registryPath), 0750); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(registryPath, []byte("default: elsewhere\n"), 0600); err != nil {
-			t.Fatal(err)
-		}
-
-		stderr := captureStderr(t, func() {
-			_, err := ResolveKB("")
-			if !errors.Is(err, ErrNoKB) {
-				t.Errorf("expected ErrNoKB, got %v", err)
-			}
-		})
-		if !strings.Contains(stderr, registryPath) {
-			t.Errorf("note %q does not name %q", stderr, registryPath)
-		}
-		if !strings.Contains(stderr, "no longer used") {
-			t.Errorf("note %q does not say the registry is unused", stderr)
-		}
-	})
-
-	t.Run("no note when the registry file is absent", func(t *testing.T) {
-		t.Setenv("HOME", t.TempDir())
-		t.Setenv(KBEnvVar, "")
-
-		stderr := captureStderr(t, func() {
-			_, _ = ResolveKB("") //nolint:errcheck // only the stderr note is under test
-		})
-		if stderr != "" {
-			t.Errorf("expected no note, got %q", stderr)
-		}
-	})
 }
 
 // assertNotAKB pins the usage error for a selected path that is not a
@@ -1121,31 +1081,6 @@ func assertNotAKB(t *testing.T, err error, path string) {
 			t.Errorf("error %q does not contain %q", err.Error(), want)
 		}
 	}
-}
-
-// captureStderr runs fn with os.Stderr redirected to a pipe and returns the
-// text fn wrote.
-func captureStderr(t *testing.T, fn func()) string {
-	t.Helper()
-
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	old := os.Stderr
-	os.Stderr = w
-	fn()
-	os.Stderr = old
-
-	if err := w.Close(); err != nil {
-		t.Fatalf("close stderr pipe: %v", err)
-	}
-	data, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatalf("read stderr pipe: %v", err)
-	}
-	return string(data)
 }
 
 // scanEnvironment isolates a discovery scan in a temporary tree: home is the

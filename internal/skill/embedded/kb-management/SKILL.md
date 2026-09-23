@@ -86,10 +86,9 @@ which creates the base at `<working directory>/<name>` and leaves the selection
 to you.
 
 There is no registry and no "current KB": `akb use` and `akb registry` were
-removed, and a `~/.config/agent-kb/registry.yaml` left on disk is ignored (a
-one-line note is printed). Pass `--kb` on every invocation, or export `AKB_KB`
-for a session or directory (for example through direnv). Mutating commands echo
-the base they act on to stderr as `kb: <name> (<absolute path>)`.
+removed. Pass `--kb` on every invocation, or export `AKB_KB` for a session or
+directory (for example through direnv). Mutating commands echo the base they
+act on to stderr as `kb: <name> (<absolute path>)`.
 
 ## Constraints
 

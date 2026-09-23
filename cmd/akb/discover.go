@@ -40,10 +40,6 @@ func init() {
 }
 
 func runDiscover(_ *cobra.Command, args []string) error {
-	if note := path.DeprecatedRegistryNote(); note != "" {
-		fmt.Fprintln(os.Stderr, note)
-	}
-
 	root, err := discoverRoot(args)
 	if err != nil {
 		return err
