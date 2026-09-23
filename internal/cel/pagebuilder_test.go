@@ -558,6 +558,34 @@ func TestFlattenLinksWikilinkForms(t *testing.T) {
 	}
 }
 
+// A wikilink token nested inside a markdown link label yields two entries:
+// the outer goldmark link, whose start offset opens the label, and the
+// wikilink token parsed from that label. Start-equality dedupe does not merge
+// them because their offsets differ.
+func TestFlattenLinksLinkContainingWikilink(t *testing.T) {
+	source := "See [text [[f]]](dest).\n"
+
+	links := flattenLinksForTest(t, source)
+	if len(links) != 2 {
+		t.Fatalf("links = %+v, want exactly 2 entries", links)
+	}
+	assertLinkEntry(t, links[0], "dest", "text [[f]]", false, 1)
+	assertLinkEntry(t, links[1], "f", "f", true, 1)
+}
+
+// A markdown link nested inside a wikilink-shaped token yields only the inner
+// goldmark link: the wikilink token regex cannot span the inner ']' of [b], so
+// the token never parses as a wikilink and no wikilink entry is emitted.
+func TestFlattenLinksWikilinkShapedTokenContainingMarkdownLink(t *testing.T) {
+	source := "See [[a [b](c)]].\n"
+
+	links := flattenLinksForTest(t, source)
+	if len(links) != 1 {
+		t.Fatalf("links = %+v, want exactly 1 entry", links)
+	}
+	assertLinkEntry(t, links[0], "c", "b", false, 1)
+}
+
 func TestFlattenLinksNonWikilinkLinksUnchanged(t *testing.T) {
 	source := "A [plain link](https://example.com) and `[[inline code]]` and:\n\n" +
 		"```\n[[fenced code]]\n```\n"
