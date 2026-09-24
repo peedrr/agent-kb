@@ -1,6 +1,6 @@
 .PHONY: build test lint clean release
 
-VERSION := 0.18.0
+VERSION := 0.19.0
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DIRTY := $(shell git diff --quiet 2>/dev/null || echo "-dirty")
 LDFLAGS := -X main.version=$(VERSION)-$(COMMIT)$(DIRTY)
