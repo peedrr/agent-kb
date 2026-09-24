@@ -5,10 +5,15 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/goccy/go-yaml"
+
+	"github.com/peedrr/agent-kb/internal/cel"
+	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/template"
 )
 
 func setupTemplateTestKB(t *testing.T) string {
@@ -502,6 +507,51 @@ func TestTemplateGet_RejectsSymlinkedTemplateFile(t *testing.T) {
 	assertSymlinkEscape(t, runErr)
 	if strings.Contains(out, secret) {
 		t.Errorf("outside template content reached stdout: %q", out)
+	}
+}
+
+// TestEmbeddedADRFailMockupFailsExactlyValidStatus pins the fail mockup of the
+// embedded adr template to one failing rule. The mockup exists to prove
+// valid_status fires on its own, so any second rule in the failing set would
+// blur what the mockup demonstrates.
+func TestEmbeddedADRFailMockupFailsExactlyValidStatus(t *testing.T) {
+	dir := t.TempDir()
+	if err := template.CopyDefaults(dir); err != nil {
+		t.Fatalf("copy embedded templates: %v", err)
+	}
+
+	templates, err := template.LoadTemplates(dir)
+	if err != nil {
+		t.Fatalf("load embedded templates: %v", err)
+	}
+	adr, ok := templates["adr"]
+	if !ok {
+		t.Fatal("embedded adr template is missing")
+	}
+
+	failData, err := os.ReadFile(filepath.Join(dir, "adr_fail.md")) //nolint:gosec // test reading a known temp file
+	if err != nil {
+		t.Fatalf("read embedded adr_fail.md: %v", err)
+	}
+	fm, body, err := frontmatter.Parse(failData)
+	if err != nil {
+		t.Fatalf("parse embedded adr_fail.md: %v", err)
+	}
+
+	env, err := cel.NewEnv()
+	if err != nil {
+		t.Fatalf("create CEL environment: %v", err)
+	}
+
+	// The fail mockup is evaluated the way template write evaluates it: as a
+	// page with no pre-modification state behind it.
+	failed, ruleID, err := evaluateValidations(env, adr.Validations, buildTestPage("kb/adr_fail.md", fm, body), nil)
+	if err != nil {
+		t.Fatalf("rule %q did not evaluate: %v", ruleID, err)
+	}
+	slices.Sort(failed)
+	if want := []string{"valid_status"}; !slices.Equal(failed, want) {
+		t.Errorf("embedded adr_fail.md fails %v, want exactly %v", failed, want)
 	}
 }
 
