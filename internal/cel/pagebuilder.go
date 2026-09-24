@@ -188,7 +188,34 @@ func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 	var merged []mergedLink
 	consumed := make([]bool, len(goldmarkLinks))
 
-	for _, wl := range markdown.ParseWikilinks(string(source)) {
+	wikilinks := markdown.ParseWikilinks(string(source))
+
+	// A wikilink token whose span contains another wikilink token is malformed:
+	// the inner token sits inside the outer token's parenthesized destination
+	// (for example [[a]]([[b]])), whose target is a bracket token rather than a
+	// path. Drop the outer token and the goldmark link describing it, so the
+	// surviving entries neither overlap nor carry the bracket-shaped target.
+	containsAnother := make([]bool, len(wikilinks))
+	for i, outer := range wikilinks {
+		for j, inner := range wikilinks {
+			if i == j {
+				continue
+			}
+			if outer.Start <= inner.Start && inner.End <= outer.End &&
+				(outer.Start < inner.Start || inner.End < outer.End) {
+				containsAnother[i] = true
+			}
+		}
+	}
+
+	for k, wl := range wikilinks {
+		if containsAnother[k] {
+			if i, matched := byOffset[wl.Start]; matched {
+				consumed[i] = true
+			}
+			continue
+		}
+
 		i, matched := byOffset[wl.Start]
 		if matched {
 			consumed[i] = true

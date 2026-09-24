@@ -511,6 +511,13 @@ func TestFlattenLinksWikilinkForms(t *testing.T) {
 			wantLine:   1,
 		},
 		{
+			name:       "deeper degenerate nesting at offset 0 keeps goldmark destination",
+			source:     "[[[[a]]]](x.md)\n",
+			wantTarget: "x.md",
+			wantText:   "[[[a]]]",
+			wantLine:   1,
+		},
+		{
 			name:       "empty destination parens stay a plain wikilink",
 			source:     "See [[notes/page]]().\n",
 			wantTarget: "notes/page",
@@ -625,6 +632,60 @@ func TestFlattenLinksExplicitDestinationSharesGoldmarkLinkStart(t *testing.T) {
 	if goldmarkPositions[0] != wikilinks[0].Start {
 		t.Fatalf("goldmark Link.Pos() = %d, wikilink Start = %d, want equal", goldmarkPositions[0], wikilinks[0].Start)
 	}
+}
+
+// The link graph reads markdown.ParseWikilinks while page.ast.links merges that
+// output with goldmark. Both readers must name the destination of
+// [[[a]]](notes/x.md): the link graph records the normalized "notes/x" and
+// page.ast.links reports goldmark's destination as written — never the
+// bracket fragment "[a".
+func TestFlattenLinksDegenerateBracketRunNamesTheDestination(t *testing.T) {
+	source := "See [[[a]]](notes/x.md).\n"
+
+	wikilinks := markdown.ParseWikilinks(source)
+	if len(wikilinks) != 1 {
+		t.Fatalf("wikilinks = %+v, want exactly 1", wikilinks)
+	}
+	if wikilinks[0].Target != "notes/x" {
+		t.Errorf("link-graph target = %q, want %q", wikilinks[0].Target, "notes/x")
+	}
+	if wikilinks[0].Destination != "notes/x" {
+		t.Errorf("link-graph destination = %q, want %q", wikilinks[0].Destination, "notes/x")
+	}
+
+	links := flattenLinksForTest(t, source)
+	if len(links) != 1 {
+		t.Fatalf("links = %+v, want exactly 1 entry", links)
+	}
+	assertLinkEntry(t, links[0], "notes/x.md", "[[a]]", true, 1)
+}
+
+// A wikilink whose parenthesized destination is itself a wikilink token —
+// [[a]]([[b]]) — yields exactly one entry: the inner token. The outer token is
+// malformed because its destination is a bracket token rather than a path, so
+// it and its goldmark link are dropped instead of overlapping the inner token
+// with the bogus target "[[b]]".
+func TestFlattenLinksWikilinkInsideDestination(t *testing.T) {
+	t.Run("the outer token is dropped", func(t *testing.T) {
+		source := "See [[a]]([[b]]) here.\n"
+
+		links := flattenLinksForTest(t, source)
+		if len(links) != 1 {
+			t.Fatalf("links = %+v, want exactly 1 entry", links)
+		}
+		assertLinkEntry(t, links[0], "b", "b", true, 1)
+	})
+
+	t.Run("later tokens are unaffected", func(t *testing.T) {
+		source := "[[a]]([[b]]) and [[c]].\n"
+
+		links := flattenLinksForTest(t, source)
+		if len(links) != 2 {
+			t.Fatalf("links = %+v, want exactly 2 entries", links)
+		}
+		assertLinkEntry(t, links[0], "b", "b", true, 1)
+		assertLinkEntry(t, links[1], "c", "c", true, 1)
+	})
 }
 
 func TestFlattenLinksSortedBySourceOffset(t *testing.T) {

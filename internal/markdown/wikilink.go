@@ -1,7 +1,6 @@
 package markdown
 
 import (
-	"regexp"
 	"strings"
 )
 
@@ -22,7 +21,66 @@ type Wikilink struct {
 	End   int
 }
 
-var wikilinkRe = regexp.MustCompile(`\[\[([^\]]+?)\]\]`)
+// wikilinkToken is the byte span of one wikilink-shaped token: the opening
+// bracket run, the inner text, and the closing bracket run.
+type wikilinkToken struct {
+	start      int // first '[' of the opening run
+	innerStart int
+	innerEnd   int
+	end        int // just past the closing run
+}
+
+// scanWikilinkTokens finds every wikilink-shaped token in content, left to
+// right. A token opens with a run of two or more '[' and closes at the first
+// following ']' run that is at least as long as the opening run; it consumes
+// exactly as many ']' as the opening run has '['. An opening run that cannot
+// close that way is retried one '[' further right, so [[[a]]] is the single
+// token [[[a]]] whose inner text is "a" — never a bracket fragment such as
+// "[a".
+func scanWikilinkTokens(content string) []wikilinkToken {
+	var tokens []wikilinkToken
+	for i := 0; i+1 < len(content); {
+		if content[i] != '[' {
+			i++
+			continue
+		}
+		open := countRun(content, i, '[')
+		if open < 2 {
+			i += open
+			continue
+		}
+
+		closeStart := strings.IndexByte(content[i+open:], ']')
+		if closeStart < 0 {
+			break
+		}
+		closeStart += i + open
+
+		if closeStart == i+open || countRun(content, closeStart, ']') < open {
+			i++
+			continue
+		}
+
+		end := closeStart + open
+		tokens = append(tokens, wikilinkToken{
+			start:      i,
+			innerStart: i + open,
+			innerEnd:   closeStart,
+			end:        end,
+		})
+		i = end
+	}
+	return tokens
+}
+
+// countRun returns the length of the run of c that starts at s[i].
+func countRun(s string, i int, c byte) int {
+	n := 0
+	for i+n < len(s) && s[i+n] == c {
+		n++
+	}
+	return n
+}
 
 // ParseWikilinks extracts wikilinks from markdown content.
 func ParseWikilinks(content string) []Wikilink {
@@ -32,19 +90,16 @@ func ParseWikilinks(content string) []Wikilink {
 
 	excluded := computeExclusions(content)
 
-	matches := wikilinkRe.FindAllStringSubmatchIndex(content, -1)
 	var links []Wikilink
-	for _, m := range matches {
-		innerStart := m[2]
-		innerEnd := m[3]
-		if excluded.isExcluded(innerStart, innerEnd) {
+	for _, token := range scanWikilinkTokens(content) {
+		if excluded.isExcluded(token.innerStart, token.innerEnd) {
 			continue
 		}
 
-		inner := content[innerStart:innerEnd]
+		inner := content[token.innerStart:token.innerEnd]
 		wl, hasPipeDisplay := parseWikilinkInner(inner)
-		wl.Start = m[0]
-		wl.End = m[1]
+		wl.Start = token.start
+		wl.End = token.end
 
 		// An explicit destination requires the opening paren to be adjacent to
 		// the closing brackets (CommonMark's inline-link rule); whitespace

@@ -743,3 +743,116 @@ func TestParseWikilinksExplicitDestination(t *testing.T) {
 		}
 	})
 }
+
+// Triple and deeper bracket runs are one balanced token, so the inner text is
+// never a bracket fragment such as "[a".
+func TestParseWikilinksDegenerateBracketRuns(t *testing.T) {
+	t.Run("triple brackets yield the inner target", func(t *testing.T) {
+		links := ParseWikilinks("[[[a]]]")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "a" {
+			t.Errorf("Target = %q, want %q — never the bracket fragment %q", wl.Target, "a", "[a")
+		}
+		if wl.Display != "a" {
+			t.Errorf("Display = %q, want %q", wl.Display, "a")
+		}
+		if wl.Destination != "" {
+			t.Errorf("Destination = %q, want empty string", wl.Destination)
+		}
+		if wl.Start != 0 || wl.End != len("[[[a]]]") {
+			t.Errorf("span = [%d,%d), want [0,%d)", wl.Start, wl.End, len("[[[a]]]"))
+		}
+	})
+
+	t.Run("triple brackets with an explicit dest use the dest as target", func(t *testing.T) {
+		content := "[[[a]]](notes/x.md)"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", wl.Target, "notes/x")
+		}
+		if wl.Destination != "notes/x" {
+			t.Errorf("Destination = %q, want %q", wl.Destination, "notes/x")
+		}
+		if wl.Display != "a" {
+			t.Errorf("Display = %q, want %q", wl.Display, "a")
+		}
+		if wl.Start != 0 || wl.End != len(content) {
+			t.Errorf("span = [%d,%d), want [0,%d) (the whole token including the dest)", wl.Start, wl.End, len(content))
+		}
+	})
+}
+
+// Spec-literal display outcomes for the explicit-destination form. Both are
+// decided corner cases, not defects: the destination is the target, and the
+// display falls back to the bracket label.
+func TestParseWikilinksExplicitDestinationDisplayFallbacks(t *testing.T) {
+	t.Run("empty bracket label [[#h]](dest) has an empty display", func(t *testing.T) {
+		// The bracket part holds only a heading, so the heading-derived display is
+		// the empty bracket label. The pipe fallback does not apply because no pipe
+		// display was written.
+		links := ParseWikilinks("[[#h]](dest)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "dest" || wl.Destination != "dest" {
+			t.Errorf("Target = %q, Destination = %q, want %q for both", wl.Target, wl.Destination, "dest")
+		}
+		if wl.Display != "" {
+			t.Errorf("Display = %q, want empty string", wl.Display)
+		}
+		if wl.HasHeading || wl.Heading != "" {
+			t.Errorf("HasHeading = %v, Heading = %q, want false and empty string (the dest discards the heading)", wl.HasHeading, wl.Heading)
+		}
+	})
+
+	t.Run("empty pipe display [[a#h|]](dest) falls back to the bracket label", func(t *testing.T) {
+		// The pipe is present but carries no display text, so it does not count as
+		// a pipe display: the heading-derived display resets to the bracket label
+		// "a" rather than the heading "h".
+		links := ParseWikilinks("[[a#h|]](dest)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "dest" || wl.Destination != "dest" {
+			t.Errorf("Target = %q, Destination = %q, want %q for both", wl.Target, wl.Destination, "dest")
+		}
+		if wl.Display != "a" {
+			t.Errorf("Display = %q, want %q", wl.Display, "a")
+		}
+		if wl.HasHeading || wl.Heading != "" {
+			t.Errorf("HasHeading = %v, Heading = %q, want false and empty string (the dest discards the heading)", wl.HasHeading, wl.Heading)
+		}
+	})
+}
+
+// Degenerate bracket runs at offset 0 and four brackets deep: the parser token
+// starts at the same offset goldmark gives its Link.Pos(), so the two readers
+// describe one token.
+func TestParseWikilinksDegenerateBracketRunsAtOffsetZero(t *testing.T) {
+	t.Run("deeper nesting starts at offset 0", func(t *testing.T) {
+		content := "[[[[a]]]](x.md)"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "x" || wl.Destination != "x" {
+			t.Errorf("Target = %q, Destination = %q, want %q for both", wl.Target, wl.Destination, "x")
+		}
+		if wl.Display != "a" {
+			t.Errorf("Display = %q, want %q", wl.Display, "a")
+		}
+		if wl.Start != 0 || wl.End != len(content) {
+			t.Errorf("span = [%d,%d), want [0,%d) (the whole token including the dest)", wl.Start, wl.End, len(content))
+		}
+	})
+}
