@@ -149,6 +149,57 @@ code is still 1.
 helper semantics; recorded in case the misclassification of read errors matters later.
 **Reported, deliberately deferred: 2026-09-24.**
 
+## Template authoring
+
+### `loadExampleTemplates` skips the old-format check `LoadTemplates` applies
+
+**What happens.** `template.LoadTemplates` rejects a template that still carries the old
+`required`/`optional`/`body` keys; `loadExampleTemplates` (`cmd/akb/template.go`), the reader
+behind `akb template list --examples` and `akb template get --examples`, unmarshals the
+embedded showcase files without that check. The embedded set is build-controlled and covered
+by template tests, so an old-format file cannot ship through it today; an in-package caller
+of the function would get no rejection.
+
+**Why deferred:** hardening an unreachable path — the duplicate checks would have to be
+re-derived on the embedded reader for no current failure mode.
+**Reported, deliberately deferred: 2026-09-24.**
+
+### Templates whose rules read optional keys unguarded cannot be overwritten
+
+**What happens.** `akb template write` re-evaluates the pass mockup with each schema-optional
+key it supplies removed, and once more as a no-op update. A template authored before those
+checks whose CEL rules read an optional key without `has()` fails the stripped evaluation,
+so an overwrite of that template is rejected even with `--force` until the rule is guarded
+or the key is marked `required: true`. Nothing migrates existing templates.
+
+**Why deferred:** the checks are the deliberate proof that `optional: true` fields are safe;
+the remedy is a per-template authoring edit, and the error names the key to guard.
+**Reported, deliberately deferred: 2026-09-24.**
+
+### Dead `unknown type` guards keep the terse message
+
+**What happens.** `cmd/akb/write.go` (three sites) and `cmd/akb/append.go` (one) guard the
+template lookup with `if !ok { return fmt.Errorf("unknown type %q", fm.Type) }` after
+`frontmatter.ValidateType` already rejected an unknown type. The guards are unreachable, and
+their message lacks the authoring guidance `ValidateType` gives; harmonizing the two was
+scheduled and never run.
+
+**Why deferred:** unreachable code — the message would matter only if the earlier check were
+removed.
+**Reported, deliberately deferred: 2026-09-24.**
+
+### Required-field presence keys `type` and `title` on non-emptiness
+
+**What happens.** `frontmatterKeyPresent` (`cmd/akb/templates_write.go`) reports `type` and
+`title` present only when non-empty — `Parse` routes them out of `Fields`, and an explicitly
+empty value counts as absent — while every other key is reported present by key-set
+membership. The lint-side mirror `frontmatterFieldPresent` has the same semantics. Every
+write path rejects an empty `type` or `title` first, so the two readings agree on real pages.
+
+**Why deferred:** an empty `type` or `title` is not a usable page, so key-set membership
+would not change an outcome today.
+**Reported, deliberately deferred: 2026-09-24.**
+
 ## Code health
 
 ### Template loading is duplicated between append and type discovery
@@ -178,6 +229,18 @@ suppressing orphan status for its stale target until the linking page is rewritt
 pins the staleness.
 
 **Why deferred:** documented behavior with a test gap, not a defect.
+**Reported, deliberately deferred: 2026-09-24.**
+
+### The embedded TEMPLATE.md carries claims no test pins
+
+**What happens.** The kb-management skill's `references/TEMPLATE.md` documents the
+optional-key stripping and self-succession checks, the `has()` discipline, and the
+three-surface failure contract. No test reads the document or asserts those claims against
+the code — the only reference to it is the literal path in the write-time error message. The
+behavior paths are pinned; a drift between the shipped document and the code would be silent.
+
+**Why deferred:** a test gap on a documentation surface; a doc-claim test would have to
+track prose.
 **Reported, deliberately deferred: 2026-09-24.**
 
 ### Embedded mockup revalidation is warning-only
