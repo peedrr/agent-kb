@@ -7,7 +7,8 @@
 # normalizes the explicit destination to the spelling the link graph records,
 # so the write itself is the normalization check and `akb links` shows that one
 # spelling resolving to the page. The same page with a body link to a different
-# destination is refused.
+# destination is refused, and the report names no other adr rule — the failing
+# rule is the link check alone.
 
 # --- Setup ---
 
@@ -48,6 +49,28 @@ stdin ../wrong-link-adr.md
 ! exec akb write decisions/wrong-link-adr.md
 stderr 'superseded_requires_link'
 stderr 'superseded ADRs must link the ADR named by supersedes'
+# Every other adr validation rule holds for this page, so the report carries
+# superseded_requires_link and no other rule id.
+! stderr 'require_title'
+! stderr 'title_no_period'
+! stderr 'title_style'
+! stderr 'valid_status'
+! stderr 'tags_nonempty'
+! stderr 'tags_format'
+! stderr 'require_context'
+! stderr 'require_decision'
+! stderr 'require_consequences'
+! stderr 'disallow_options'
+! stderr 'disallow_pros_cons'
+! stderr 'min_word_count'
+! stderr 'code_blocks_have_language'
+! stderr 'valid_state_transition'
+! stderr 'created_immutable'
+! stderr 'updated_not_before_created'
+! stderr 'temporal_created'
+! stderr 'superseded_requires_field'
+! stderr 'proposed_has_no_supersedes'
+! stderr 'require_wikilink'
 ! exists kb/decisions/wrong-link-adr.md
 
 -- old-adr.md --
