@@ -40,7 +40,10 @@ spelling there.
 Every wikilink yields exactly one entry per token, so `.all()` and `.exists()` over
 `page.ast.links` see each token once. A wikilink nested inside a markdown link label is the
 exception, and it is two tokens, not one: `[text [[f]]](dest)` yields the outer goldmark
-entry (target `dest`, `is_wikilink: false`) plus the wikilink's own entry (target `f`).
+entry (target `dest`, `is_wikilink: false`) plus the wikilink's own entry (target `f`). A
+bracket run inside an explicit destination is destination text rather than a token: nested
+in the quoted title or in a path destination it carries no entry of its own in either
+reader — see Degenerate tokens.
 
 ## Adjacency rule
 
@@ -132,6 +135,8 @@ such as `[a`. Pinned outcomes:
 | `[[[a]]](notes/x.md)` | one link: target `notes/x` in **both** the link graph and `page.ast.links` (never the bracket fragment `[a`), display `a`, span covers the whole token |
 | `[[[[a]]]](x.md)` | one link: target `x`, display `a`, span covers the whole token |
 | `[[a]]([[b]])` | `page.ast.links` emits one entry, target `b`, text `b` — the outer token and its goldmark link are dropped. The link graph still records the bracket-shaped `[[b]]`; ledgered in [`KNOWN-LIMITATIONS.md`](../KNOWN-LIMITATIONS.md) |
+| `[[a]](notes/[[weird]].md)` | one entry, the outer link: target `notes/[[weird]]`, text `[a]` — a bracket run inside the destination path is path text, so the parser records no token for it and both readers name only the outer link |
+| `[[a]](x.md "see [[b]]")` | one entry, the outer link: target `x`, text `[a]` — a bracket run inside the quoted title is title text, so the parser records no token for it and both readers name only the outer link |
 | `[[#h]](dest)` | target `dest`, empty display (the bracket part holds only a heading, and no pipe display was written); CEL `text` is goldmark's label `[#h]` |
 | `[[a#h|]](dest)` | target `dest`, display `a` — an empty pipe display does not count, so the heading-derived display falls back to the bracket label; CEL `text` is goldmark's label `[a#h|]` |
 | `[[the page]](.md)` | plain wikilink: target `the page`, display `the page`, CEL `text` `the page` — the parser display, **not** the bracketed label, the same treatment `[[a]](<>)` gets |

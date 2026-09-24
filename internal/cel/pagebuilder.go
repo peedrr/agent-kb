@@ -166,6 +166,10 @@ func flattenHeadings(doc ast.Node, source []byte) []map[string]any {
 // goldmark's destination run through normalizeWikilinkTarget. A plain markdown
 // link keeps goldmark's destination as written, because the link graph ignores
 // those links entirely.
+//
+// Bracket runs nested inside a quoted title or inside a path destination are
+// part of that destination, so the parser records no token for them and they
+// emit no entry of their own.
 func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 	type mergedLink struct {
 		offset int
@@ -201,10 +205,11 @@ func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 	// rather than a path. The bracket parts of tokens never overlap, so such an
 	// inner token can only sit inside the outer token's destination part. Drop
 	// the outer token and the goldmark link describing it, so the surviving
-	// entries neither overlap nor carry the bracket-shaped target. A destination
-	// that is a real path (x.md, notes/[[weird]].md) is not a bracket token, so
-	// the outer token stays a valid link that keeps its merge with the goldmark
-	// link while the inner token emits its own entry.
+	// entries neither overlap nor carry the bracket-shaped target. A real path
+	// destination (x.md, notes/[[weird]].md) is not a bracket token: the outer
+	// token stays a valid link that keeps its merge with the goldmark link, and
+	// the parser has already suppressed the bracket runs nested in its title or
+	// path, so those emit no entry of their own.
 	containsAnother := make([]bool, len(wikilinks))
 	for i, outer := range wikilinks {
 		for j, inner := range wikilinks {

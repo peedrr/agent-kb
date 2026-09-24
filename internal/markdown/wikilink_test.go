@@ -537,6 +537,36 @@ func TestParseWikilinksExplicitDestination(t *testing.T) {
 		}
 	})
 
+	t.Run("a token inside a quoted title is not recorded", func(t *testing.T) {
+		content := `[[a]](x.md "see [[b]]")`
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1 (a title holds no token of its own)", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "x" || wl.Destination != "x" {
+			t.Errorf("Target = %q, Destination = %q, want %q for both", wl.Target, wl.Destination, "x")
+		}
+		if wl.End != len(content) {
+			t.Errorf("End = %d, want %d (the title is part of the token)", wl.End, len(content))
+		}
+	})
+
+	t.Run("a token inside a bracket-carrying path destination is not recorded", func(t *testing.T) {
+		content := "[[a]](notes/[[weird]].md)"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1 (the path holds no token of its own)", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "notes/[[weird]]" || wl.Destination != "notes/[[weird]]" {
+			t.Errorf("Target = %q, Destination = %q, want %q for both", wl.Target, wl.Destination, "notes/[[weird]]")
+		}
+		if wl.End != len(content) {
+			t.Errorf("End = %d, want %d (the path is part of the token)", wl.End, len(content))
+		}
+	})
+
 	t.Run("unclosed title leaves a plain wikilink", func(t *testing.T) {
 		content := `[[a]](notes/x.md "title)`
 		links := ParseWikilinks(content)

@@ -90,8 +90,20 @@ func ParseWikilinks(content string) []Wikilink {
 
 	excluded := computeExclusions(content)
 
+	// suppressedUntil is the end offset of an accepted explicit destination
+	// whose internals cannot hold a link of their own: a bracket run inside a
+	// quoted title — [[a]](x.md "see [[b]]") — or inside a path destination —
+	// [[a]](notes/[[weird]].md) — is part of that destination, not a token of
+	// its own. A token that opens before the offset is skipped. A destination
+	// that is itself a bracket token ([[a]]([[b]])) sets no suppression: there
+	// the inner token wins and the outer one is the malformed side.
+	suppressedUntil := 0
+
 	var links []Wikilink
 	for _, token := range scanWikilinkTokens(content) {
+		if token.start < suppressedUntil {
+			continue
+		}
 		if excluded.isExcluded(token.innerStart, token.innerEnd) {
 			continue
 		}
@@ -122,6 +134,9 @@ func ParseWikilinks(content string) []Wikilink {
 					wl.HasHeading = false
 					wl.Heading = ""
 					wl.End += end
+					if !strings.HasPrefix(dest, "[[") {
+						suppressedUntil = wl.End
+					}
 				}
 			}
 		}
