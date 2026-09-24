@@ -270,7 +270,7 @@ func isPunct(c byte) bool {
 // normalizeDest cleans an explicit destination: an optional trailing link
 // title is dropped, then surrounding whitespace and angle brackets, as are a
 // leading "./" and a trailing ".md" (the link graph's resolution step re-adds
-// the extension).
+// the extension). Repeated affixes collapse, so "././a.md.md" becomes "a".
 func normalizeDest(dest string) string {
 	d := strings.TrimSpace(dest)
 	if parsed, _, ok := parseLinkDestination(d); ok {
@@ -279,8 +279,13 @@ func normalizeDest(dest string) string {
 	if len(d) >= 2 && strings.HasPrefix(d, "<") && strings.HasSuffix(d, ">") {
 		d = d[1 : len(d)-1]
 	}
-	d = strings.TrimPrefix(d, "./")
-	d = strings.TrimSuffix(d, ".md")
+	d = strings.TrimSpace(d)
+	for strings.HasPrefix(d, "./") {
+		d = strings.TrimPrefix(d, "./")
+	}
+	for strings.HasSuffix(d, ".md") {
+		d = strings.TrimSuffix(d, ".md")
+	}
 	return d
 }
 

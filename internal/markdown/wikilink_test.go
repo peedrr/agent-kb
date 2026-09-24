@@ -442,6 +442,30 @@ func TestParseWikilinksExplicitDestination(t *testing.T) {
 		}
 	})
 
+	t.Run("whitespace inside the angle brackets is trimmed", func(t *testing.T) {
+		links := ParseWikilinks("[[a]](<foo >)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "foo" {
+			t.Errorf("Target = %q, want %q", wl.Target, "foo")
+		}
+		if wl.Destination != "foo" {
+			t.Errorf("Destination = %q, want %q", wl.Destination, "foo")
+		}
+	})
+
+	t.Run("angle-bracket whitespace around a path dest is trimmed", func(t *testing.T) {
+		links := ParseWikilinks("[[a]](< ./notes/x.md >)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/x")
+		}
+	})
+
 	t.Run("double-quoted title after the dest is stripped", func(t *testing.T) {
 		content := `[[Guide]](notes/x.md "title")`
 		links := ParseWikilinks(content)
@@ -601,6 +625,45 @@ func TestParseWikilinksExplicitDestination(t *testing.T) {
 		}
 		if links[0].Target != "notes/daily/2024-01-01" {
 			t.Errorf("Target = %q, want %q", links[0].Target, "notes/daily/2024-01-01")
+		}
+	})
+
+	t.Run("repeated ./ and .md affixes collapse", func(t *testing.T) {
+		links := ParseWikilinks("[[a]](././a.md.md)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "a" {
+			t.Errorf("Target = %q, want %q", wl.Target, "a")
+		}
+		if wl.Destination != "a" {
+			t.Errorf("Destination = %q, want %q", wl.Destination, "a")
+		}
+	})
+
+	t.Run("repeated .md affixes collapse", func(t *testing.T) {
+		links := ParseWikilinks("[[a]](notes/x.md.md)")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/x")
+		}
+	})
+
+	t.Run("a dest that normalizes to empty stays a plain wikilink", func(t *testing.T) {
+		content := "[[a]](.md)"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "a" || wl.Destination != "" {
+			t.Errorf("Target = %q, Destination = %q, want %q and empty string", wl.Target, wl.Destination, "a")
+		}
+		if wantEnd := len("[[a]]"); wl.End != wantEnd {
+			t.Errorf("End = %d, want %d (an empty dest is not part of the token)", wl.End, wantEnd)
 		}
 	})
 
