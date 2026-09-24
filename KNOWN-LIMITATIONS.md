@@ -149,6 +149,47 @@ code is still 1.
 helper semantics; recorded in case the misclassification of read errors matters later.
 **Reported, deliberately deferred: 2026-09-24.**
 
+## Path guards
+
+### `assertContained` allows the walk when the base root cannot be resolved
+
+**What happens.** `filepath.EvalSymlinks(kbRoot)` failing (a looping or unreadable ancestor)
+makes `assertContained` return no error: with no resolved root there is no boundary to compare
+a link against, so the component walk is skipped. CLI calls are unreachable this way — the
+base's config is stat'ed through the same path first — but a library caller handling an exotic
+`kbRoot` gets no escape check.
+
+**Why deferred:** fail-open on a path the CLI cannot reach; closing it means deciding what an
+unresolvable base means, which changes the library calling contract.
+**Reported, deliberately deferred: 2026-09-24.**
+
+### `..` is rejected inside a filename, not only as a path component
+
+**What happens.** `ResolveKBPath`/`ResolveRawPath` reject any input containing `..`, so a
+legitimate mid-filename occurrence such as `notes/v2..bak.md` is refused as a
+parent-directory escape (`path must not contain '..'`).
+
+**Why deferred:** the lexical guard is deliberately blunt — allowing `..` only as a whole
+component means a component-aware parse of every input, and no page name needs the sequence.
+**Reported, deliberately deferred: 2026-09-24.**
+
+### A symlink planted at `kb/` changes what the bulk sweeps see
+
+**What happens.** The bulk page sweeps open the pages directory without the path resolver's
+containment check, and `kb/` is itself a component that check would inspect. With `kb/` a
+symlink to a directory outside the base, the sweeps that walk it (`akb list`, `akb status`,
+the page walk behind `akb lint`, the search and link-graph rebuilds, the raw-delete link
+scan) open the symlinked root as a non-directory entry and descend no further, so the base
+reports an empty pages tree; direct reads that join `kb/<name>` follow the link instead —
+`akb lint`'s index read resolves `kb/index.md` through it and reports on the outside file.
+Commands that address a page by name are unaffected: the resolver rejects the escaping `kb/`
+component as a usage fault. The constraint stays: the triage parked this case, and this
+entry is its durable record.
+
+**Why deferred:** making every bulk read containment-check the pages directory and each
+entry below it is the trust-boundary wave's read-side work.
+**Reported, deliberately deferred: 2026-09-24.**
+
 ## Template authoring
 
 ### `loadExampleTemplates` skips the old-format check `LoadTemplates` applies
@@ -217,6 +258,28 @@ helper.
 current write path.
 
 **Why deferred:** outside the blast radius of every change since; trivial lint hygiene.
+**Reported, deliberately deferred: 2026-09-24.**
+
+### The retired freshness and summary thresholds stay exported
+
+**What happens.** `internal/lint/thresholds.go` still exports `FreshnessHalfLifeDays`,
+`FreshnessScoreThreshold`, `SummaryMinLength`, and `SummaryMaxLength`, whose checkers were
+removed, alongside the consumed `ProvenanceDriftThreshold`. Only `engine_test.go` reads the
+four.
+
+**Why deferred:** decision recorded — keep: they are stable threshold spellings a consumer
+may read, and deleting exported identifiers is a breaking change with no current need; a
+removal belongs to a lint-package cleanup of its own.
+**Reported, deliberately deferred: 2026-09-24.**
+
+### `internal/lint/AGENTS.md` lists one of the five threshold constants
+
+**What happens.** The THRESHOLDS block in `internal/lint/AGENTS.md` shows only
+`ProvenanceDriftThreshold`, while `thresholds.go` defines five exported constants, four of
+them unconsumed by the engine.
+
+**Why deferred:** documentation drift on an internal map; the block is corrected together
+with the constants' fate (the entry above).
 **Reported, deliberately deferred: 2026-09-24.**
 
 ## Test hygiene
