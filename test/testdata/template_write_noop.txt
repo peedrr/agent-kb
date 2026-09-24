@@ -28,6 +28,13 @@ cmp stdout history.txt
 cmp note.yaml .akb/templates/note.yaml
 cmp note_pass.md .akb/templates/note_pass.md
 
+# The same byte-identical re-run with the persistent --no-commit flag is
+# still a no-op: exit 0, the 'unchanged' message, and no new commit.
+exec akb --no-commit template write note --template note.yaml --pass note_pass.md --fail ../note-fail.md --force
+stdout 'Template .note. unchanged'
+exec git log --oneline
+cmp stdout history.txt
+
 # Different mockup content is a real write again, and is recorded in a commit.
 exec akb template write note --template note.yaml --pass ../changed-pass.md --fail ../note-fail.md --force
 stdout 'Template .note. written'
@@ -45,6 +52,35 @@ exec git commit -m 'plant a template whose pass mockup violates its rule'
 ! exec akb template write planted --template ../planted.yaml --pass ../planted_pass.md --fail ../planted_fail.md --force
 stderr 'pass mockup no longer validates'
 ! stderr 'unchanged'
+
+# A first write with the persistent --no-commit flag leaves the template files
+# uncommitted. A byte-identical --force --no-commit re-run must still exit 0
+# without reaching git with an empty change set, and must leave the installed
+# files untouched.
+cd ..
+exec akb init nocommit-kb
+cd nocommit-kb
+env AKB_KB=.
+exec akb template get note --full --examples
+cp stdout note.yaml
+exec akb template get note --example --examples
+cp stdout note_pass.md
+exec git log --oneline
+cp stdout history-nocommit.txt
+exec akb --no-commit template write note --template note.yaml --pass note_pass.md --fail ../note-fail.md
+stdout 'Template .note. written'
+exec git log --oneline
+cmp stdout history-nocommit.txt
+exec git status --porcelain -- .akb/templates
+stdout '\?\? .akb/templates/'
+exec akb --no-commit template write note --template note.yaml --pass note_pass.md --fail ../note-fail.md --force
+stdout 'Template .note. written'
+! stderr 'nothing to commit'
+exec git log --oneline
+cmp stdout history-nocommit.txt
+cmp note.yaml .akb/templates/note.yaml
+cmp note_pass.md .akb/templates/note_pass.md
+cmp ../note-fail.md .akb/templates/note_fail.md
 
 -- note-fail.md --
 ---
