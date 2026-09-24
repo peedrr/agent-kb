@@ -59,6 +59,9 @@
               # https://github.com/golangci/golangci-lint
               golangci-lint
 
+              # Go vulnerability database
+              govulncheck
+
               self.formatter.${system}
               self.nixLsp.${system}
 
