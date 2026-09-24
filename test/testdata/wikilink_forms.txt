@@ -8,7 +8,13 @@
 
 # --- Setup ---
 
+# Every invocation names its base explicitly: the harness default (AKB_KB=.)
+# resolves against the working directory of each command, so the scenario pins
+# the absolute path it created instead — the same base however the commands are
+# scheduled, and whatever else shares TMPDIR.
+env AKB_KB=
 exec akb init wk-kb
+env AKB_KB=$WORK/wk-kb
 cd wk-kb
 
 # init seeds no templates: copy the note template for the linked-to page, and
