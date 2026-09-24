@@ -239,7 +239,8 @@ component as a usage fault. The constraint stays: the triage parked this case, a
 entry is its durable record.
 
 **Why deferred:** making every bulk read containment-check the pages directory and each
-entry below it is the trust-boundary wave's read-side work.
+entry below it is deferred to a future read-side containment pass over the bulk-read
+commands.
 **Reported, deliberately deferred: 2026-09-24.**
 
 ## Template authoring
