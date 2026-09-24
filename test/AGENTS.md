@@ -4,14 +4,14 @@
 
 ## OVERVIEW
 
-Integration tests using the testscript framework. 54 `.txt` script files define end-to-end CLI scenarios.
+Integration tests using the testscript framework. 61 `.txt` script files define end-to-end CLI scenarios.
 
 ## FILES
 
 | File | Purpose |
 |------|---------|
 | `integration_test.go` | TestMain builds akb binary; Test runs testscript with `HOME` set to the scenario work dir and `AKB_KB=.` |
-| `testdata/*.txt` | 54 testscript scenarios covering full workflows, edge cases, and command permutations |
+| `testdata/*.txt` | 61 testscript scenarios covering full workflows, edge cases, and command permutations |
 
 ## TESTSCRIPT CONVENTIONS
 

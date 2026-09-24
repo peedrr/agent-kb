@@ -1,7 +1,8 @@
-# Lint Integration Tests — every checker plus --json and exit codes
+# Lint Integration Tests — nine of the ten checkers in one sweep (required_fields
+# is pinned by lint_required_fields.txt), plus --json output and exit codes
 
 # ============================================================
-# Section 1: All 13 checks in one KB
+# Section 1: The nine checkers this script plants issues for
 # ============================================================
 
 exec akb init lint-kb
@@ -62,7 +63,7 @@ exec cp ../bad-type.md kb/notes/bad-type.md
 exec mkdir -p kb/random
 exec cp ../misplaced.md kb/random/misplaced.md
 
-# --- Run lint once and verify all 13 check types appear ---
+# --- Run lint once and verify all nine check types appear ---
 
 ! exec akb lint
 

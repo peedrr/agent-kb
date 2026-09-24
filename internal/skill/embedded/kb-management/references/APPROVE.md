@@ -29,7 +29,7 @@
 akb approve --all-drafts
 ```
 
-Approves every draft page at once. Already-approved pages are skipped silently. A summary count is printed.
+Approves every draft that passes schema required-field validation; already-approved pages are skipped silently and a summary count is printed. A draft that leaves a schema-required frontmatter field unset keeps its draft state, is reported, and the run exits 1.
 
 **When to use batch:** After a batch ingest where all pages have been reviewed.
 **When to use single:** When reviewing individual pages for quality.
