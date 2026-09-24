@@ -82,6 +82,21 @@ the goldmark-reported path (`normalizeWikilinkTarget`).
 for URL-shaped destinations, a behavior call with no current consumer.
 **Reported, deliberately deferred: 2026-09-24.**
 
+### Lowercase HTML declarations interrupt paragraphs goldmark keeps open
+
+**What happens.** `startsParagraphInterrupt` lowercases the line before the HTML type-4 and
+type-5 start checks, so a lowercase declaration line (`<!doctype html>`, `<!a>`, or
+`<![cdata[`) inside an open list-item paragraph is judged a paragraph interrupt: the list
+item closes and a following blank-line-plus-4-indented wikilink is dropped as indented code.
+goldmark v1.8.2 requires an uppercase ASCII letter for type 4 (`^[ ]{0,3}<![A-Z]+`) and the
+exact `<![CDATA[` spelling for type 5, so it treats those lines as lazy paragraph
+continuations and renders the link.
+
+**Why deferred:** the parser is spec-frozen as of v0.19.0 — the divergence needs the exact
+lowercase spelling inside a list item to fire, and spec-frozen divergences on degenerate
+input are documented, not patched.
+**Reported, deliberately deferred: 2026-09-24.**
+
 ## Exclusions not shared with the marker parsers
 
 ### Provenance and annotation parsers keep their own, narrower exclusion set

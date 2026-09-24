@@ -168,3 +168,5 @@ such as `[a`. Pinned outcomes:
 ## Parser spec-frozen
 
 Parser spec-frozen as of v0.19.0 — divergences from goldmark on degenerate input are documented in this file and KNOWN-LIMITATIONS.md, not patched.
+
+One documented divergence: a lowercase HTML declaration (`<!doctype html>`, `<!a>`) or a lowercase `<![cdata[` is treated as a paragraph interrupt here, where goldmark requires an uppercase letter after `<!` or the exact `<![CDATA[` spelling and reads the line as a lazy paragraph continuation.
