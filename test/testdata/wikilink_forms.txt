@@ -64,6 +64,33 @@ stdout 'Written to kb/probes/explicit.md'
 exec akb links probes/explicit.md
 stdout '  notes/probe-target -> kb/notes/probe-target.md'
 
+# --- FORM 4 SPELLINGS: every .md-bearing destination normalizes to one target ---
+
+# The same .md-bearing destination, spelled three more ways. Each page writes
+# only if CEL's target is the target the link graph records, and `akb links`
+# shows that same spelling resolving to the destination page — so both readers
+# agree on one target for all four spellings.
+stdin ../explicit-angle.md
+exec akb write probes/explicit-angle.md
+stdout 'Written to kb/probes/explicit-angle.md'
+
+exec akb links probes/explicit-angle.md
+stdout '  notes/probe-target -> kb/notes/probe-target.md'
+
+stdin ../explicit-relative.md
+exec akb write probes/explicit-relative.md
+stdout 'Written to kb/probes/explicit-relative.md'
+
+exec akb links probes/explicit-relative.md
+stdout '  notes/probe-target -> kb/notes/probe-target.md'
+
+stdin ../explicit-titled.md
+exec akb write probes/explicit-titled.md
+stdout 'Written to kb/probes/explicit-titled.md'
+
+exec akb links probes/explicit-titled.md
+stdout '  notes/probe-target -> kb/notes/probe-target.md'
+
 # --- CEL refuses a declared target the body does not link ---
 
 stdin ../mismatch.md
@@ -169,6 +196,42 @@ expect_target: notes/probe-target
 
 The explicit-destination form links [[Probe Target]](notes/probe-target.md): the
 bracket carries the label, the parens carry the destination.
+
+-- explicit-angle.md --
+---
+type: probe
+title: Angle-bracketed destination wikilink
+expect_target: notes/probe-target
+---
+
+# Angle-bracketed destination wikilink
+
+The angle-bracketed form links [[Probe Target]](<notes/probe-target.md>): the
+angle brackets are not part of the target.
+
+-- explicit-relative.md --
+---
+type: probe
+title: Relative destination wikilink
+expect_target: notes/probe-target
+---
+
+# Relative destination wikilink
+
+The relative form links [[Probe Target]](./notes/probe-target.md): the leading
+"./" is not part of the target.
+
+-- explicit-titled.md --
+---
+type: probe
+title: Titled destination wikilink
+expect_target: notes/probe-target
+---
+
+# Titled destination wikilink
+
+The titled form links [[Probe Target]](notes/probe-target.md "Probe Target"): the
+link title is not part of the target.
 
 -- mismatch.md --
 ---
