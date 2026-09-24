@@ -390,6 +390,185 @@ updated: 2024-01-01
 	}
 }
 
+// TestTemplateGet_ExampleWarnsOnUnevaluableAndFailingRule pins that the
+// --example warning path keeps checking the remaining rules after one cannot be
+// evaluated: the unevaluable rule gets its own warning on stderr, and the
+// headline still names the rule that evaluated to false.
+func TestTemplateGet_ExampleWarnsOnUnevaluableAndFailingRule(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templateBody := `name: mixed
+description: Template with one unevaluable rule and one failing rule
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: unevaluable_probe
+    rule: 'page.frontmatter["key the mockup does not set"] != ""'
+    expect: the probe key must be set
+  - id: failing_probe
+    rule: 'page.frontmatter.title == "Never a title"'
+    expect: the title can never match
+`
+	mockupBody := `---
+type: mixed
+title: Mixed
+---
+
+# Mixed
+`
+	if err := os.WriteFile(filepath.Join(templatesDir, "mixed.yaml"), []byte(templateBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "mixed_pass.md"), []byte(mockupBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := runTemplateGetExample(t, "mixed")
+	if err != nil {
+		t.Fatalf("template get --example failed: %v", err)
+	}
+	if !strings.Contains(stdout, "type: mixed") {
+		t.Errorf("stdout = %q, want the mockup displayed", stdout)
+	}
+	for _, want := range []string{
+		"WARNING: Could not validate mockup: CEL error in rule 'unevaluable_probe':",
+		"no such key: key the mockup does not set",
+		"This mockup no longer passes validation against the current template rules.",
+		"Failed rule(s): [failing_probe]",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr = %q, want it to contain %q", stderr, want)
+		}
+	}
+}
+
+// TestTemplateGet_ExampleWarnsOnEachBrokenRule pins that every rule that cannot
+// be compiled or evaluated gets its own warning rather than the first broken
+// rule hiding the rest, and that a variant whose every rule was skipped prints
+// the per-rule warnings alone.
+func TestTemplateGet_ExampleWarnsOnEachBrokenRule(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templateBody := `name: broken
+description: Template whose rules can neither compile nor evaluate
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: uncompilable_probe
+    rule: 'this is not valid CEL (('
+    expect: never reported
+  - id: unevaluable_probe
+    rule: 'page.frontmatter["key the mockup does not set"] != ""'
+    expect: the probe key must be set
+`
+	mockupBody := `---
+type: broken
+title: Broken
+---
+
+# Broken
+`
+	if err := os.WriteFile(filepath.Join(templatesDir, "broken.yaml"), []byte(templateBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "broken_pass.md"), []byte(mockupBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := runTemplateGetExample(t, "broken")
+	if err != nil {
+		t.Fatalf("template get --example failed: %v", err)
+	}
+	if !strings.Contains(stdout, "type: broken") {
+		t.Errorf("stdout = %q, want the mockup displayed", stdout)
+	}
+	// The mockup supplies no schema-optional key, so it is checked twice: as
+	// given, and as an update of itself. Each broken rule warns in both.
+	for _, want := range []string{
+		"WARNING: Could not validate mockup: CEL error in rule 'uncompilable_probe':",
+		"WARNING: Could not validate mockup: CEL error in rule 'unevaluable_probe':",
+	} {
+		if got := strings.Count(stderr, want); got != 2 {
+			t.Errorf("stderr = %q, want %q twice — once per variant, got %d", stderr, want, got)
+		}
+	}
+	if strings.Contains(stderr, "Failed rule(s):") {
+		t.Errorf("stderr = %q, want no failing-rule headline when every rule was skipped", stderr)
+	}
+}
+
+// TestTemplateGet_ExampleWarnsForEveryVariant pins that each of the three
+// mockup variants — as given, with a schema-optional key stripped, and as its
+// own old_page — still reports its own headline and its own failed-rule list.
+func TestTemplateGet_ExampleWarnsForEveryVariant(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templateBody := `name: variantprobe
+description: Template whose three mockup variants each break a different rule
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    sources:
+      type: list
+      required: false
+validations:
+  - id: sources_present
+    rule: 'has(page.frontmatter.sources)'
+    expect: sources must be set
+  - id: title_must_change
+    rule: '!has(old_page.frontmatter) || page.frontmatter.title != old_page.frontmatter.title'
+    expect: the title must change on every update
+  - id: never_a_title
+    rule: 'page.frontmatter.title == "Never a title"'
+    expect: the probe title can never match
+`
+	mockupBody := `---
+type: variantprobe
+title: Variant Probe
+sources: [raw/data.csv]
+---
+
+# Variant Probe
+`
+	if err := os.WriteFile(filepath.Join(templatesDir, "variantprobe.yaml"), []byte(templateBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "variantprobe_pass.md"), []byte(mockupBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := runTemplateGetExample(t, "variantprobe")
+	if err != nil {
+		t.Fatalf("template get --example failed: %v", err)
+	}
+	if !strings.Contains(stdout, "type: variantprobe") {
+		t.Errorf("stdout = %q, want the mockup displayed", stdout)
+	}
+	for _, want := range []string{
+		"This mockup no longer passes validation against the current template rules.",
+		"Failed rule(s): [never_a_title]",
+		"This mockup no longer validates without optional key sources.",
+		"Failed rule(s): [sources_present never_a_title]",
+		"This mockup no longer validates as an update of itself.",
+		"Failed rule(s): [title_must_change never_a_title]",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr = %q, want it to contain %q", stderr, want)
+		}
+	}
+}
+
 func TestTemplateGet_Full(t *testing.T) {
 	setupTemplateTestKB(t)
 

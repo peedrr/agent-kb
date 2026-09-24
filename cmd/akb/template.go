@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/goccy/go-yaml"
 	gocel "github.com/google/cel-go/cel"
+	"github.com/google/cel-go/common/types"
 	"github.com/spf13/cobra"
 
 	"github.com/peedrr/agent-kb/internal/cel"
@@ -218,13 +221,36 @@ func warnMockupValidation(tmpl template.Template, name string, data []byte) {
 }
 
 // warnMockupVariant evaluates the template's validation rules against one
-// variant of the pass mockup and warns when a rule fails or cannot be
-// evaluated.
+// variant of the pass mockup and warns on stderr about every rule it breaks:
+// a rule that cannot be compiled or evaluated gets its own warning, later rules
+// are still checked, and the IDs of the rules that did not evaluate to true are
+// reported together in one headline.
 func warnMockupVariant(env *gocel.Env, tmpl template.Template, page, oldPage map[string]any, headline string) {
-	failed, ruleID, err := evaluateValidations(env, tmpl.Validations, page, oldPage)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: CEL error in rule '%s': %v\n", ruleID, err)
-		return
+	var failed []string
+	for _, rule := range tmpl.Validations {
+		prg, err := cel.CompileRule(env, rule.Rule)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: CEL error in rule '%s': %v\n", rule.ID, err)
+			continue
+		}
+		// A nil map is not the same as an absent page: an empty map makes
+		// old_page.frontmatter a missing key instead of a null value.
+		var oldPageValue any
+		if oldPage != nil {
+			oldPageValue = oldPage
+		}
+		result, err := cel.Evaluate(context.Background(), prg, map[string]any{
+			"page":     page,
+			"old_page": oldPageValue,
+			"now":      time.Now(),
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: CEL error in rule '%s': %v\n", rule.ID, err)
+			continue
+		}
+		if result != types.True {
+			failed = append(failed, rule.ID)
+		}
 	}
 	if len(failed) > 0 {
 		fmt.Fprintf(os.Stderr, "WARNING: %s\n         Failed rule(s): %v\n         The template may have been changed without updating the mockup.\n", headline, failed)
