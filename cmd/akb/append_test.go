@@ -9,6 +9,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/peedrr/agent-kb/internal/cel"
+	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/template"
 )
 
 func appendSetupTestKB(t *testing.T) string {
@@ -769,5 +773,117 @@ func TestAppendMissingRequiredFieldFailsValidation(t *testing.T) {
 	}
 	if string(data) != adrMissingStatus {
 		t.Errorf("page changed by the failed append:\nbefore: %q\nafter:  %q", adrMissingStatus, data)
+	}
+}
+
+// appendOldPageProbeTemplate is a probe template whose single rule passes only
+// when append validation is handed the page's pre-append on-disk state. A nil
+// old_page fails the rule, and so does an old_page that does not carry the
+// planted status and update stamp.
+const appendOldPageProbeTemplate = `name: append-old-page-probe
+description: Probe pinning the old_page append validation is handed
+dir: notes
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    type:
+      type: string
+      required: true
+    status:
+      type: string
+      required: true
+    created:
+      type: string
+      required: true
+    updated:
+      type: string
+      required: true
+validations:
+  - id: old_page_carries_pre_append_state
+    rule: 'has(old_page.frontmatter) && old_page.frontmatter.status == "proposed" && old_page.frontmatter.updated == timestamp("2020-01-01T00:00:00Z")'
+    requirement: Append validation must see the page's pre-append on-disk state
+    expect: old_page must carry the page's pre-append status and update stamp
+`
+
+// appendOldPagePlanted is the page the probe test plants on disk: the probe
+// rule pins the status and update stamp carried here, and the append stamps a
+// fresh update time over the planted one.
+const appendOldPagePlanted = `---
+type: append-old-page-probe
+title: Old Page Probe
+status: proposed
+created: '2020-01-01T00:00:00Z'
+updated: '2020-01-01T00:00:00Z'
+---
+Original body.`
+
+// assertOldPageProbeRejectsNilOldPage fails unless the probe template's rule
+// reports a failure against a nil old_page, so an append that passes the rule
+// cannot have been validated without a populated old_page.
+func assertOldPageProbeRejectsNilOldPage(t *testing.T, templatesDir string) {
+	t.Helper()
+
+	templates, err := template.LoadTemplates(templatesDir)
+	if err != nil {
+		t.Fatalf("load probe template: %v", err)
+	}
+	probe, ok := templates["append-old-page-probe"]
+	if !ok {
+		t.Fatal("probe template did not load")
+	}
+
+	fm, body, err := frontmatter.Parse([]byte(appendOldPagePlanted))
+	if err != nil {
+		t.Fatalf("parse planted page: %v", err)
+	}
+
+	env, err := cel.NewEnv()
+	if err != nil {
+		t.Fatalf("create CEL environment: %v", err)
+	}
+
+	failed, ruleID, err := evaluateValidations(env, probe.Validations, buildTestPage("kb/notes/old-page-probe.md", fm, body), nil)
+	if err != nil {
+		t.Fatalf("probe rule %q did not evaluate: %v", ruleID, err)
+	}
+	if len(failed) != 1 || failed[0] != "old_page_carries_pre_append_state" {
+		t.Errorf("probe rule against a nil old_page failed %v, want the rule itself", failed)
+	}
+}
+
+// TestAppendValidationSeesPreAppendOldPage pins that append validation is
+// handed the page's pre-append on-disk state as old_page. The probe template's
+// rule holds only for the planted pre-append status and update stamp, so the
+// append below passes only because old_page carried that state; the same rule
+// fails against a nil old_page, so a vacuous pass cannot stand in for the
+// populated state.
+func TestAppendValidationSeesPreAppendOldPage(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	const relPath = "kb/notes/old-page-probe.md"
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := os.WriteFile(filepath.Join(templatesDir, "append-old-page-probe.yaml"), []byte(appendOldPageProbeTemplate), 0600); err != nil {
+		t.Fatalf("write probe template: %v", err)
+	}
+	writeRawPage(t, kbRoot, relPath, appendOldPagePlanted)
+
+	assertOldPageProbeRejectsNilOldPage(t, templatesDir)
+
+	out, err := appendRun(kbRoot, "notes/old-page-probe.md", "Appended body.")
+	if err != nil {
+		t.Fatalf("append failed validation against the probe template: %s: %v", out, err)
+	}
+	if !strings.Contains(out, "Appended to "+relPath) {
+		t.Errorf("output = %q, want %q", out, "Appended to "+relPath)
+	}
+
+	// The append rewrites the page, so the update stamp the rule pinned is
+	// necessarily the pre-append one.
+	fm := pageFrontmatter(t, filepath.Join(kbRoot, filepath.FromSlash(relPath)))
+	if got := frontmatterString(t, fm, "updated"); got == "2020-01-01T00:00:00Z" {
+		t.Errorf("updated = %q, want the append to move the update time on", got)
 	}
 }
