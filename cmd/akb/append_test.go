@@ -776,6 +776,19 @@ func TestAppendMissingRequiredFieldFailsValidation(t *testing.T) {
 	}
 }
 
+// TestAppendUnevaluableRuleIsValidationFailure pins that `akb append`
+// classifies an unevaluable rule as a validation failure rather than an akb
+// fault, and leaves the page untouched.
+func TestAppendUnevaluableRuleIsValidationFailure(t *testing.T) {
+	kbRoot := appendSetupTestKB(t)
+	defer appendCleanup(kbRoot)
+
+	relPath := plantUnguardedTemplate(t, kbRoot)
+
+	out, err := appendRun(kbRoot, "sourced/planted.md", "Appended body.")
+	assertUnevaluableRuleValidationFailure(t, kbRoot, relPath, out, err)
+}
+
 // appendOldPageProbeTemplate is a probe template whose single rule passes only
 // when append validation is handed the page's pre-append on-disk state. A nil
 // old_page fails the rule, and so does an old_page that does not carry the

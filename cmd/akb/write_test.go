@@ -2137,3 +2137,113 @@ func TestWriteAppendMissingRequiredFieldFailsValidation(t *testing.T) {
 		t.Errorf("page changed by the failed append:\nbefore: %q\nafter:  %q", adrMissingStatus, data)
 	}
 }
+
+// unguardedTemplate is a probe template whose rule reads a schema-optional key
+// without has(), so evaluating it against a page that omits the key fails
+// rather than returning a verdict.
+const unguardedTemplate = `name: sourced
+description: probe template whose rule reads an absent optional key unguarded
+dir: sourced
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    sources:
+      type: list
+      required: false
+validations:
+  - id: sources_named
+    rule: 'page.frontmatter.sources[0] != ""'
+    requirement: sources must name at least one source
+    expect: sources must name at least one source
+`
+
+// unguardedPage is a page of unguardedTemplate's type that omits the optional
+// key the rule reads, planted on disk for the update branches.
+const unguardedPage = `---
+type: sourced
+title: Unguarded
+---
+
+A page whose type has an optional sources field it leaves out.`
+
+// plantUnguardedTemplate installs unguardedTemplate and a page that omits the
+// key its rule reads, and returns the page's KB-relative path. The update
+// branches read the page as it exists on disk, so the unevaluable rule keeps
+// them from creating it through akb write.
+func plantUnguardedTemplate(t *testing.T, kbRoot string) string {
+	t.Helper()
+
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "sourced.yaml"), []byte(unguardedTemplate), 0600); err != nil {
+		t.Fatalf("write probe template: %v", err)
+	}
+	const relPath = "kb/sourced/planted.md"
+	writeRawPage(t, kbRoot, relPath, unguardedPage)
+	return relPath
+}
+
+// assertUnevaluableRuleValidationFailure fails unless the update command
+// classified its unevaluable rule as a validation failure: exit 1, the
+// author-directed report without an internal prefix, and the planted page
+// byte-identical.
+func assertUnevaluableRuleValidationFailure(t *testing.T, kbRoot, relPath, out string, err error) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatalf("expected the unevaluable rule to block the update, got: %s", out)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected an exit error, got %T: %v", err, err)
+	}
+	if code := exitErr.ExitCode(); code != exitFailure {
+		t.Errorf("exit code = %d, want %d; output: %s", code, exitFailure, out)
+	}
+	for _, want := range []string{
+		"rule sources_named could not be evaluated: no such key: sources",
+		"template authoring problem",
+		"guard optional frontmatter keys with has()",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output = %q, want it to contain %q", out, want)
+		}
+	}
+	if strings.Contains(out, "internal:") {
+		t.Errorf("output = %q, want a validation failure rather than an akb fault", out)
+	}
+
+	data, readErr := os.ReadFile(filepath.Join(kbRoot, filepath.FromSlash(relPath))) //nolint:gosec // test reading a known temp file
+	if readErr != nil {
+		t.Fatalf("read the planted page: %v", readErr)
+	}
+	if string(data) != unguardedPage {
+		t.Errorf("page changed by the failed update:\nbefore: %q\nafter:  %q", unguardedPage, data)
+	}
+}
+
+// TestWriteAppendUnevaluableRuleIsValidationFailure pins that the --append
+// branch classifies an unevaluable rule as a validation failure rather than an
+// akb fault, and leaves the page untouched.
+func TestWriteAppendUnevaluableRuleIsValidationFailure(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	relPath := plantUnguardedTemplate(t, kbRoot)
+
+	out, err := writeRun(kbRoot, "sourced/planted.md", "Appended body.", "--append")
+	assertUnevaluableRuleValidationFailure(t, kbRoot, relPath, out, err)
+}
+
+// TestWriteFrontmatterUpdateUnevaluableRuleIsValidationFailure pins that the
+// --frontmatter branch classifies an unevaluable rule as a validation failure
+// rather than an akb fault, and leaves the page untouched.
+func TestWriteFrontmatterUpdateUnevaluableRuleIsValidationFailure(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	relPath := plantUnguardedTemplate(t, kbRoot)
+
+	out, err := writeRun(kbRoot, "sourced/planted.md", "", "--frontmatter", "title=Renamed")
+	assertUnevaluableRuleValidationFailure(t, kbRoot, relPath, out, err)
+}

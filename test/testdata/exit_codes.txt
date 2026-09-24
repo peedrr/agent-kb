@@ -55,6 +55,37 @@ stderr 'guard optional frontmatter keys with has\(\)'
 ! stderr 'internal:'
 ! exists kb/sourced/unguarded.md
 
+# === VALIDATION FAILURE: the unevaluable rule on the update paths, exit 1 ===
+
+# The update paths read a page of the type from disk: plant one, because the
+# unevaluable rule keeps akb write from creating it.
+mkdir kb/sourced
+cp ../unguarded-page.md kb/sourced/planted.md
+exec git add kb/sourced/planted.md
+exec git commit -m 'plant a sourced page for the update paths'
+cp kb/sourced/planted.md ../planted-before.txt
+
+exec bash -c 'akb append sourced/planted.md <../appended-body.md; echo "akb-exit=$?"'
+stdout 'akb-exit=1$'
+stderr 'rule sources_named could not be evaluated'
+stderr 'no such key: sources'
+stderr 'template authoring problem'
+stderr 'guard optional frontmatter keys with has\(\)'
+! stderr 'internal:'
+cmp ../planted-before.txt kb/sourced/planted.md
+
+exec bash -c 'akb write --append sourced/planted.md <../appended-body.md; echo "akb-exit=$?"'
+stdout 'akb-exit=1$'
+stderr 'rule sources_named could not be evaluated'
+! stderr 'internal:'
+cmp ../planted-before.txt kb/sourced/planted.md
+
+exec bash -c 'akb write --frontmatter title=Renamed sourced/planted.md; echo "akb-exit=$?"'
+stdout 'akb-exit=1$'
+stderr 'rule sources_named could not be evaluated'
+! stderr 'internal:'
+cmp ../planted-before.txt kb/sourced/planted.md
+
 # === UNKNOWN TYPE: content failure the caller can fix, exit 1 ===
 
 exec bash -c 'akb write notes/unknown.md <../unknown-type.md; echo "akb-exit=$?"'
@@ -251,6 +282,9 @@ title: Unguarded rule
 ---
 
 A page whose type has an optional `sources` field it leaves out.
+
+-- appended-body.md --
+Appended body that a failed update must never reach the page with.
 
 -- corrupt-manifest.txt --
 invalid line without pipes
