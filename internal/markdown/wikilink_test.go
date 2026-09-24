@@ -856,3 +856,131 @@ func TestParseWikilinksDegenerateBracketRunsAtOffsetZero(t *testing.T) {
 		}
 	})
 }
+
+// A backslash-escaped bracket makes the token literal text in CommonMark, so
+// neither the link graph nor CEL records it as a link.
+func TestParseWikilinksEscapedBrackets(t *testing.T) {
+	t.Run("an escaped opening bracket excludes the token", func(t *testing.T) {
+		content := `The literal \[[alpha]](notes/x.md) stays text, but [[real]] is a link.`
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "real" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "real")
+		}
+	})
+
+	t.Run("an escaped closing bracket excludes the token", func(t *testing.T) {
+		content := `The literal [[alpha\]](notes/x.md) stays text, but [[real]] is a link.`
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "real" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "real")
+		}
+	})
+
+	t.Run("an escaped backslash does not escape the bracket", func(t *testing.T) {
+		content := `A bare backslash \\[[alpha]] still links.`
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "alpha" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "alpha")
+		}
+	})
+}
+
+// An indented (four-space or tab) block is code in CommonMark, so
+// wikilink-shaped tokens inside one stay literal text in both readers.
+func TestParseWikilinksIndentedCodeBlocks(t *testing.T) {
+	t.Run("a four-space indented block is excluded", func(t *testing.T) {
+		content := "A paragraph.\n\n    [[indented]](notes/x.md)\n\n[[real]]\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "real" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "real")
+		}
+	})
+
+	t.Run("a tab-indented block is excluded", func(t *testing.T) {
+		content := "A paragraph.\n\n\t[[indented]]\n\n[[real]]\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "real" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "real")
+		}
+	})
+
+	t.Run("a three-space indent is prose, not code", func(t *testing.T) {
+		content := "A paragraph.\n\n   [[real]]\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "real" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "real")
+		}
+	})
+
+	t.Run("an indented line after a paragraph is a lazy continuation", func(t *testing.T) {
+		content := "A paragraph.\n    [[lazy]]\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "lazy" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "lazy")
+		}
+	})
+}
+
+// The indented-code exclusion is line-structured while a token's span can
+// cross lines: a quoted link title may contain a newline. Only a token whose
+// bracket part lies inside an indented block is excluded; a span that merely
+// crosses an indented line is still recorded.
+func TestParseWikilinksIndentedCodeBlockSpanBoundary(t *testing.T) {
+	t.Run("a multiline title crossing an indented line keeps the token", func(t *testing.T) {
+		content := "[[a]](notes/x.md \"line one\n    line two\")\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", wl.Target, "notes/x")
+		}
+		if wl.Display != "a" {
+			t.Errorf("Display = %q, want %q", wl.Display, "a")
+		}
+	})
+
+	t.Run("a token inside an indented block is excluded across its title", func(t *testing.T) {
+		content := "A paragraph.\n\n    [[a]](notes/x.md \"title\nline two\")\n\n[[real]]\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "real" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "real")
+		}
+	})
+
+	t.Run("an inner text crossing an indented boundary is kept", func(t *testing.T) {
+		content := "[[a\n\n    b]](x.md)\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "x")
+		}
+	})
+}

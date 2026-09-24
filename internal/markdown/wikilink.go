@@ -400,10 +400,79 @@ func computeExclusions(content string) exclusionSet {
 	var es exclusionSet
 
 	es.ranges = append(es.ranges, fencedCodeBlockRanges(content)...)
+	es.ranges = append(es.ranges, indentedCodeBlockRanges(content)...)
 	es.ranges = append(es.ranges, inlineCodeRanges(content)...)
 	es.ranges = append(es.ranges, htmlCommentRanges(content)...)
+	es.ranges = append(es.ranges, escapedBracketRanges(content)...)
 
 	return es
+}
+
+// indentedCodeBlockRanges returns the byte ranges of indented code blocks: runs
+// of lines indented by four or more spaces (or a tab). An indented line that
+// follows a paragraph without an intervening blank line continues that
+// paragraph — a lazy continuation — so only a block reaching the start of the
+// content or following a blank line is code.
+func indentedCodeBlockRanges(content string) []exclusion {
+	var ranges []exclusion
+	blockStart := -1
+	prevBlank := true
+
+	for lineStart := 0; lineStart < len(content); {
+		lineEnd := lineStart
+		for lineEnd < len(content) && content[lineEnd] != '\n' {
+			lineEnd++
+		}
+		line := content[lineStart:lineEnd]
+
+		switch {
+		case isIndentedCodeLine(line):
+			if blockStart < 0 && prevBlank {
+				blockStart = lineStart
+			}
+		case blockStart >= 0:
+			ranges = append(ranges, exclusion{start: blockStart, end: lineStart})
+			blockStart = -1
+		}
+
+		prevBlank = strings.TrimSpace(line) == ""
+		lineStart = lineEnd + 1
+	}
+
+	if blockStart >= 0 {
+		ranges = append(ranges, exclusion{start: blockStart, end: len(content)})
+	}
+	return ranges
+}
+
+// isIndentedCodeLine reports whether line carries the four-space (or one tab)
+// indent that starts an indented code block.
+func isIndentedCodeLine(line string) bool {
+	return strings.HasPrefix(line, "    ") || strings.HasPrefix(line, "\t")
+}
+
+// escapedBracketRanges returns the inner range of every wikilink-shaped token
+// whose opening '[' or closing ']' is backslash-escaped. CommonMark renders
+// such a token as literal text rather than a link, so neither the link graph
+// nor CEL should record it.
+func escapedBracketRanges(content string) []exclusion {
+	var ranges []exclusion
+	for _, token := range scanWikilinkTokens(content) {
+		if isEscapedByte(content, token.start) || isEscapedByte(content, token.innerEnd) {
+			ranges = append(ranges, exclusion{start: token.start, end: token.innerEnd})
+		}
+	}
+	return ranges
+}
+
+// isEscapedByte reports whether the byte at index i is escaped: preceded by an
+// odd number of backslashes, the count CommonMark's escape rule uses.
+func isEscapedByte(content string, i int) bool {
+	count := 0
+	for j := i - 1; j >= 0 && content[j] == '\\'; j-- {
+		count++
+	}
+	return count%2 == 1
 }
 
 func fencedCodeBlockRanges(content string) []exclusion {
