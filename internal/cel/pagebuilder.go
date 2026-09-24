@@ -190,11 +190,15 @@ func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 
 	wikilinks := markdown.ParseWikilinks(string(source))
 
-	// A wikilink token whose span contains another wikilink token is malformed:
-	// the inner token sits inside the outer token's parenthesized destination
-	// (for example [[a]]([[b]])), whose target is a bracket token rather than a
-	// path. Drop the outer token and the goldmark link describing it, so the
-	// surviving entries neither overlap nor carry the bracket-shaped target.
+	// A wikilink token whose parenthesized destination is itself a bracket
+	// token — [[a]]([[b]]) — is malformed: its destination names a wikilink
+	// rather than a path. The bracket parts of tokens never overlap, so such an
+	// inner token can only sit inside the outer token's destination part. Drop
+	// the outer token and the goldmark link describing it, so the surviving
+	// entries neither overlap nor carry the bracket-shaped target. A destination
+	// that is a real path (x.md, notes/[[weird]].md) is not a bracket token, so
+	// the outer token stays a valid link that keeps its merge with the goldmark
+	// link while the inner token emits its own entry.
 	containsAnother := make([]bool, len(wikilinks))
 	for i, outer := range wikilinks {
 		for j, inner := range wikilinks {
@@ -202,7 +206,8 @@ func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 				continue
 			}
 			if outer.Start <= inner.Start && inner.End <= outer.End &&
-				(outer.Start < inner.Start || inner.End < outer.End) {
+				(outer.Start < inner.Start || inner.End < outer.End) &&
+				strings.HasPrefix(outer.Destination, "[[") {
 				containsAnother[i] = true
 			}
 		}

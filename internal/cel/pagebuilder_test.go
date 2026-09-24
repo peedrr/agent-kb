@@ -688,6 +688,44 @@ func TestFlattenLinksWikilinkInsideDestination(t *testing.T) {
 	})
 }
 
+// A wikilink token nested in an outer token's parenthesized destination is
+// only malformed when the destination is itself a bracket token. A real path
+// destination keeps the outer entry — carrying goldmark's destination as
+// written — alongside the inner token's own entry.
+func TestFlattenLinksWikilinkInsidePathDestination(t *testing.T) {
+	t.Run("an inner token in a quoted title keeps both links", func(t *testing.T) {
+		source := "See [[a]](x.md \"see [[b]]\") here.\n"
+
+		links := flattenLinksForTest(t, source)
+		if len(links) != 2 {
+			t.Fatalf("links = %+v, want exactly 2 entries", links)
+		}
+		assertLinkEntry(t, links[0], "x.md", "[a]", true, 1)
+		assertLinkEntry(t, links[1], "b", "b", true, 1)
+	})
+
+	t.Run("an inner token inside the destination path keeps both links", func(t *testing.T) {
+		source := "See [[a]](notes/[[weird]].md) here.\n"
+
+		links := flattenLinksForTest(t, source)
+		if len(links) != 2 {
+			t.Fatalf("links = %+v, want exactly 2 entries", links)
+		}
+		assertLinkEntry(t, links[0], "notes/[[weird]].md", "[a]", true, 1)
+		assertLinkEntry(t, links[1], "weird", "weird", true, 1)
+	})
+
+	t.Run("a bracket-token destination still drops the outer token", func(t *testing.T) {
+		source := "See [[a]]([[b]]) here.\n"
+
+		links := flattenLinksForTest(t, source)
+		if len(links) != 1 {
+			t.Fatalf("links = %+v, want exactly 1 entry", links)
+		}
+		assertLinkEntry(t, links[0], "b", "b", true, 1)
+	})
+}
+
 func TestFlattenLinksSortedBySourceOffset(t *testing.T) {
 	source := "Bare [[alpha]] then a [plain](https://example.com) then [[beta|B]](notes/beta.md).\n"
 
