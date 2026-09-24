@@ -235,3 +235,23 @@ the missing-frontmatter check skips it (frontmatter is present). No checker repo
 schema — and closing the gap means deciding which checker owns empty-type pages, a
 checker-responsibility design call rather than a local fix.
 **Reported, deliberately deferred: 2026-09-24.**
+
+## Git and storage edges
+
+### A staged-but-reverted index still fails a no-op template write
+
+**What happens.** `akb template write --force` can still fail at the commit step when the
+template files are in a staged-but-reverted git state: the index differs from HEAD while the
+worktree matches HEAD and matches the content being written. The byte-identity check
+(`templateFilesMatch`) passes, but `storage.NothingToCommit` returns false because
+`git status --porcelain` reports the staged difference, so the write is not treated as a
+no-op. The swap-plus-commit path then stages the worktree content — identical to HEAD,
+flattening the index — and git refuses the commit. The failure surfaces with the
+`commit template write: git commit:` prefix; git's own wording after it varies
+(`nothing to commit, working tree clean`, or `nothing added to commit but untracked files
+present` when untracked files exist).
+
+**Why deferred:** detecting the index-versus-worktree-versus-HEAD divergence needs more
+git-state machinery than this pre-existing edge justifies, and the failure message already
+names the cause.
+**Reported, deliberately deferred: 2026-09-24.**
