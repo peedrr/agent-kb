@@ -1,0 +1,104 @@
+# Template write no-op: re-writing a template whose YAML and both mockups are
+# byte-identical to the committed files succeeds as an 'unchanged' no-op
+# instead of failing with an empty commit. Every mockup validation still runs
+# before the no-op decision.
+
+exec akb init noop-kb
+cd noop-kb
+env AKB_KB=.
+
+# Seed a template and its pass mockup from the embedded showcase set.
+exec akb template get note --full --examples
+cp stdout note.yaml
+exec akb template get note --example --examples
+cp stdout note_pass.md
+
+# The first write installs and commits the template and its mockups.
+exec akb template write note --template note.yaml --pass note_pass.md --fail ../note-fail.md
+stdout 'Template .note. written'
+exec git log --oneline
+cp stdout history.txt
+
+# The byte-identical --force re-run is a no-op: exit 0, the 'unchanged'
+# message, no new commit, and the installed files untouched.
+exec akb template write note --template note.yaml --pass note_pass.md --fail ../note-fail.md --force
+stdout 'Template .note. unchanged'
+exec git log --oneline
+cmp stdout history.txt
+cmp note.yaml .akb/templates/note.yaml
+cmp note_pass.md .akb/templates/note_pass.md
+
+# Different mockup content is a real write again, and is recorded in a commit.
+exec akb template write note --template note.yaml --pass ../changed-pass.md --fail ../note-fail.md --force
+stdout 'Template .note. written'
+exec git log --oneline -1
+stdout 'akb: template write note'
+
+# Validation still runs before the no-op decision: a committed template whose
+# pass mockup violates its own rule is refused even though every byte matches
+# what the write would record.
+cp ../planted.yaml .akb/templates/planted.yaml
+cp ../planted_pass.md .akb/templates/planted_pass.md
+cp ../planted_fail.md .akb/templates/planted_fail.md
+exec git add .akb/templates
+exec git commit -m 'plant a template whose pass mockup violates its rule'
+! exec akb template write planted --template ../planted.yaml --pass ../planted_pass.md --fail ../planted_fail.md --force
+stderr 'pass mockup no longer validates'
+! stderr 'unchanged'
+
+-- note-fail.md --
+---
+type: note
+title: ""
+summary: A note whose title is empty
+tags: [test]
+---
+
+# Empty title
+
+This note fails require_title because the title is an empty string.
+
+-- changed-pass.md --
+---
+type: note
+title: Test Note
+summary: A note whose mockup gained a summary
+tags: [test]
+---
+
+# Test Note
+
+This is a valid note.
+
+-- planted.yaml --
+name: planted
+description: Template planted with a pass mockup that violates its rule
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: title_not_planted
+    rule: 'page.frontmatter.title != "Planted"'
+    expect: title must differ from "Planted"
+
+-- planted_pass.md --
+---
+type: planted
+title: Planted
+---
+
+# Planted title
+
+This pass mockup violates title_not_planted, so a template write must refuse it.
+
+-- planted_fail.md --
+---
+type: planted
+title: Planted
+---
+
+# Planted title
+
+This fail mockup fails title_not_planted, which is what a fail mockup is for.

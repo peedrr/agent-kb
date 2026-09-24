@@ -346,6 +346,20 @@ func CommitFiles(kbRoot, commitMsg string, paths ...string) error {
 	return err
 }
 
+// NothingToCommit reports whether committing the given KB-relative paths would
+// record nothing: every path matches the committed tree, with no staged change,
+// no worktree change and no untracked file. It lets a command that would write
+// exactly what is already committed treat the operation as a no-op instead of
+// reaching git with an empty change set.
+func NothingToCommit(kbRoot string, paths ...string) (bool, error) {
+	args := append([]string{"status", "--porcelain", "--"}, paths...)
+	out, err := runGit(kbRoot, "git status", args...)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(out) == "", nil
+}
+
 // recordablePaths keeps the paths git can record: the ones present in the
 // worktree, plus the ones recorded in the committed tree, which an operation
 // may have deleted.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -261,6 +262,22 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	}
 	defer repoLock.Release()
 
+	// A write that would record exactly the template already committed changes
+	// nothing, so it succeeds without reaching git with an empty change set. The
+	// check runs after every mockup validation above and under the lock, so the
+	// content it compares is the content the commit below would record. --force
+	// skips the overwrite confirmation only; validation has already run.
+	if templateExists && templateFilesMatch(templatesDir, name, tmplData, passData, failData) {
+		recordEmpty, err := storage.NothingToCommit(kbRoot, templateCommitPaths(name)...)
+		if err != nil {
+			return fmt.Errorf("inspect template files in git: %w", err)
+		}
+		if recordEmpty {
+			fmt.Printf("Template %q unchanged.\n", name)
+			return nil
+		}
+	}
+
 	tmpDir, err := os.MkdirTemp(targetDir, ".tmp-write-")
 	if err != nil {
 		return fmt.Errorf("create temp directory: %w", err)
@@ -403,6 +420,27 @@ func withoutFrontmatterKey(fm *frontmatter.ParsedFrontmatter, key string) *front
 		}
 	}
 	return stripped
+}
+
+// templateFilesMatch reports whether the template YAML and both mockups on
+// disk hold exactly the content a write would record. A file that cannot be
+// read does not match: the write proceeds and reports its own error.
+func templateFilesMatch(templatesDir, name string, tmplData, passData, failData []byte) bool {
+	files := []struct {
+		path string
+		want []byte
+	}{
+		{filepath.Join(templatesDir, name+".yaml"), tmplData},
+		{filepath.Join(templatesDir, name+"_pass.md"), passData},
+		{filepath.Join(templatesDir, name+"_fail.md"), failData},
+	}
+	for _, file := range files {
+		onDisk, err := os.ReadFile(file.path) //nolint:gosec // known path inside the templates directory
+		if err != nil || !bytes.Equal(onDisk, file.want) {
+			return false
+		}
+	}
+	return true
 }
 
 func detectOldFormat(raw map[string]any, filename string) error {
