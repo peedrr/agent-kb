@@ -850,6 +850,42 @@ func TestParseWikilinksDegenerateBracketRuns(t *testing.T) {
 			t.Errorf("span = [%d,%d), want [2,%d) (the retry opens inside the four-bracket run)", wl.Start, wl.End, len(content))
 		}
 	})
+
+	t.Run("an angle-bracketed bracket-token destination keeps both tokens", func(t *testing.T) {
+		// Destination normalization strips the angle brackets, so <[[b]]>
+		// normalizes to the bracket token [[b]]: the parser records the same
+		// two overlapping tokens it records for [[a]]([[b]]) — the outer token
+		// carrying the bracket-shaped destination, and the inner token.
+		content := "[[a]](<[[b]]>)"
+		links := ParseWikilinks(content)
+		if len(links) != 2 {
+			t.Fatalf("len(links) = %d, want 2", len(links))
+		}
+		outer := links[0]
+		if outer.Target != "[[b]]" || outer.Destination != "[[b]]" {
+			t.Errorf("outer Target = %q, Destination = %q, want %q for both", outer.Target, outer.Destination, "[[b]]")
+		}
+		if outer.Display != "a" {
+			t.Errorf("outer Display = %q, want %q", outer.Display, "a")
+		}
+		if outer.Start != 0 || outer.End != len(content) {
+			t.Errorf("outer span = [%d,%d), want [0,%d) (the whole token including the dest)", outer.Start, outer.End, len(content))
+		}
+		inner := links[1]
+		if inner.Target != "b" {
+			t.Errorf("inner Target = %q, want %q", inner.Target, "b")
+		}
+		if inner.Destination != "" {
+			t.Errorf("inner Destination = %q, want empty string", inner.Destination)
+		}
+		if inner.Display != "b" {
+			t.Errorf("inner Display = %q, want %q", inner.Display, "b")
+		}
+		innerStart := strings.Index(content, "[[b]]")
+		if inner.Start != innerStart || inner.End != innerStart+len("[[b]]") {
+			t.Errorf("inner span = [%d,%d), want [%d,%d)", inner.Start, inner.End, innerStart, innerStart+len("[[b]]"))
+		}
+	})
 }
 
 // Spec-literal display outcomes for the explicit-destination form. Both are

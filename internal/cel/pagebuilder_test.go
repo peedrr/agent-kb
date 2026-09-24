@@ -776,6 +776,16 @@ func TestFlattenLinksWikilinkInsideDestination(t *testing.T) {
 		assertLinkEntry(t, links[0], "b", "b", true, 1)
 	})
 
+	t.Run("an angle-bracketed bracket-token destination drops the outer token", func(t *testing.T) {
+		source := "See [[a]](<[[b]]>) here.\n"
+
+		links := flattenLinksForTest(t, source)
+		if len(links) != 1 {
+			t.Fatalf("links = %+v, want exactly 1 entry", links)
+		}
+		assertLinkEntry(t, links[0], "b", "b", true, 1)
+	})
+
 	t.Run("later tokens are unaffected", func(t *testing.T) {
 		source := "[[a]]([[b]]) and [[c]].\n"
 
