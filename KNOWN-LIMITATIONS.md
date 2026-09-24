@@ -207,3 +207,17 @@ evidence.
 
 **Why deferred:** standing practice note rather than a defect.
 **Reported, deliberately deferred: 2026-09-24.**
+
+## Fail-closed template loading
+
+### One unparseable template file blocks every approve
+
+**What happens.** `akb approve` loads the base's templates fail-closed (`approveTemplates` →
+`template.LoadTemplates`) before it approves anything, so a single corrupt or unparseable YAML
+file in `.akb/templates/` makes every approve fail — including approvals of a page whose type
+is unrelated to the broken template — with the load error naming the offending file. The write
+path loads templates with the same fail-closed behavior.
+
+**Why deferred:** a broken template file is a base-level fault the author must repair;
+silently skipping unloadable templates would hide real corruption.
+**Reported, deliberately deferred: 2026-09-24.**
