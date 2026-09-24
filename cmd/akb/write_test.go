@@ -1069,6 +1069,78 @@ validations:
 	}
 }
 
+// TestWriteComputeBudgetRuleGetsBudgetRemedy pins that a rule whose evaluation
+// exhausts the engine's compute budget is a template-authoring problem with a
+// budget remedy: the has() advice for an unguarded optional key would misdirect
+// the author, while the failure stays a validation failure, not an akb fault.
+func TestWriteComputeBudgetRuleGetsBudgetRemedy(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	tmplData := `name: budget
+description: probe template whose rule exceeds the evaluation compute budget
+dir: budget
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: heading_triples
+    rule: 'page.ast.headings.exists(a, page.ast.headings.exists(b, page.ast.headings.exists(c, a.level == 0 && b.level == 0 && c.level == 0)))'
+    requirement: never satisfiable
+    expect: never reported
+`
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "budget.yaml"), []byte(tmplData), 0600); err != nil {
+		t.Fatalf("write probe template: %v", err)
+	}
+
+	// The rule scans every triple of headings and its predicate never holds, so
+	// this page's heading count exhausts the budget before the rule can decide.
+	content := "---\ntype: budget\ntitle: Expensive\n---\n" + strings.Repeat("## Heading\n\n", 256)
+
+	withWriteFlags(t, nil, false)
+	pointStdinAtTempFile(t, content)
+
+	var runErr error
+	stderr := captureStderr(t, func() {
+		runErr = runWrite(nil, []string{"budget/page.md"})
+	})
+	if runErr == nil {
+		t.Fatalf("expected the compute-budget rule to block the write, stderr: %s", stderr)
+	}
+
+	var internalErr *internalError
+	if errors.As(runErr, &internalErr) {
+		t.Errorf("failure %v is an akb fault; a rule that exhausts the budget is a template-authoring problem", runErr)
+	}
+	var validationErr validationFailure
+	if !errors.As(runErr, &validationErr) {
+		t.Fatalf("failure %v is not a validation failure", runErr)
+	}
+	if code, report := classifyExit(runErr); code != exitFailure || report != "" {
+		t.Errorf("classifyExit = (%d, %q), want (%d, %q)", code, report, exitFailure, "")
+	}
+
+	if _, err := os.Stat(filepath.Join(kbRoot, "kb", "budget", "page.md")); !os.IsNotExist(err) {
+		t.Errorf("the page was written despite the compute-budget rule: %v", err)
+	}
+
+	for _, want := range []string{
+		"rule heading_triples could not be evaluated: exceeded compute budget",
+		"template authoring problem",
+		"the rule is too expensive to evaluate",
+		"simplify it or reduce the input it examines",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr = %q, want it to contain %q", stderr, want)
+		}
+	}
+	if advice := "guard optional frontmatter keys with has()"; strings.Contains(stderr, advice) {
+		t.Errorf("stderr = %q, want the compute-budget remedy rather than %q", stderr, advice)
+	}
+}
+
 // TestWriteUncompilableRuleIsInternalFault pins that a template whose rule does
 // not compile — a template file that bypassed `akb template write`, which
 // rejects one — stays an akb fault: the write exits 2 and the page is not
