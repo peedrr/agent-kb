@@ -942,6 +942,56 @@ func TestParseWikilinksIndentedCodeBlocks(t *testing.T) {
 	})
 }
 
+// A list item opens its content at the marker's content column, so a line
+// indented four columns past that column is code inside the item while item
+// content indented four spaces past the marker's own column is prose. The
+// exclusion for an indented block is measured from the innermost open item.
+func TestParseWikilinksIndentedCodeBlocksInLists(t *testing.T) {
+	t.Run("item content indented four spaces past the marker is prose", func(t *testing.T) {
+		content := "- item\n\n    [[a]](notes/x.md)\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/x")
+		}
+	})
+
+	t.Run("ordered item content is measured from the marker", func(t *testing.T) {
+		content := "1. item\n\n    [[a]](notes/x.md)\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/x")
+		}
+	})
+
+	t.Run("nested item content is measured from the innermost marker", func(t *testing.T) {
+		content := "- outer\n\n  - inner\n\n      [[a]](notes/x.md)\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/x")
+		}
+	})
+
+	t.Run("content four columns past the item content column is code", func(t *testing.T) {
+		content := "- item\n\n      [[a]](notes/x.md)\n\n[[real]]\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "real" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "real")
+		}
+	})
+}
+
 // The indented-code exclusion is line-structured while a token's span can
 // cross lines: a quoted link title may contain a newline. Only a token whose
 // bracket part lies inside an indented block is excluded; a span that merely

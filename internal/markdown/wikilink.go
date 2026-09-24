@@ -409,14 +409,21 @@ func computeExclusions(content string) exclusionSet {
 }
 
 // indentedCodeBlockRanges returns the byte ranges of indented code blocks: runs
-// of lines indented by four or more spaces (or a tab). An indented line that
-// follows a paragraph without an intervening blank line continues that
-// paragraph — a lazy continuation — so only a block reaching the start of the
-// content or following a blank line is code.
+// of lines indented four or more columns past the content column of the
+// innermost open list item (four columns at the top level). A list item's
+// content column is where its text starts, so item content such as
+// "- item"'s four-space continuation is prose while four further columns are
+// code. An indented line that follows a paragraph without an intervening blank
+// line continues that paragraph — a lazy continuation — so only a block
+// reaching the start of the content or following a blank line is code.
 func indentedCodeBlockRanges(content string) []exclusion {
 	var ranges []exclusion
 	blockStart := -1
 	prevBlank := true
+
+	// contentColumns holds the content columns of the open list items,
+	// outermost first; the last entry is the innermost open item.
+	var contentColumns []int
 
 	for lineStart := 0; lineStart < len(content); {
 		lineEnd := lineStart
@@ -425,14 +432,52 @@ func indentedCodeBlockRanges(content string) []exclusion {
 		}
 		line := content[lineStart:lineEnd]
 
+		lineIndent, _ := leadingWhitespaceColumn(line)
+		itemContentColumn, isMarker := scanListMarker(line)
+
+		threshold := 4
+		if n := len(contentColumns); n > 0 {
+			threshold = contentColumns[n-1] + 4
+		}
+		isCodeLine := lineIndent >= threshold
+		if isCodeLine && blockStart < 0 && !prevBlank {
+			// A lazy continuation: the indented line continues the preceding
+			// paragraph rather than starting an indented code block.
+			isCodeLine = false
+		}
+
 		switch {
-		case isIndentedCodeLine(line):
-			if blockStart < 0 && prevBlank {
+		case isCodeLine:
+			if blockStart < 0 {
 				blockStart = lineStart
 			}
-		case blockStart >= 0:
-			ranges = append(ranges, exclusion{start: blockStart, end: lineStart})
-			blockStart = -1
+		case isMarker:
+			// A marker below an open item's content column cannot be nested
+			// inside that item, so it closes the item and any deeper ones.
+			for len(contentColumns) > 0 && contentColumns[len(contentColumns)-1] > lineIndent {
+				contentColumns = contentColumns[:len(contentColumns)-1]
+			}
+			contentColumns = append(contentColumns, itemContentColumn)
+			if blockStart >= 0 {
+				ranges = append(ranges, exclusion{start: blockStart, end: lineStart})
+				blockStart = -1
+			}
+		case strings.TrimSpace(line) != "":
+			// A non-blank line below an open item's content column lies outside
+			// the item, so it closes the item and any deeper ones. Blank lines
+			// never close a list.
+			for len(contentColumns) > 0 && contentColumns[len(contentColumns)-1] > lineIndent {
+				contentColumns = contentColumns[:len(contentColumns)-1]
+			}
+			if blockStart >= 0 {
+				ranges = append(ranges, exclusion{start: blockStart, end: lineStart})
+				blockStart = -1
+			}
+		default:
+			if blockStart >= 0 {
+				ranges = append(ranges, exclusion{start: blockStart, end: lineStart})
+				blockStart = -1
+			}
 		}
 
 		prevBlank = strings.TrimSpace(line) == ""
@@ -445,10 +490,64 @@ func indentedCodeBlockRanges(content string) []exclusion {
 	return ranges
 }
 
-// isIndentedCodeLine reports whether line carries the four-space (or one tab)
-// indent that starts an indented code block.
-func isIndentedCodeLine(line string) bool {
-	return strings.HasPrefix(line, "    ") || strings.HasPrefix(line, "\t")
+// leadingWhitespaceColumn returns the column of the first non-whitespace byte
+// of line and that byte's index. A tab advances to the next multiple of four,
+// so a tab-indented line starts at column four.
+func leadingWhitespaceColumn(line string) (column, index int) {
+	for index < len(line) {
+		switch line[index] {
+		case ' ':
+			column++
+		case '\t':
+			column += 4 - column%4
+		default:
+			return column, index
+		}
+		index++
+	}
+	return column, index
+}
+
+// scanListMarker reports whether line opens a list item and returns the column
+// at which that item's content begins. A marker is '-', '*', or '+', or a run
+// of digits followed by '.' or ')'; it must be followed by spaces or end the
+// line, so a word such as "-item" is not a marker. One to four spaces after
+// the marker are part of the item's prefix; five or more spaces, or a marker
+// ending the line, leave the content one column past the marker.
+func scanListMarker(line string) (contentColumn int, ok bool) {
+	markerColumn, i := leadingWhitespaceColumn(line)
+	if i >= len(line) {
+		return 0, false
+	}
+
+	width := 0
+	switch line[i] {
+	case '-', '*', '+':
+		width = 1
+	default:
+		for j := i; j < len(line) && line[j] >= '0' && line[j] <= '9'; j++ {
+			width++
+		}
+		if width == 0 || i+width >= len(line) || (line[i+width] != '.' && line[i+width] != ')') {
+			return 0, false
+		}
+		width++
+	}
+
+	afterMarker := i + width
+	spaces := 0
+	for afterMarker+spaces < len(line) && line[afterMarker+spaces] == ' ' {
+		spaces++
+	}
+	atEndOfLine := afterMarker+spaces == len(line)
+	if !atEndOfLine && spaces == 0 {
+		return 0, false
+	}
+
+	if atEndOfLine || spaces > 4 {
+		return markerColumn + width + 1, true
+	}
+	return markerColumn + width + spaces, true
 }
 
 // escapedBracketRanges returns the inner range of every wikilink-shaped token
