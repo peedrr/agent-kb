@@ -1034,3 +1034,115 @@ func TestParseWikilinksIndentedCodeBlockSpanBoundary(t *testing.T) {
 		}
 	})
 }
+
+// assertWikilinkTargets parses content and fails unless the recorded wikilinks
+// have exactly the wanted targets, in order.
+func assertWikilinkTargets(t *testing.T, content string, want ...string) {
+	t.Helper()
+	links := ParseWikilinks(content)
+	if len(links) != len(want) {
+		t.Fatalf("ParseWikilinks(%q) recorded %d links, want %d", content, len(links), len(want))
+	}
+	for i, target := range want {
+		if links[i].Target != target {
+			t.Errorf("links[%d].Target = %q, want %q", i, links[i].Target, target)
+		}
+	}
+}
+
+// A line of three or more '-' or '*' characters separated only by spaces is a
+// thematic break, and a run of ten or more digits keeps an ordered-marker line
+// a paragraph, so neither line opens a list item.
+func TestParseWikilinksThematicBreakAndOrderedMarkerDigitCap(t *testing.T) {
+	t.Run("a '*' thematic break is not a list item", func(t *testing.T) {
+		assertWikilinkTargets(t, "* * *\n\n    [[a]](notes/x.md)")
+	})
+
+	t.Run("a '-' thematic break is not a list item", func(t *testing.T) {
+		assertWikilinkTargets(t, "- - -\n\n    [[a]](notes/x.md)")
+	})
+
+	t.Run("ten digits before '.' keep the line a paragraph", func(t *testing.T) {
+		assertWikilinkTargets(t, "1234567890. item\n\n    [[a]](notes/x.md)")
+	})
+
+	t.Run("a single '-' bullet is still a list item", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n\n    [[a]](notes/x.md)", "notes/x")
+	})
+
+	t.Run("a single-digit ordered marker is still a list item", func(t *testing.T) {
+		assertWikilinkTargets(t, "9. item\n\n    [[a]](notes/x.md)", "notes/x")
+	})
+}
+
+// An indented line directly after a non-blank line is a lazy continuation of
+// the preceding paragraph, so it opens no list item and closes none: a marker
+// on such a line is literal paragraph text.
+func TestParseWikilinksLazyContinuationListBookkeeping(t *testing.T) {
+	t.Run("a demoted marker line opens no list item", func(t *testing.T) {
+		assertWikilinkTargets(t, "paragraph\n    - item\n\n        [[a]](notes/x.md)")
+	})
+
+	t.Run("a demoted line of plain text stays prose", func(t *testing.T) {
+		assertWikilinkTargets(t, "paragraph\n    [[a]](notes/x.md)", "notes/x")
+	})
+
+	t.Run("a lazy continuation inside an item keeps the item open", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n        [[a]](notes/x.md)", "notes/x")
+	})
+}
+
+// A fenced code block is opaque to the list tracker: its lines neither open nor
+// close items, so a marker inside a fence is literal text and a blank line
+// inside a fence is not a paragraph break.
+func TestParseWikilinksFencedCodeInListTracking(t *testing.T) {
+	t.Run("a marker inside a fence opens no item", func(t *testing.T) {
+		assertWikilinkTargets(t, "```\n- item\n  ```\n\n    [[a]](notes/x.md)")
+	})
+
+	t.Run("a fence with plain code keeps the indented block code", func(t *testing.T) {
+		assertWikilinkTargets(t, "```\ncode\n  ```\n\n    [[a]](notes/x.md)")
+	})
+
+	t.Run("a real list still keeps its four-space item content prose", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n\n    [[a]](notes/x.md)", "notes/x")
+	})
+}
+
+// A line indented four or more columns that starts below the innermost open
+// item's content column closes the items that no longer contain it and is then
+// judged against what remains: code when it reaches four columns past the
+// remaining item's content column (or sits at the top level), prose otherwise.
+func TestParseWikilinksIndentedCodeBelowItemContentColumn(t *testing.T) {
+	t.Run("a three-space item closes under a four-space line", func(t *testing.T) {
+		assertWikilinkTargets(t, "   - item\n\n    [[a]](notes/x.md)")
+	})
+
+	t.Run("a wide ordered marker closes under a four-space line", func(t *testing.T) {
+		assertWikilinkTargets(t, "100. item\n\n    [[a]](notes/x.md)")
+	})
+
+	t.Run("four spaces after a marker push the content column past the line", func(t *testing.T) {
+		assertWikilinkTargets(t, "-    item\n\n    [[a]](notes/x.md)")
+	})
+
+	t.Run("item content four spaces past the marker stays prose", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n\n    [[a]](notes/x.md)", "notes/x")
+	})
+
+	t.Run("item content five spaces past the marker stays prose", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n\n     [[a]](notes/x.md)", "notes/x")
+	})
+
+	t.Run("six spaces past the marker is code inside the item", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n\n      [[a]](notes/x.md)")
+	})
+
+	t.Run("a line inside the outer item stays the outer item's prose", func(t *testing.T) {
+		assertWikilinkTargets(t, "- outer\n   - inner\n\n    [[a]](notes/x.md)", "notes/x")
+	})
+
+	t.Run("a line four columns past the remaining outer item is code", func(t *testing.T) {
+		assertWikilinkTargets(t, "- outer\n      - inner\n\n      [[a]](notes/x.md)")
+	})
+}

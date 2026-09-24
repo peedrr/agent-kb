@@ -425,9 +425,12 @@ func computeExclusions(content string) exclusionSet {
 // "- item"'s four-space continuation is prose while four further columns are
 // code. An indented line that follows a paragraph without an intervening blank
 // line continues that paragraph — a lazy continuation — so only a block
-// reaching the start of the content or following a blank line is code.
+// reaching the start of the content or following a blank line is code. Lines
+// inside a fenced code block are literal text and leave the list bookkeeping
+// untouched.
 func indentedCodeBlockRanges(content string) []exclusion {
 	var ranges []exclusion
+	fenced := fencedCodeBlockRanges(content)
 	blockStart := -1
 	prevBlank := true
 
@@ -442,6 +445,15 @@ func indentedCodeBlockRanges(content string) []exclusion {
 		}
 		line := content[lineStart:lineEnd]
 
+		if lineOverlapsRanges(fenced, lineStart, lineEnd) {
+			// A fenced code block is opaque: its lines are literal text, so
+			// they neither open nor close list items and leave the blank-line
+			// state and any pending indented block untouched.
+			lineStart = lineEnd + 1
+			continue
+		}
+
+		trimmed := strings.TrimSpace(line)
 		lineIndent, _ := leadingWhitespaceColumn(line)
 		itemContentColumn, isMarker := scanListMarker(line)
 
@@ -450,10 +462,31 @@ func indentedCodeBlockRanges(content string) []exclusion {
 			threshold = contentColumns[n-1] + 4
 		}
 		isCodeLine := lineIndent >= threshold
+		isLazyContinuation := false
 		if isCodeLine && blockStart < 0 && !prevBlank {
 			// A lazy continuation: the indented line continues the preceding
 			// paragraph rather than starting an indented code block.
 			isCodeLine = false
+			isLazyContinuation = true
+		}
+
+		// After a blank line, a line indented below the innermost open item's
+		// content column falls outside that item, so the items it falls
+		// outside of close. The line is indented code only when it is still
+		// indented four or more columns past whatever item remains open, or
+		// four or more columns at the top level when none does; otherwise it
+		// is that item's prose. This outranks marker detection: a marker
+		// indented four or more columns is code, not a new item.
+		if blockStart < 0 && prevBlank && trimmed != "" && lineIndent >= 4 &&
+			len(contentColumns) > 0 && contentColumns[len(contentColumns)-1] > lineIndent {
+			for len(contentColumns) > 0 && contentColumns[len(contentColumns)-1] > lineIndent {
+				contentColumns = contentColumns[:len(contentColumns)-1]
+			}
+			remainingThreshold := 4
+			if n := len(contentColumns); n > 0 {
+				remainingThreshold = contentColumns[n-1] + 4
+			}
+			isCodeLine = lineIndent >= remainingThreshold
 		}
 
 		switch {
@@ -461,6 +494,8 @@ func indentedCodeBlockRanges(content string) []exclusion {
 			if blockStart < 0 {
 				blockStart = lineStart
 			}
+		case isLazyContinuation:
+			// Paragraph continuation text: it opens no item and closes none.
 		case isMarker:
 			// A marker below an open item's content column cannot be nested
 			// inside that item, so it closes the item and any deeper ones.
@@ -472,7 +507,7 @@ func indentedCodeBlockRanges(content string) []exclusion {
 				ranges = append(ranges, exclusion{start: blockStart, end: lineStart})
 				blockStart = -1
 			}
-		case strings.TrimSpace(line) != "":
+		case trimmed != "":
 			// A non-blank line below an open item's content column lies outside
 			// the item, so it closes the item and any deeper ones. Blank lines
 			// never close a list.
@@ -490,7 +525,7 @@ func indentedCodeBlockRanges(content string) []exclusion {
 			}
 		}
 
-		prevBlank = strings.TrimSpace(line) == ""
+		prevBlank = trimmed == ""
 		lineStart = lineEnd + 1
 	}
 
@@ -498,6 +533,17 @@ func indentedCodeBlockRanges(content string) []exclusion {
 		ranges = append(ranges, exclusion{start: blockStart, end: len(content)})
 	}
 	return ranges
+}
+
+// lineOverlapsRanges reports whether the line span [lineStart, lineEnd)
+// overlaps any of the ranges.
+func lineOverlapsRanges(ranges []exclusion, lineStart, lineEnd int) bool {
+	for _, r := range ranges {
+		if lineStart < r.end && lineEnd > r.start {
+			return true
+		}
+	}
+	return false
 }
 
 // leadingWhitespaceColumn returns the column of the first non-whitespace byte
@@ -520,10 +566,13 @@ func leadingWhitespaceColumn(line string) (column, index int) {
 
 // scanListMarker reports whether line opens a list item and returns the column
 // at which that item's content begins. A marker is '-', '*', or '+', or a run
-// of digits followed by '.' or ')'; it must be followed by spaces or end the
-// line, so a word such as "-item" is not a marker. One to four spaces after
-// the marker are part of the item's prefix; five or more spaces, or a marker
-// ending the line, leave the content one column past the marker.
+// of one to nine digits followed by '.' or ')'; it must be followed by spaces
+// or end the line, so a word such as "-item" is not a marker. Three or more
+// '-' or '*' characters separated only by spaces are a thematic break rather
+// than a list item, and ten or more digits keep an ordered-marker line a
+// paragraph. One to four spaces after the marker are part of the item's
+// prefix; five or more spaces, or a marker ending the line, leave the content
+// one column past the marker.
 func scanListMarker(line string) (contentColumn int, ok bool) {
 	markerColumn, i := leadingWhitespaceColumn(line)
 	if i >= len(line) {
@@ -532,13 +581,18 @@ func scanListMarker(line string) (contentColumn int, ok bool) {
 
 	width := 0
 	switch line[i] {
-	case '-', '*', '+':
+	case '-', '*':
+		if isThematicBreak(line[i:], line[i]) {
+			return 0, false
+		}
+		width = 1
+	case '+':
 		width = 1
 	default:
 		for j := i; j < len(line) && line[j] >= '0' && line[j] <= '9'; j++ {
 			width++
 		}
-		if width == 0 || i+width >= len(line) || (line[i+width] != '.' && line[i+width] != ')') {
+		if width == 0 || width > 9 || i+width >= len(line) || (line[i+width] != '.' && line[i+width] != ')') {
 			return 0, false
 		}
 		width++
@@ -558,6 +612,23 @@ func scanListMarker(line string) (contentColumn int, ok bool) {
 		return markerColumn + width + 1, true
 	}
 	return markerColumn + width + spaces, true
+}
+
+// isThematicBreak reports whether s, which begins at a '-' or '*' bullet
+// marker, consists of three or more repetitions of that marker separated only
+// by spaces.
+func isThematicBreak(s string, marker byte) bool {
+	count := 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case marker:
+			count++
+		case ' ':
+		default:
+			return false
+		}
+	}
+	return count >= 3
 }
 
 // escapedBracketRanges returns the inner range of every wikilink-shaped token
