@@ -77,46 +77,205 @@ func ParseWikilinks(content string) []Wikilink {
 	return links
 }
 
-// scanParenDestination reads a parenthesized destination starting at s[0] == '('.
-// It returns the raw destination, the byte offset just past the matching ')',
-// and whether a matching ')' exists.
+// scanParenDestination reads a parenthesized explicit destination starting at
+// s[0] == '('. It returns the raw text between the outer parens, the byte
+// offset just past the matching ')', and whether a matching ')' exists.
+//
+// The scan follows the CommonMark inline-link tail: an angle-bracketed
+// destination ends at its closing '>', a bare destination at the first
+// unescaped whitespace or unbalanced ')', and a title that follows the
+// destination can contain a ')'. Those spans are skipped so a ')' inside one
+// does not end the token early.
 func scanParenDestination(s string) (string, int, bool) {
-	depth := 0
-	for i := 0; i < len(s); i++ {
+	depth := 1
+	atDestStart := true
+	for i := 1; i < len(s); i++ {
 		switch s[i] {
 		case '(':
 			depth++
+			atDestStart = false
 		case ')':
 			depth--
 			if depth == 0 {
 				return s[1:i], i + 1, true
 			}
+			atDestStart = false
+		case '<':
+			if atDestStart {
+				atDestStart = false
+				if end, ok := scanAngleDestination(s, i); ok {
+					i = end - 1
+				}
+			}
+		case '"', '\'':
+			// A title follows the destination, so it is always preceded by
+			// whitespace or by the '>' that closed an angle-bracketed
+			// destination.
+			if i > 1 && (isSpace(s[i-1]) || s[i-1] == '>') {
+				if end, ok := scanTitle(s, i); ok {
+					i = end - 1
+				}
+			}
+			atDestStart = false
+		case '\\':
+			if i+1 < len(s) && isPunct(s[i+1]) {
+				i++
+			}
+			atDestStart = false
+		case ' ', '\t', '\n', '\v', '\f', '\r':
+			// Leading whitespace does not end the destination start.
+		default:
+			atDestStart = false
 		}
 	}
 	return "", 0, false
 }
 
 // isValidLinkDestination reports whether raw, the text scanned between an
-// adjacent pair of parens, is a valid CommonMark link destination. Surrounding
-// whitespace is ignored; the remainder is valid when it is either
-// angle-bracketed with no newline inside the brackets, or free of whitespace
-// entirely. Balanced nested parentheses are accepted in both forms.
+// adjacent pair of parens, is a valid CommonMark link destination with an
+// optional trailing link title. Leading and trailing whitespace is ignored;
+// the destination is valid when it is either angle-bracketed with no newline
+// inside the brackets, or free of whitespace entirely. Balanced nested
+// parentheses are accepted in both forms. A title, when present, is a quoted
+// or parenthesized string that follows the destination.
 func isValidLinkDestination(raw string) bool {
-	d := strings.TrimSpace(raw)
-	if d == "" {
-		return false
-	}
-	if len(d) >= 2 && strings.HasPrefix(d, "<") && strings.HasSuffix(d, ">") {
-		return !strings.ContainsAny(d[1:len(d)-1], "\n\r")
-	}
-	return !strings.ContainsAny(d, " \t\n\r")
+	_, end, ok := parseLinkDestination(raw)
+	return ok && end == len(raw)
 }
 
-// normalizeDest cleans an explicit destination: surrounding whitespace and
-// angle brackets are dropped, as are a leading "./" and a trailing ".md" (the
-// link graph's resolution step re-adds the extension).
+// parseLinkDestination parses a CommonMark link destination and an optional
+// trailing link title from the start of s, skipping leading whitespace. It
+// returns the raw destination text (angle brackets kept, title excluded), the
+// byte offset just past the parsed destination-with-title, and whether a
+// destination was found.
+func parseLinkDestination(s string) (string, int, bool) {
+	i := skipSpaces(s, 0)
+	if i == len(s) {
+		return "", 0, false
+	}
+	dest, i, ok := scanDestination(s, i)
+	if !ok {
+		return "", 0, false
+	}
+	i = skipSpaces(s, i)
+	if i == len(s) {
+		return dest, i, true
+	}
+	if s[i] != '"' && s[i] != '\'' && s[i] != '(' {
+		return "", 0, false
+	}
+	end, ok := scanTitle(s, i)
+	if !ok {
+		return "", 0, false
+	}
+	return dest, skipSpaces(s, end), true
+}
+
+// scanDestination parses a CommonMark link destination starting at s[i]:
+// either an angle-bracketed destination, or a bare one that ends at the first
+// unescaped whitespace or unbalanced ')'. A backslash-escaped punctuation
+// character is part of the destination.
+func scanDestination(s string, i int) (string, int, bool) {
+	if s[i] == '<' {
+		end, ok := scanAngleDestination(s, i)
+		if !ok {
+			return "", 0, false
+		}
+		return s[i:end], end, true
+	}
+	depth := 0
+	for j := i; j < len(s); j++ {
+		c := s[j]
+		if c == '\\' && j+1 < len(s) && isPunct(s[j+1]) {
+			j++
+			continue
+		}
+		switch c {
+		case '(':
+			depth++
+		case ')':
+			if depth == 0 {
+				return s[i:j], j, j > i
+			}
+			depth--
+		case ' ', '\t', '\n', '\v', '\f', '\r':
+			return s[i:j], j, j > i
+		}
+	}
+	return s[i:], len(s), len(s) > i
+}
+
+// scanAngleDestination returns the byte offset just past the '>' that closes
+// the angle-bracketed destination starting at s[i] == '<'. It reports false
+// when no '>' appears before the end of the line; a backslash-escaped
+// punctuation character does not close the destination.
+func scanAngleDestination(s string, i int) (int, bool) {
+	for j := i + 1; j < len(s); j++ {
+		switch {
+		case s[j] == '\n' || s[j] == '\r':
+			return 0, false
+		case s[j] == '\\' && j+1 < len(s) && isPunct(s[j+1]):
+			j++
+		case s[j] == '>':
+			return j + 1, true
+		}
+	}
+	return 0, false
+}
+
+// scanTitle returns the byte offset just past the closing delimiter of the
+// link title starting at s[i], which must be a double quote, single quote, or
+// '('. A title ends at the first unescaped matching delimiter; a
+// parenthesized title may not contain a nested '(', and a backslash-escaped
+// punctuation character does not close the title.
+func scanTitle(s string, i int) (int, bool) {
+	opener := s[i]
+	closer := opener
+	if opener == '(' {
+		closer = ')'
+	}
+	for j := i + 1; j < len(s); j++ {
+		switch {
+		case s[j] == '\\' && j+1 < len(s) && isPunct(s[j+1]):
+			j++
+		case s[j] == closer:
+			return j + 1, true
+		case opener == '(' && s[j] == '(':
+			return 0, false
+		}
+	}
+	return 0, false
+}
+
+// skipSpaces returns the offset of the first byte at or after i that is not
+// whitespace.
+func skipSpaces(s string, i int) int {
+	for i < len(s) && isSpace(s[i]) {
+		i++
+	}
+	return i
+}
+
+// isSpace reports whether c is whitespace in CommonMark's sense.
+func isSpace(c byte) bool {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'
+}
+
+// isPunct reports whether c is an ASCII punctuation character, the set
+// CommonMark allows a backslash to escape.
+func isPunct(c byte) bool {
+	return c >= '!' && c <= '/' || c >= ':' && c <= '@' || c >= '[' && c <= '`' || c >= '{' && c <= '~'
+}
+
+// normalizeDest cleans an explicit destination: an optional trailing link
+// title is dropped, then surrounding whitespace and angle brackets, as are a
+// leading "./" and a trailing ".md" (the link graph's resolution step re-adds
+// the extension).
 func normalizeDest(dest string) string {
 	d := strings.TrimSpace(dest)
+	if parsed, _, ok := parseLinkDestination(d); ok {
+		d = parsed
+	}
 	if len(d) >= 2 && strings.HasPrefix(d, "<") && strings.HasSuffix(d, ">") {
 		d = d[1 : len(d)-1]
 	}

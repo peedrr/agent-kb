@@ -442,6 +442,104 @@ func TestParseWikilinksExplicitDestination(t *testing.T) {
 		}
 	})
 
+	t.Run("double-quoted title after the dest is stripped", func(t *testing.T) {
+		content := `[[Guide]](notes/x.md "title")`
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", wl.Target, "notes/x")
+		}
+		if wl.Destination != "notes/x" {
+			t.Errorf("Destination = %q, want %q", wl.Destination, "notes/x")
+		}
+		if wl.Display != "Guide" {
+			t.Errorf("Display = %q, want %q", wl.Display, "Guide")
+		}
+		if wl.End != len(content) {
+			t.Errorf("End = %d, want %d (the title is part of the token)", wl.End, len(content))
+		}
+	})
+
+	t.Run("single-quoted title after the dest is stripped", func(t *testing.T) {
+		links := ParseWikilinks("[[a]](notes/x.md 'title')")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/x")
+		}
+	})
+
+	t.Run("parenthesized title after the dest is stripped", func(t *testing.T) {
+		links := ParseWikilinks("[[a]](notes/x.md (title))")
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/x")
+		}
+	})
+
+	t.Run("title may contain an unbalanced closing paren", func(t *testing.T) {
+		links := ParseWikilinks(`[[a]](notes/x.md "ti)tle")`)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/x")
+		}
+	})
+
+	t.Run("angle-bracketed dest with a title", func(t *testing.T) {
+		links := ParseWikilinks(`[[a]](<notes/x.md> "title")`)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/x")
+		}
+	})
+
+	t.Run("title directly after an angle-bracketed dest", func(t *testing.T) {
+		links := ParseWikilinks(`[[a]](<notes/x.md>"title")`)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/x")
+		}
+	})
+
+	t.Run("unclosed title leaves a plain wikilink", func(t *testing.T) {
+		content := `[[a]](notes/x.md "title)`
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "a" || wl.Destination != "" {
+			t.Errorf("Target = %q, Destination = %q, want %q and empty string", wl.Target, wl.Destination, "a")
+		}
+		if wantEnd := len("[[a]]"); wl.End != wantEnd {
+			t.Errorf("End = %d, want %d (an invalid dest is not part of the token)", wl.End, wantEnd)
+		}
+	})
+
+	t.Run("text after the title leaves a plain wikilink", func(t *testing.T) {
+		content := `[[a]](notes/x.md "title" extra)`
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "a" || wl.Destination != "" {
+			t.Errorf("Target = %q, Destination = %q, want %q and empty string", wl.Target, wl.Destination, "a")
+		}
+	})
+
 	t.Run("empty parens leave a plain wikilink", func(t *testing.T) {
 		content := "[[a]]()"
 		links := ParseWikilinks(content)
