@@ -44,7 +44,7 @@ func init() {
 // RunLint runs all lint checks against the KB and returns the report.
 // It handles: resolve KB → open DB → load templates → read manifest →
 // rebuild link graph → walk pages → build KB struct → create engine →
-// add all 8 checkers → run → return report.
+// add all 10 checkers → run → return report.
 func RunLint(ctx context.Context) (*lint.LintReport, error) {
 	kbRoot, err := path.ResolveKB(kbFlag)
 	if err != nil {
@@ -153,6 +153,7 @@ func RunLint(ctx context.Context) (*lint.LintReport, error) {
 	engine.AddChecker(lint.NewOrphansChecker())
 	engine.AddChecker(lint.NewEmptyPagesChecker())
 	engine.AddChecker(lint.NewMissingFrontmatterChecker())
+	engine.AddChecker(lint.NewRequiredFieldsChecker())
 	engine.AddChecker(lint.NewIndexConsistencyChecker())
 	engine.AddChecker(lint.NewCitationsChecker())
 	engine.AddChecker(lint.NewProvenanceChecker())

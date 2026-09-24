@@ -1,0 +1,96 @@
+# Lint — required_fields checker: pages that leave a schema-required field unset
+
+# ============================================================
+# Section 1: a page write validation refuses is still swept
+# ============================================================
+
+exec akb init required-fields-kb
+cd required-fields-kb
+
+# init seeds no templates: copy the one this scenario writes pages of.
+exec akb template get adr --full --examples
+cp stdout .akb/templates/adr.yaml
+exec git add .akb/templates
+exec git commit -m 'seed adr template'
+
+# An ADR leaving out the schema-required status and deciders fields. akb write
+# refuses it, so it is copied in directly: this is the pre-existing page the
+# sweep has to reach.
+exec mkdir -p kb/decisions
+exec cp ../incomplete-adr.md kb/decisions/incomplete-adr.md
+
+# The required_fields issue is an error, so the sweep fails.
+! exec akb lint
+
+# Exactly one required_fields issue, reported against the incomplete ADR and
+# worded the way the write path refuses the same page.
+stdout -count=1 'rule_id=required_fields'
+stdout '(?s)=== kb/decisions/incomplete-adr\.md ===\n(  \[[^\n]*\n)*  \[required_fields\] rule_id=required_fields error: missing required frontmatter field\(s\): deciders, status \(declared required by template "adr"\)'
+
+# It is the only error-severity issue of the run: the other issues the page
+# collects (index_consistency, orphans) are warnings.
+stdout -count=1 'error:'
+
+! exec akb lint --json
+stdout '"required_fields": 1'
+
+# ============================================================
+# Section 2: no false positives for pages whose schema another check owns
+# ============================================================
+
+cd ..
+exec akb init other-checks-own-the-schema-kb
+cd other-checks-own-the-schema-kb
+
+# init seeds no templates: copy the one this scenario writes pages of.
+exec akb template get note --full --examples
+cp stdout .akb/templates/note.yaml
+exec git add .akb/templates
+exec git commit -m 'seed note template'
+
+# A page whose type has no template and a page without frontmatter declare no
+# schema: type_orphan and missing_frontmatter report them, not this check.
+exec sh -c 'echo "A page with no frontmatter at all." > kb/bare.md'
+exec mkdir -p kb/notes
+exec cp ../retired-type.md kb/notes/retired-type.md
+
+# A well-formed page of a type whose schema it satisfies.
+stdin ../good-note.md
+exec akb write good-note.md
+stdout 'Written to kb/notes/good-note.md'
+exec akb index add kb/notes/good-note.md 'A well-formed note'
+
+! exec akb lint
+! stdout 'required_fields'
+
+! exec akb lint --json
+stdout '"required_fields": 0'
+
+-- incomplete-adr.md --
+---
+type: adr
+title: Incomplete ADR
+summary: An ADR that never passed write validation
+tags: linttest
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+Decision body without the required status and deciders fields.
+
+-- retired-type.md --
+---
+type: retired-type
+title: Retired Type Page
+---
+Body of a page whose type has no template.
+
+-- good-note.md --
+---
+type: note
+title: Good Note
+summary: A well-formed note for testing
+tags: linttest
+created: '2026-01-01'
+updated: '2026-09-01'
+---
+This is a well-formed note with proper frontmatter.
