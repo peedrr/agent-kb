@@ -162,3 +162,7 @@ such as `[a`. Pinned outcomes:
 - End to end: `test/testdata/wikilink_forms.txt` writes each form and asserts the target the
   link graph records equals the target CEL matched; `test/testdata/superseded_adr.txt`
   exercises a `.md`-bearing destination against a `.md`-less `supersedes` value.
+
+## Parser spec-frozen
+
+Parser spec-frozen as of v0.19.0 — divergences from goldmark on degenerate input are documented in this file and KNOWN-LIMITATIONS.md, not patched.
