@@ -38,26 +38,78 @@ An owner ruling on whether to close it was still pending when this file was writ
 is ledgered by default until that ruling lands.
 **Reported, deliberately deferred: 2026-09-24.**
 
+### A normalized path destination that lands on a bracket token repeats that disagreement
+
+**What happens.** `[[a]](./[[b]].md)` normalizes its destination to `[[b]]`, a bracket token,
+so the parser suppresses no bracket run below it and emits both the outer token and the inner
+one. The shape reproduces the disagreement above by a second route: the link graph records
+two rows — raw targets `[[b]]` and `b` — while `page.ast.links` keeps one entry, the inner
+token `b`. The angle-bracketed spelling `[[a]](<./[[b]].md>)` measures identically. Both
+readers classify the destination as a bracket token, so the outcome is pinned by behavior,
+not a second defect.
+
+**Why deferred:** same graph-side fix as the entry above — span containment extended from the
+CEL merge into `ParseWikilinks`/`internal/linkgraph`.
+**Reported, deliberately deferred: 2026-09-24.**
+
 ### Indented-code detection is the simple 4-column rule
 
 **What happens.** Indented code is measured as four columns past the content column of the
-innermost open list item (four columns at the top level). Strict CommonMark would need six
-spaces in some list contexts, so a 4-space line after a blank line inside a list item can be
-treated as code where strict CommonMark would call it paragraph text. Scope-literal,
-degenerate.
+innermost open list item (four columns at the top level), and the parser's item-closing
+bookkeeping — not a container stack — decides which item a line belongs to. The bookkeeping
+tracks the open items' content columns: a non-blank line below an open item's content column
+closes that item and every deeper one, except a lazy continuation of an open paragraph, which
+closes nothing whatever its indent. A marker line opens an item and opens a paragraph only
+when it carries item content; a paragraph interrupt — a fence delimiter, a thematic break, an
+ATX heading, a block quote, or an HTML block of CommonMark type 1-6 — closes the items it
+falls outside of. The lazy-continuation test keys on the previous line being non-blank rather
+than on a paragraph actually being open, so a line indented four or more columns directly
+after a paragraph-interrupting block is prose here where goldmark renders an indented code
+block (`- item`, `# H`, `    [[a]]` records `a`).
 
-**Why deferred:** the rule is a deliberate simplification — full container-stack modelling is
-a larger change than the divergence justifies.
+**Why deferred:** the 4-column rule and the paragraph-state approximation are deliberate
+simplifications; full container-stack modelling with per-item paragraph state is a larger
+change than the divergence justifies, and the parser is spec-frozen.
 **Reported, deliberately deferred: 2026-09-24.**
 
 ### Nested and empty list items are modelled as one flat item
 
 **What happens.** Marker-only items such as `+ + +` are modelled as a single flat item, while
 goldmark nests empty items. A blank line followed by a 4-space line then records one link
-where goldmark renders indented code (zero links).
+where goldmark renders indented code (zero links). The trailing markers count as item
+content on the flat item, so its paragraph state opens and a low-indent line before the blank
+line is a lazy continuation that closes nothing: `+ + +`, `x`, blank, `    [[a]]` records the
+link too.
 
-**Why deferred:** same container-stack modelling limit as above; pre-existing and unchanged by
-the list-bookkeeping work.
+**Why deferred:** same container-stack modelling limit as above; the low-indent shape is a
+consequence of the paragraph-open tracking, not a separate mechanism.
+**Reported, deliberately deferred: 2026-09-24.**
+
+### An indented line after a fence's closing delimiter stays a lazy continuation
+
+**What happens.** The list bookkeeping's lazy-continuation test keys on the previous line
+being non-blank, and a closing fence delimiter is a non-blank line, so a line indented four
+or more columns directly after the closing delimiter of a fenced block is read as prose: the
+parser records the link where goldmark renders an indented code block (zero links). A fenced
+block is not a paragraph, so there is nothing to continue.
+
+**Why deferred:** the spec-freeze classifies the residual lazy-continuation approximation as
+documented, not patched.
+**Reported, deliberately deferred: 2026-09-24.**
+
+### `fencedCodeBlockRanges` accepts a fence anywhere and ignores an unclosed one
+
+**What happens.** The fence detector opens a block on a fence delimiter anywhere in a line —
+not only at the line start — and emits no range for a fence that never closes. Both readers
+therefore drop a token between a mid-line delimiter and the next one (a mid-line opener with a
+later closing delimiter, or two delimiters on one line) while goldmark renders the text as a
+paragraph, and both record a token inside an unclosed fence while goldmark's fence runs to
+the end of the file. The list bookkeeping narrows a fence range to the lines strictly between
+its delimiters, so a same-line pair contributes no indented-code judgment; the range function
+itself is unchanged.
+
+**Why deferred:** line-start-only fencing and an end-of-file range change token exclusion for
+every consumer and need a goldmark-parity pass, not a local fix.
 **Reported, deliberately deferred: 2026-09-24.**
 
 ### Goldmark-only path: a malformed destination only goldmark accepts
