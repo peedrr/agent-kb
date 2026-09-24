@@ -1020,6 +1020,21 @@ func TestParseWikilinksIndentedCodeBlocksInLists(t *testing.T) {
 			t.Errorf("Target = %q, want %q", links[0].Target, "real")
 		}
 	})
+
+	t.Run("a tab after the marker sets the content column four columns in", func(t *testing.T) {
+		content := "-\titem\n\n      [[a]](notes/x.md)\n"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		if links[0].Target != "notes/x" {
+			t.Errorf("Target = %q, want %q", links[0].Target, "notes/x")
+		}
+	})
+
+	t.Run("a line four columns past a tab-set content column is code", func(t *testing.T) {
+		assertWikilinkTargets(t, "-\titem\n\n        [[a]](notes/x.md)")
+	})
 }
 
 // The indented-code exclusion is line-structured while a token's span can
@@ -1119,6 +1134,10 @@ func TestParseWikilinksLazyContinuationListBookkeeping(t *testing.T) {
 
 	t.Run("a lazy continuation inside an item keeps the item open", func(t *testing.T) {
 		assertWikilinkTargets(t, "- item\n        [[a]](notes/x.md)", "notes/x")
+	})
+
+	t.Run("a low-indent lazy continuation keeps the item open", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\ncontinuation\n\n    [[a]]", "a")
 	})
 }
 

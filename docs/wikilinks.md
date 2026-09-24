@@ -113,9 +113,11 @@ inside:
   literal text, so neither is a link; `\\[[alpha]]` is not escaped and still links;
 - an **indented code block**: a line indented four or more columns past the content column
   of the innermost open list item (four columns at the top level). A tab advances to the
-  next multiple of four. An indented line that follows a paragraph with no intervening blank
-  line is a lazy continuation — prose, not code — and a fence delimiter line runs the list
-  bookkeeping like any other line.
+  next multiple of four, both in a line's leading indent and in the whitespace after a list
+  marker — `-\titem` puts the item's content at column four. An indented line that follows a
+  paragraph with no intervening blank line is a lazy continuation — prose, not code — and it
+  closes no list item, whatever its indent; a fence delimiter line runs the list bookkeeping
+  like any other line.
 
 The exclusion is line-structured while a token's span can cross lines: a token whose span
 merely crosses an indented line (a quoted title spanning a newline) is still recorded; only

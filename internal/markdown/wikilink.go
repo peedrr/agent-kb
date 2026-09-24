@@ -440,10 +440,11 @@ func computeExclusions(content string) exclusionSet {
 // "- item"'s four-space continuation is prose while four further columns are
 // code. An indented line that follows a paragraph without an intervening blank
 // line continues that paragraph — a lazy continuation — so only a block
-// reaching the start of the content or following a blank line is code. Lines
-// strictly inside a fenced code block are literal text and leave the list
-// bookkeeping untouched; the fence delimiter lines are ordinary markdown and
-// run it like any other line.
+// reaching the start of the content or following a blank line is code, and a
+// lazy continuation line closes no open item even when it sits below the item's
+// content column. Lines strictly inside a fenced code block are literal text
+// and leave the list bookkeeping untouched; the fence delimiter lines are
+// ordinary markdown and run it like any other line.
 func indentedCodeBlockRanges(content string) []exclusion {
 	var ranges []exclusion
 	fencedInterior := fencedCodeBlockInteriors(content, fencedCodeBlockRanges(content))
@@ -453,6 +454,13 @@ func indentedCodeBlockRanges(content string) []exclusion {
 	// contentColumns holds the content columns of the open list items,
 	// outermost first; the last entry is the innermost open item.
 	var contentColumns []int
+
+	// paragraphOpen reports whether the previous line left a paragraph open.
+	// Its text continues on a later line even when that line is indented below
+	// the open item's content column — a lazy continuation, which closes no
+	// item. A line that opens a block which interrupts a paragraph closes items
+	// the way any other block-start line does.
+	paragraphOpen := false
 
 	for lineStart := 0; lineStart < len(content); {
 		lineEnd := lineStart
@@ -509,11 +517,13 @@ func indentedCodeBlockRanges(content string) []exclusion {
 
 		switch {
 		case isCodeLine:
+			paragraphOpen = false
 			if blockStart < 0 {
 				blockStart = lineStart
 			}
 		case isLazyContinuation:
 			// Paragraph continuation text: it opens no item and closes none.
+			paragraphOpen = true
 		case isMarker:
 			// A marker below an open item's content column cannot be nested
 			// inside that item, so it closes the item and any deeper ones.
@@ -525,10 +535,17 @@ func indentedCodeBlockRanges(content string) []exclusion {
 				ranges = append(ranges, exclusion{start: blockStart, end: lineStart})
 				blockStart = -1
 			}
+			paragraphOpen = true
 		case trimmed != "":
 			// A non-blank line below an open item's content column lies outside
 			// the item, so it closes the item and any deeper ones. Blank lines
-			// never close a list.
+			// never close a list. A line that continues an open paragraph is
+			// lazy continuation text instead: it lies outside the item's indent
+			// but stays inside its paragraph, so it closes nothing.
+			interrupt := startsParagraphInterrupt(line)
+			if paragraphOpen && !interrupt {
+				break
+			}
 			for len(contentColumns) > 0 && contentColumns[len(contentColumns)-1] > lineIndent {
 				contentColumns = contentColumns[:len(contentColumns)-1]
 			}
@@ -536,7 +553,9 @@ func indentedCodeBlockRanges(content string) []exclusion {
 				ranges = append(ranges, exclusion{start: blockStart, end: lineStart})
 				blockStart = -1
 			}
+			paragraphOpen = !interrupt
 		default:
+			paragraphOpen = false
 			if blockStart >= 0 {
 				ranges = append(ranges, exclusion{start: blockStart, end: lineStart})
 				blockStart = -1
@@ -584,13 +603,14 @@ func leadingWhitespaceColumn(line string) (column, index int) {
 
 // scanListMarker reports whether line opens a list item and returns the column
 // at which that item's content begins. A marker is '-', '*', or '+', or a run
-// of one to nine digits followed by '.' or ')'; it must be followed by spaces
-// or end the line, so a word such as "-item" is not a marker. Three or more
-// '-' or '*' characters separated only by spaces are a thematic break rather
-// than a list item, and ten or more digits keep an ordered-marker line a
-// paragraph. One to four spaces after the marker are part of the item's
-// prefix; five or more spaces, or a marker ending the line, leave the content
-// one column past the marker.
+// of one to nine digits followed by '.' or ')'; it must be followed by spaces,
+// tabs, or end the line, so a word such as "-item" is not a marker. Three or
+// more '-' or '*' characters separated only by spaces are a thematic break
+// rather than a list item, and ten or more digits keep an ordered-marker line a
+// paragraph. Up to four whitespace columns after the marker are part of the
+// item's prefix, a tab advancing to the next multiple of four; more than four
+// columns, or a marker ending the line, leave the content one column past the
+// marker.
 func scanListMarker(line string) (contentColumn int, ok bool) {
 	markerColumn, i := leadingWhitespaceColumn(line)
 	if i >= len(line) {
@@ -617,19 +637,25 @@ func scanListMarker(line string) (contentColumn int, ok bool) {
 	}
 
 	afterMarker := i + width
-	spaces := 0
-	for afterMarker+spaces < len(line) && line[afterMarker+spaces] == ' ' {
-		spaces++
+	column := markerColumn + width
+	whitespace := 0
+	for afterMarker+whitespace < len(line) && (line[afterMarker+whitespace] == ' ' || line[afterMarker+whitespace] == '\t') {
+		if line[afterMarker+whitespace] == '\t' {
+			column += 4 - column%4
+		} else {
+			column++
+		}
+		whitespace++
 	}
-	atEndOfLine := afterMarker+spaces == len(line)
-	if !atEndOfLine && spaces == 0 {
+	atEndOfLine := afterMarker+whitespace == len(line)
+	if !atEndOfLine && whitespace == 0 {
 		return 0, false
 	}
 
-	if atEndOfLine || spaces > 4 {
+	if atEndOfLine || column-(markerColumn+width) > 4 {
 		return markerColumn + width + 1, true
 	}
-	return markerColumn + width + spaces, true
+	return column, true
 }
 
 // isThematicBreak reports whether s, which begins at a '-' or '*' bullet
@@ -647,6 +673,21 @@ func isThematicBreak(s string, marker byte) bool {
 		}
 	}
 	return count >= 3
+}
+
+// startsParagraphInterrupt reports whether line opens a block that interrupts
+// an open paragraph: a fenced code block delimiter or a thematic break. Such a
+// line closes the list items it falls outside of; an ordinary text line in the
+// same position is a lazy continuation of the paragraph instead.
+func startsParagraphInterrupt(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "```") {
+		return true
+	}
+	if trimmed == "" || (trimmed[0] != '-' && trimmed[0] != '*') {
+		return false
+	}
+	return isThematicBreak(trimmed, trimmed[0])
 }
 
 // escapedBracketRanges returns the inner range of every wikilink-shaped token
