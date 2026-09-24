@@ -64,8 +64,10 @@ func RunLint(ctx context.Context) (*lint.LintReport, error) {
 	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
 		return nil, fmt.Errorf("resolve templates directory: %w", err)
 	}
+	// The guard's error names the offending template file, so it is reported as
+	// it stands.
 	if err := assertTemplateFilesContained(kbRoot, templatesDir); err != nil {
-		return nil, fmt.Errorf("resolve templates directory: %w", err)
+		return nil, err
 	}
 	templates, err := template.LoadTemplates(templatesDir)
 	if err != nil {

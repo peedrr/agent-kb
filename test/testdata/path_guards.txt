@@ -75,6 +75,42 @@ stderr 'page not found'
 [symlink] stderr 'usage: resolve path: path escapes the knowledge base through a symlink: '${WORK@R}'/test-kb/kb/evil\.md'
 [symlink] ! stdout 'outside the base'
 
+# --- Template file symlink pointing outside the KB ---
+# A template file that is a symlink out of the base is an invocation mistake
+# too: every command that reads the templates refuses it before the file is
+# read, naming the offending template file rather than the directory it sits
+# in. Planting the fixture needs symlink support, so the block runs only where
+# the harness reports it.
+[symlink] mkdir -p kb/notes
+[symlink] cp ../template-page.md kb/notes/template-page.md
+[symlink] symlink .akb/templates/evil.yaml -> ../../../outside-template.yaml
+
+# append resolved through the type directories, which are read from disk
+[symlink] stdin ../append-input.md
+[symlink] exec bash -c 'akb append template-page.md; echo "akb-exit=$?"'
+[symlink] stdout 'akb-exit=2$'
+[symlink] stderr 'check template file evil\.yaml'
+[symlink] ! stderr 'resolve templates directory'
+
+# append of the page at the named path, which reads the templates itself
+[symlink] stdin ../append-input.md
+[symlink] exec bash -c 'akb append notes/template-page.md; echo "akb-exit=$?"'
+[symlink] stdout 'akb-exit=2$'
+[symlink] stderr 'check template file evil\.yaml'
+[symlink] ! stderr 'resolve templates directory'
+
+# index add of a path that holds no page, so the templates are read
+[symlink] exec bash -c 'akb index add notes/missing.md "Missing note"; echo "akb-exit=$?"'
+[symlink] stdout 'akb-exit=2$'
+[symlink] stderr 'check template file evil\.yaml'
+[symlink] ! stderr 'resolve templates directory'
+
+# lint reads the templates before it walks the pages
+[symlink] exec bash -c 'akb lint; echo "akb-exit=$?"'
+[symlink] stdout 'akb-exit=2$'
+[symlink] stderr 'check template file evil\.yaml'
+[symlink] ! stderr 'resolve templates directory'
+
 -- raw-prefix-input.md --
 ---
 type: note
@@ -112,3 +148,15 @@ type: note
 title: Outside
 ---
 content outside the base
+
+-- template-page.md --
+---
+type: note
+title: Template Page
+---
+Body
+
+-- outside-template.yaml --
+name: outside
+description: A template file outside the base
+dir: outside

@@ -208,6 +208,34 @@ func TestIndexAdd_RejectsAbsolutePath(t *testing.T) {
 	}
 }
 
+// TestIndexAddReportsTemplateLoadFailure pins that a template set that cannot
+// be loaded is reported by that failure, on a message that still carries the
+// page the command was addressed with.
+func TestIndexAddReportsTemplateLoadFailure(t *testing.T) {
+	kbRoot := setupIndexTestKB(t)
+
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := os.MkdirAll(templatesDir, 0750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "broken.yaml"), []byte("name: [unterminated\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	// kb/notes/missing.md holds no page, so the command falls through to the
+	// templates to resolve the page by its type directory.
+	err := runIndexAdd(nil, []string{"notes/missing.md", "Missing note"})
+	if err == nil {
+		t.Fatal("index add succeeded with a template set that cannot be loaded")
+	}
+	if want := "load templates for notes/missing.md"; !strings.Contains(err.Error(), want) {
+		t.Errorf("error = %q, want it to carry %q", err, want)
+	}
+	if stale := "no such file"; strings.Contains(err.Error(), stale) {
+		t.Errorf("error = %q, want the template failure rather than the page read", err)
+	}
+}
+
 func TestIndexRemove_RejectsIndexMd(t *testing.T) {
 	kbRoot := setupIndexTestKB(t)
 
