@@ -190,9 +190,12 @@ func gitInitAndCommit(name string) error {
 		return err
 	}
 
-	// Both steps touch the repository index, so they run through the retry
-	// runner every other staging and commit step uses: another process holding
-	// the index lock is waited out instead of failing the fresh base.
+	// The staging and commit steps touch the repository index, so they run
+	// through the retry runner every other staging and commit step uses:
+	// another process holding the index lock is waited out instead of failing
+	// the fresh base. The `git init` above and the `git config` invocations in
+	// ensureGitConfig run directly via exec.Command on purpose: neither creates
+	// nor contends on the repository index lock.
 	if _, err := storage.RunGit(absPath, "git add", "add", "-A"); err != nil {
 		//nolint:wrapcheck // RunGit's error already names the git step and its output
 		return err
