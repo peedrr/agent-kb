@@ -1,0 +1,172 @@
+# Superseded ADR — the supersedes link in the link graph's spelling
+
+# `superseded_requires_link` holds only when the body links the target
+# `supersedes` names. The fixture declares `supersedes: decisions/old-adr` and
+# its body links [[Old Pipeline]](decisions/old-adr.md): the .md-bearing
+# destination and the .md-less field name are the same target only if CEL
+# normalizes the explicit destination to the spelling the link graph records,
+# so the write itself is the normalization check and `akb links` shows that one
+# spelling resolving to the page. The same page with a body link to a different
+# destination is refused.
+
+# --- Setup ---
+
+# Every invocation names its base explicitly: the harness default (AKB_KB=.)
+# resolves against the working directory of each command, so the scenario pins
+# the absolute path it created instead — the same base however the commands are
+# scheduled, and whatever else shares TMPDIR.
+env AKB_KB=
+exec akb init sa-kb
+env AKB_KB=$WORK/sa-kb
+cd sa-kb
+
+# init seeds no templates: copy the adr template for the pages this scenario
+# writes.
+exec akb template get adr --full --examples
+cp stdout .akb/templates/adr.yaml
+exec git add .akb/templates
+exec git commit -m 'seed adr template'
+
+# The record the superseded page names.
+stdin ../old-adr.md
+exec akb write decisions/old-adr.md
+stdout 'Written to kb/decisions/old-adr.md'
+
+# --- PASS: superseded, supersedes set, body link matches in another spelling ---
+
+stdin ../superseded-adr.md
+exec akb write decisions/superseded-adr.md
+stdout 'Written to kb/decisions/superseded-adr.md'
+
+exec akb links decisions/superseded-adr.md
+stdout 'Outbound:'
+stdout '  decisions/old-adr -> kb/decisions/old-adr.md'
+
+# --- FAIL: the same page with a link to a destination supersedes never names ---
+
+stdin ../wrong-link-adr.md
+! exec akb write decisions/wrong-link-adr.md
+stderr 'superseded_requires_link'
+stderr 'superseded ADRs must link the ADR named by supersedes'
+! exists kb/decisions/wrong-link-adr.md
+
+-- old-adr.md --
+---
+type: adr
+title: Adopt the Original Pipeline
+summary: The first pipeline this record set adopts
+tags: [pipeline]
+status: accepted
+deciders: akb maintainers
+created: '2026-01-05'
+updated: '2026-02-10'
+---
+
+# Adopt the Original Pipeline
+
+This record adopts the first version of the ingestion pipeline, the one the
+superseding decision replaces. It is kept in the set as the predecessor every
+later pipeline record links back to, so the chain of decisions stays readable
+without opening the git history of a retired design.
+
+## Context
+
+The knowledge base needed a single way to turn raw sources into indexed pages.
+Every alternative at the time either hid the transform behind a service the
+maintainers could not inspect or wrote pages that failed validation after the
+fact, so the team settled on a small in-process pipeline whose steps are
+visible in the repository. The record below captures that first shape and the
+constraints that made it the right move at the time.
+
+## Decision
+
+Adopt the in-process pipeline: read a source, transform it, validate the
+result, and write one page. See [[decisions/superseded-adr]] for the record
+that replaces this one.
+
+## Consequences
+
+The pipeline is inspectable and its failures are local to one run. It also
+runs in the CLI process, so long sources block the command that ingests them,
+which is the limitation the successor record addresses.
+
+-- superseded-adr.md --
+---
+type: adr
+title: Supersede the Original Pipeline
+summary: The pipeline this set adopts in place of the original
+tags: [pipeline]
+status: superseded
+deciders: akb maintainers
+created: '2026-02-11'
+updated: '2026-03-01'
+supersedes: decisions/old-adr
+---
+
+# Supersede the Original Pipeline
+
+This record supersedes [[Old Pipeline]](decisions/old-adr.md) and carries the
+pipeline shape the set now follows, while the older record stays in place as
+the predecessor it replaced. The body link spells its destination with a .md
+suffix while the supersedes field does not, so the write proves the two
+spellings resolve to one target.
+
+## Context
+
+The original pipeline blocked the CLI on long sources, and the workaround of
+splitting a source by hand moved the failure outside the tool. The team needed
+an ingest step that yields between chunks, so a long run stays cancellable and
+a partial run leaves the index consistent with the pages on disk.
+
+## Decision
+
+Read, transform, validate, and write one chunk at a time, and record the
+position of the last completed chunk in the pipeline state. The superseded
+record remains reachable from this page, so a reader can follow the chain of
+decisions from the original design to this replacement.
+
+## Consequences
+
+Runs stay cancellable and resumable. The trade is a state file that must be
+committed with the pages it describes, and a reader who wants the full history
+must follow the link to the superseded record.
+
+-- wrong-link-adr.md --
+---
+type: adr
+title: Wrong Link Pipeline Record
+summary: The superseded fixture whose body links a different destination
+tags: [pipeline]
+status: superseded
+deciders: akb maintainers
+created: '2026-02-11'
+updated: '2026-03-01'
+supersedes: decisions/old-adr
+---
+
+# Wrong Link Pipeline Record
+
+This record claims to supersede the original pipeline but links
+[[Old Pipeline]](decisions/renamed-adr.md) instead, a destination the
+supersedes field never names. Every other rule holds, so the write fails on the
+supersedes link alone and the report names that rule and no other.
+
+## Context
+
+The original pipeline blocked the CLI on long sources, and the workaround of
+splitting a source by hand moved the failure outside the tool. The team needed
+an ingest step that yields between chunks, so a long run stays cancellable and
+a partial run leaves the index consistent with the pages on disk.
+
+## Decision
+
+Read, transform, validate, and write one chunk at a time, and record the
+position of the last completed chunk in the pipeline state. The superseded
+record remains reachable from this page, so a reader can follow the chain of
+decisions from the original design to this replacement.
+
+## Consequences
+
+Runs stay cancellable and resumable. The trade is a state file that must be
+committed with the pages it describes, and a reader who wants the full history
+must follow the link to the superseded record.
