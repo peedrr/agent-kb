@@ -1173,6 +1173,30 @@ func TestParseWikilinksLazyContinuationListBookkeeping(t *testing.T) {
 		assertWikilinkTargets(t, "- item\ncontinuation\n\n    [[a]]", "a")
 	})
 
+	t.Run("an ATX heading interrupts the item's paragraph", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n# Heading\n\n    [[a]]")
+	})
+
+	t.Run("a block quote interrupts the item's paragraph", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n> quote\n\n    [[a]]")
+	})
+
+	t.Run("an HTML block interrupts the item's paragraph", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n<div>\n\n    [[a]]")
+	})
+
+	t.Run("a type 7 inline tag does not interrupt the item's paragraph", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n<span>\n\n    [[a]]", "a")
+	})
+
+	t.Run("a thematic break still interrupts the item's paragraph", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n---\n\n    [[a]]")
+	})
+
+	t.Run("a setext underline does not interrupt the item's paragraph", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n===\n\n    [[a]]", "a")
+	})
+
 	t.Run("an empty item opens no paragraph", func(t *testing.T) {
 		assertWikilinkTargets(t, "-\ncontinuation\n\n    [[a]]")
 	})

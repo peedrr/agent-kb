@@ -116,8 +116,10 @@ inside:
   next multiple of four, both in a line's leading indent and in the whitespace after a list
   marker — `-\titem` puts the item's content at column four. An indented line that follows a
   paragraph with no intervening blank line is a lazy continuation — prose, not code — and it
-  closes no list item, whatever its indent; a fence delimiter line runs the list bookkeeping
-  like any other line.
+  closes no list item, whatever its indent. A line that opens a block which interrupts a
+  paragraph — a fence delimiter, a thematic break, an ATX heading, a block quote, or an HTML
+  block of CommonMark type 1-6 — instead runs the list bookkeeping and closes the items it
+  falls outside of; a setext heading underline never interrupts.
 
 The exclusion is line-structured while a token's span can cross lines: a token whose span
 merely crosses an indented line (a quoted title spanning a newline) is still recorded; only

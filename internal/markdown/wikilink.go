@@ -678,18 +678,90 @@ func isThematicBreak(s string, marker byte) bool {
 }
 
 // startsParagraphInterrupt reports whether line opens a block that interrupts
-// an open paragraph: a fenced code block delimiter or a thematic break. Such a
-// line closes the list items it falls outside of; an ordinary text line in the
-// same position is a lazy continuation of the paragraph instead.
+// an open paragraph: a fenced code block delimiter, a thematic break, an ATX
+// heading, a block quote, or an HTML block of a type that may interrupt a
+// paragraph (CommonMark types 1-6). Such a line closes the list items it falls
+// outside of; an ordinary text line in the same position is a lazy
+// continuation of the paragraph instead. A setext heading underline is not an
+// interrupt: it stays attached to the paragraph above it.
 func startsParagraphInterrupt(line string) bool {
 	trimmed := strings.TrimSpace(line)
 	if strings.HasPrefix(trimmed, "```") {
 		return true
 	}
-	if trimmed == "" || (trimmed[0] != '-' && trimmed[0] != '*') {
+	if trimmed == "" {
 		return false
 	}
-	return isThematicBreak(trimmed, trimmed[0])
+	if trimmed[0] == '-' || trimmed[0] == '*' {
+		return isThematicBreak(trimmed, trimmed[0])
+	}
+
+	// An ATX heading, a block quote, and an HTML block interrupt only from
+	// within the first three columns: a line indented four or more columns is
+	// indented code, and an indented code block cannot interrupt a paragraph.
+	if indent, _ := leadingWhitespaceColumn(line); indent > 3 {
+		return false
+	}
+
+	// ATX heading: one to six '#' followed by a space, a tab, or the end of
+	// the line.
+	if n := countRun(trimmed, 0, '#'); n >= 1 && n <= 6 &&
+		(n == len(trimmed) || trimmed[n] == ' ' || trimmed[n] == '\t') {
+		return true
+	}
+
+	// Block quote.
+	if trimmed[0] == '>' {
+		return true
+	}
+
+	// HTML block, types 1-6: the start conditions that may interrupt a
+	// paragraph. Type 7, any other tag at the start of a line, may not.
+	lower := strings.ToLower(trimmed)
+	for _, tag := range []string{"<script", "<pre", "<style"} {
+		if rest, ok := strings.CutPrefix(lower, tag); ok &&
+			(rest == "" || rest[0] == '>' || isSpace(rest[0])) {
+			return true
+		}
+	}
+	if strings.HasPrefix(lower, "<!--") || strings.HasPrefix(lower, "<?") ||
+		strings.HasPrefix(lower, "<![cdata[") {
+		return true
+	}
+	if rest, ok := strings.CutPrefix(lower, "<!"); ok && rest != "" &&
+		rest[0] >= 'a' && rest[0] <= 'z' {
+		return true
+	}
+
+	// Type 6: a block-level tag name, optionally preceded by '/'.
+	name := strings.TrimPrefix(lower, "</")
+	if name == lower {
+		name = strings.TrimPrefix(lower, "<")
+	}
+	if name == lower {
+		return false
+	}
+
+	tagEnd := 0
+	for tagEnd < len(name) &&
+		(name[tagEnd] >= 'a' && name[tagEnd] <= 'z' || name[tagEnd] >= '0' && name[tagEnd] <= '9') {
+		tagEnd++
+	}
+	switch name[:tagEnd] {
+	case "address", "article", "aside", "base", "basefont", "blockquote", "body",
+		"caption", "center", "col", "colgroup", "dd", "details", "dialog", "dir",
+		"div", "dl", "dt", "fieldset", "figcaption", "figure", "footer", "form",
+		"frame", "frameset", "h1", "h2", "h3", "h4", "h5", "h6", "head", "header",
+		"hr", "html", "iframe", "legend", "li", "link", "main", "menu", "menuitem",
+		"nav", "noframes", "ol", "optgroup", "option", "p", "param", "search",
+		"section", "summary", "table", "tbody", "td", "tfoot", "th", "thead",
+		"title", "tr", "track", "ul":
+	default:
+		return false
+	}
+
+	after := name[tagEnd:]
+	return after == "" || after[0] == '>' || isSpace(after[0]) || after == "/>"
 }
 
 // hasItemContent reports whether line carries non-whitespace text at or past
