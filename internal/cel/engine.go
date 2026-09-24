@@ -17,6 +17,12 @@ import (
 // compiled by CompileRule; evaluation aborts once the tracked cost exceeds it.
 const MaxCostLimit = 100000
 
+// ErrComputeBudget reports that a rule's evaluation hit the engine's compute
+// budget and was cancelled before it could produce a verdict. It is returned
+// unwrapped so callers can identify the budget with errors.Is rather than by
+// matching the error text, which may embed user-chosen key names.
+var ErrComputeBudget = errors.New("exceeded compute budget")
+
 var programCache = sync.Map{}
 
 // NewEnv creates a CEL environment pre-configured with variables for page
@@ -60,7 +66,7 @@ func CompileRule(env *cel.Env, expr string) (cel.Program, error) {
 // Evaluate runs a compiled CEL program with the given variables and context.
 // The cost budget is enforced by the program options applied in CompileRule.
 // It recovers from panics during evaluation, translating cost-limit-exceeded
-// errors into a structured "exceeded compute budget" error.
+// errors into ErrComputeBudget.
 func Evaluate(ctx context.Context, prg cel.Program, vars map[string]any) (ref.Val, error) {
 	var result ref.Val
 	var evalErr error
@@ -75,7 +81,7 @@ func Evaluate(ctx context.Context, prg cel.Program, vars map[string]any) (ref.Va
 				}
 				var cancelled interpreter.EvalCancelledError
 				if errors.As(rerr, &cancelled) {
-					evalErr = fmt.Errorf("exceeded compute budget")
+					evalErr = ErrComputeBudget
 					return
 				}
 				evalErr = fmt.Errorf("internal CEL error")
@@ -88,7 +94,7 @@ func Evaluate(ctx context.Context, prg cel.Program, vars map[string]any) (ref.Va
 	if evalErr != nil {
 		var cancelled interpreter.EvalCancelledError
 		if errors.As(evalErr, &cancelled) {
-			evalErr = fmt.Errorf("exceeded compute budget")
+			evalErr = ErrComputeBudget
 		}
 		return nil, evalErr
 	}

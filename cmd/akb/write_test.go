@@ -1141,6 +1141,77 @@ validations:
 	}
 }
 
+// TestWriteKeyNamedLikeComputeBudgetGetsHasRemedy pins that the remedy for an
+// unevaluable rule keys off the compute-budget error itself rather than the
+// text it carries: a template whose optional key is literally named "exceeded
+// compute budget" produces an evaluation error embedding that phrase, and its
+// author still needs the has() remedy for the unguarded read.
+func TestWriteKeyNamedLikeComputeBudgetGetsHasRemedy(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	tmplData := `name: colliding
+description: probe template whose optional key is named like the budget error
+dir: colliding
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    exceeded compute budget:
+      type: string
+      required: false
+validations:
+  - id: colliding_key_guard
+    rule: 'page.frontmatter["exceeded compute budget"] != ""'
+    requirement: the colliding key must be set
+    expect: the colliding key must be set
+`
+	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "colliding.yaml"), []byte(tmplData), 0600); err != nil {
+		t.Fatalf("write probe template: %v", err)
+	}
+
+	withWriteFlags(t, nil, false)
+	pointStdinAtTempFile(t, "---\ntype: colliding\ntitle: Colliding\n---\nBody.")
+
+	var runErr error
+	stderr := captureStderr(t, func() {
+		runErr = runWrite(nil, []string{"colliding/page.md"})
+	})
+	if runErr == nil {
+		t.Fatalf("expected the unevaluable rule to block the write, stderr: %s", stderr)
+	}
+
+	var internalErr *internalError
+	if errors.As(runErr, &internalErr) {
+		t.Errorf("failure %v is an akb fault; an unevaluable rule is a template-authoring problem", runErr)
+	}
+	var validationErr validationFailure
+	if !errors.As(runErr, &validationErr) {
+		t.Fatalf("failure %v is not a validation failure", runErr)
+	}
+	if code, report := classifyExit(runErr); code != exitFailure || report != "" {
+		t.Errorf("classifyExit = (%d, %q), want (%d, %q)", code, report, exitFailure, "")
+	}
+
+	if _, err := os.Stat(filepath.Join(kbRoot, "kb", "colliding", "page.md")); !os.IsNotExist(err) {
+		t.Errorf("the page was written despite the unevaluable rule: %v", err)
+	}
+
+	for _, want := range []string{
+		"rule colliding_key_guard could not be evaluated: no such key: exceeded compute budget",
+		"template authoring problem",
+		"guard optional frontmatter keys with has() (see the kb-management skill's TEMPLATE.md)",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr = %q, want it to contain %q", stderr, want)
+		}
+	}
+	if advice := "the rule is too expensive to evaluate"; strings.Contains(stderr, advice) {
+		t.Errorf("stderr = %q, want the has() remedy rather than the compute-budget remedy", stderr)
+	}
+}
+
 // TestWriteUncompilableRuleIsInternalFault pins that a template whose rule does
 // not compile — a template file that bypassed `akb template write`, which
 // rejects one — stays an akb fault: the write exits 2 and the page is not

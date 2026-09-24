@@ -632,18 +632,14 @@ func runTemplateValidations(celEnv *gocel.Env, tmpl template.Template, page, old
 	return validationFailure{}
 }
 
-// computeBudgetErrorText is the error text internal/cel reports when a rule's
-// evaluation hits the engine's compute budget. The budget is a rule property,
-// not an absent frontmatter key, so the remedy for a missing key would
-// misdirect the author.
-const computeBudgetErrorText = "exceeded compute budget"
-
 // unevaluableRuleMessage describes an unevaluable rule to its author. Every
 // evaluation error is a template-authoring problem, but the remedy depends on
-// the cause: a rule that exhausted the compute budget needs simplifying, while
+// the cause: a rule that exhausted the compute budget (cel.ErrComputeBudget)
+// needs simplifying — the budget is a rule property, not an absent frontmatter
+// key, so the has() remedy for a missing key would misdirect the author — while
 // any other error is usually an unguarded read of an optional key.
 func unevaluableRuleMessage(ruleID string, err error) string {
-	if strings.Contains(err.Error(), computeBudgetErrorText) {
+	if errors.Is(err, cel.ErrComputeBudget) {
 		return fmt.Sprintf("rule %s could not be evaluated: %v — template authoring problem; "+
 			"the rule is too expensive to evaluate, so simplify it or reduce the input it examines "+
 			"(see the kb-management skill's TEMPLATE.md)", ruleID, err)

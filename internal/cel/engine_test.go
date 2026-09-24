@@ -2,6 +2,7 @@ package cel
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -138,6 +139,9 @@ func TestCostLimit(t *testing.T) {
 	want := "exceeded compute budget"
 	if err.Error() != want {
 		t.Errorf("error = %q, want %q", err.Error(), want)
+	}
+	if !errors.Is(err, ErrComputeBudget) {
+		t.Errorf("error %v does not match ErrComputeBudget", err)
 	}
 }
 
@@ -314,6 +318,9 @@ func TestPanicRecovery(t *testing.T) {
 		want := "exceeded compute budget"
 		if err.Error() != want {
 			t.Errorf("error = %q, want %q", err.Error(), want)
+		}
+		if !errors.Is(err, ErrComputeBudget) {
+			t.Errorf("error %v does not match ErrComputeBudget", err)
 		}
 	})
 
