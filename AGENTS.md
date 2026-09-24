@@ -18,7 +18,7 @@ agent-kb/
 │   ├── frontmatter/# YAML frontmatter parsing (goldmark + goccy/go-yaml)
 │   ├── index/      # kb/index.md management
 │   ├── linkgraph/  # SQLite link tracking (wikilinks)
-│   ├── lint/       # 9 lint checkers + engine
+│   ├── lint/       # 10 lint checkers + engine
 │   ├── log/        # kb/log.md append-only log
 │   ├── manifest/   # raw/files.log SHA-256 manifest
 │   ├── markdown/   # Wikilink, annotation, provenance parsers
@@ -54,7 +54,7 @@ agent-kb/
 | DB schema | `internal/db/db.go` | documents, pages, links tables + FTS5 |
 | Config format | `internal/config/config.go` | YAML .akb.yaml |
 | Lint engine | `internal/lint/engine.go` | LintEngine, LintChecker interface |
-| Lint checks | `internal/lint/*.go` | 9 checkers (broken_links, orphans, empty_pages, missing_frontmatter, index_consistency, citations, provenance, cel_lint, type_orphan) |
+| Lint checks | `internal/lint/*.go` | 10 checkers (broken_links, orphans, empty_pages, missing_frontmatter, required_fields, index_consistency, citations, provenance, cel_lint, type_orphan) |
 | CEL lint checker | `internal/lint/cel.go` | Evaluates template `lint_rules` with `now` injection |
 | Manifest | `internal/manifest/manifest.go` | raw/files.log SHA-256 tracking |
 | Skill install | `internal/skill/skill.go` | `//go:embed embedded/*` |
@@ -157,7 +157,7 @@ nix develop                     # Dev shell (Go, gopls, delve, golangci-lint)
 - Templates embedded in binary via `//go:embed embedded/*` (includes `.yaml` + `_pass.md` + `_fail.md`)
 - Skills embedded in binary via `//go:embed embedded/*`
 - Integration tests use testscript framework (`.txt` files in testdata/)
-- 9 lint checks: 6 structural + 1 template-driven (cel_lint) + 2 semantic (provenance, citations)
+- 10 lint checks: 7 structural + 1 template-driven (cel_lint) + 2 semantic (provenance, citations)
 - Provenance drift threshold: 0.20 (still checked by provenance.go)
 - Lint thresholds are hardcoded constants (not configurable via `.akb.yaml` in v1)
 - CEL engine: programs cached in sync.Map, cost limit 100000, panics recovered as "exceeded compute budget"

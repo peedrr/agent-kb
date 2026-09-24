@@ -29,7 +29,7 @@ Integration tests using the testscript framework. 54 `.txt` script files define 
 |----------|-------|----------|
 | Core workflow | `full_workflow.txt`, `round_trip.txt`, `core_io_verification.txt` | init→write→read→append→delete |
 | Search/links | `search_tests.txt`, `link_graph_round_trip.txt`, `link_resolution.txt`, `wikilink_round_trip.txt` | FTS5, wikilinks, backlinks |
-| Lint | `lint_tests.txt` | All 9 checkers |
+| Lint | `lint_tests.txt`, `lint_required_fields.txt` | All 10 checkers |
 | Raw | `raw_workflow.txt`, `raw_status_drift.txt`, `raw_sync.txt`, `raw_delete.txt` | SHA-256 manifest, drift detection |
 | Git | `git_commits.txt`, `git_edge_cases.txt`, `no_commit.txt` | Auto-commit, merge conflicts |
 | Index/log | `index_add_remove.txt`, `index_rebuild.txt`, `log_show_append.txt` | Index management, append-only log |

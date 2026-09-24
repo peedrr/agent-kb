@@ -2,6 +2,30 @@
 
 Behavior changes and fixes worth acting on. Versions before 0.18.0 predate this file.
 
+## [0.19.0] — 2026-09-24
+
+### Added
+
+- **`akb lint` gained a tenth check, `required_fields`.** The sweep now reports every on-disk
+  page that leaves a schema-required frontmatter field unset, as an error naming the missing
+  fields and the template that declares them. Write-time validation only covers pages that
+  passed `akb write`, so a page pulled from git, planted by hand, or written before its
+  template declared a field stayed invisible until now. A page without frontmatter and a page
+  whose `type` has no template declare no schema and stay with `missing_frontmatter` and
+  `type_orphan`. The check reads presence only — a field set to an empty value counts as set
+  — matching `akb write`, and type and enum constraints stay with the template's CEL rules.
+
+### Changed
+
+- **`akb approve` refuses a draft that leaves a schema-required frontmatter field unset.**
+  Approval runs the write path's required-field check before it rewrites the page, so a page
+  `akb write` would reject can no longer be published by approving it: the run reports the
+  missing fields and the declaring template and exits 1, leaving the page untouched and no
+  approval commit behind. `akb approve --all-drafts` refuses the incomplete
+  drafts and approves the rest, then fails with the count of the refused drafts, so a refusal
+  is never reported as part of a successful batch. A page whose `type` has no template is
+  approved as before.
+
 ## [0.18.0] — 2026-09-24
 
 ### Changed

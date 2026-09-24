@@ -19,6 +19,7 @@
    | `orphans` | A page has zero inbound links — nothing connects to it |
    | `empty_pages` | A page has no body content |
    | `missing_frontmatter` | A page has no YAML frontmatter |
+   | `required_fields` | A page leaves a schema-required frontmatter field unset |
    | `index_consistency` | A page is listed in the index but doesn't exist, or vice versa |
    | `type_orphan` | A page's `type` has no matching template — no enforced structure |
    | `cel_lint` | A page violates its template's `lint_rules` (skipped for type-orphans) |

@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Lint engine with 9 checkers across 3 categories: structural, template-driven, semantic.
+Lint engine with 10 checkers across 3 categories: structural, template-driven, semantic.
 
 ## FILES
 
@@ -16,6 +16,7 @@ Lint engine with 9 checkers across 3 categories: structural, template-driven, se
 | `orphans.go` | orphans | structural |
 | `empty_pages.go` | empty_pages | structural |
 | `missing_frontmatter.go` | missing_frontmatter | structural |
+| `required_fields.go` | required_fields | structural |
 | `index_consistency.go` | index_consistency | structural |
 | `citations.go` | citations | semantic |
 | `provenance.go` | provenance | semantic |
@@ -49,3 +50,4 @@ ProvenanceDriftThreshold = 0.20   // |frontmatter - inline| ratio
 - Retired checkers (replaced by CEL): `type_exists`, `frontmatter_schema`, `category_dirs`
 - Removed checkers: `freshness`, `confidence`, `summary_length`
 - `type_orphan` detects pages whose `type` frontmatter has no matching template in `.akb/templates/`; excludes pages without frontmatter or empty type; severity: error
+- `required_fields` detects pages leaving a schema-required frontmatter field unset; presence only, so a set-but-empty value passes and type and enum constraints stay with the template's CEL rules; excludes pages without frontmatter and pages whose type has no template; severity: error
