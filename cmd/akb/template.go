@@ -1,16 +1,14 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
-	"time"
 
 	"github.com/goccy/go-yaml"
-	"github.com/google/cel-go/common/types"
+	gocel "github.com/google/cel-go/cel"
 	"github.com/spf13/cobra"
 
 	"github.com/peedrr/agent-kb/internal/cel"
@@ -148,40 +146,7 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 			return fmt.Errorf("pass mockup not found for template %q: %w", name, err)
 		}
 
-		passFM, passBody, fmErr := frontmatter.Parse(data)
-		if fmErr == nil {
-			passPage := buildTestPage(fmt.Sprintf("kb/%s_pass.md", name), passFM, passBody)
-			celEnv, celErr := cel.NewEnv()
-			if celErr == nil {
-				var failedRules []string
-				for _, rule := range tmpl.Validations {
-					prg, compErr := cel.CompileRule(celEnv, rule.Rule)
-					if compErr != nil {
-						fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: CEL compile error in rule '%s': %v\n", rule.ID, compErr)
-						continue
-					}
-					result, evalErr := cel.Evaluate(context.Background(), prg, map[string]any{
-						"page":     passPage,
-						"old_page": nil,
-						"now":      time.Now(),
-					})
-					if evalErr != nil {
-						fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: CEL evaluate error in rule '%s': %v\n", rule.ID, evalErr)
-						continue
-					}
-					if result != types.True {
-						failedRules = append(failedRules, rule.ID)
-					}
-				}
-				if len(failedRules) > 0 {
-					fmt.Fprintf(os.Stderr, "WARNING: This mockup no longer passes validation against the current template rules.\n         Failed rule(s): %v\n         The template may have been changed without updating the mockup.\n", failedRules)
-				}
-			} else {
-				fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: %v\n", celErr)
-			}
-		} else {
-			fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: %v\n", fmErr)
-		}
+		warnMockupValidation(tmpl, name, data)
 
 		fmt.Print(string(data))
 		return nil
@@ -218,6 +183,52 @@ func runTemplateGet(_ *cobra.Command, args []string) error {
 	}
 	fmt.Print(string(out))
 	return nil
+}
+
+// warnMockupValidation reports on stderr every way the displayed pass mockup
+// fails the checks `akb template write` applies before it records a template:
+// the mockup as given, once per schema-optional key it supplies with that key
+// removed, and once with the mockup as its own old_page. The display still
+// succeeds — a stale mockup is a warning, not a command failure.
+func warnMockupValidation(tmpl template.Template, name string, data []byte) {
+	passFM, passBody, err := frontmatter.Parse(data)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: %v\n", err)
+		return
+	}
+
+	celEnv, err := cel.NewEnv()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: %v\n", err)
+		return
+	}
+
+	passPage := buildTestPage(fmt.Sprintf("kb/%s_pass.md", name), passFM, passBody)
+	warnMockupVariant(celEnv, tmpl, passPage, nil,
+		"This mockup no longer passes validation against the current template rules.")
+
+	for _, key := range optionalKeysSuppliedByMockup(&tmpl, passFM) {
+		strippedPage := buildTestPage(fmt.Sprintf("kb/%s_pass.md", name), withoutFrontmatterKey(passFM, key), passBody)
+		warnMockupVariant(celEnv, tmpl, strippedPage, nil,
+			fmt.Sprintf("This mockup no longer validates without optional key %s.", key))
+	}
+
+	warnMockupVariant(celEnv, tmpl, passPage, passPage,
+		"This mockup no longer validates as an update of itself.")
+}
+
+// warnMockupVariant evaluates the template's validation rules against one
+// variant of the pass mockup and warns when a rule fails or cannot be
+// evaluated.
+func warnMockupVariant(env *gocel.Env, tmpl template.Template, page, oldPage map[string]any, headline string) {
+	failed, ruleID, err := evaluateValidations(env, tmpl.Validations, page, oldPage)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: Could not validate mockup: CEL error in rule '%s': %v\n", ruleID, err)
+		return
+	}
+	if len(failed) > 0 {
+		fmt.Fprintf(os.Stderr, "WARNING: %s\n         Failed rule(s): %v\n         The template may have been changed without updating the mockup.\n", headline, failed)
+	}
 }
 
 func runTemplateList(_ *cobra.Command, _ []string) error {

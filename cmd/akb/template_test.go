@@ -259,6 +259,137 @@ func TestTemplateGet_Example(t *testing.T) {
 	}
 }
 
+// runTemplateGetExample drives `akb template get <name> --example` in process
+// and returns the mockup it displayed, the warnings it printed, and its error.
+func runTemplateGetExample(t *testing.T, name string) (string, string, error) {
+	t.Helper()
+
+	orig := templateExample
+	templateExample = true
+	t.Cleanup(func() { templateExample = orig })
+
+	var (
+		runErr error
+		stdout string
+	)
+	stderr := captureStderr(t, func() {
+		stdout = captureStdout(t, func() {
+			runErr = runTemplateGet(nil, []string{name})
+		})
+	})
+	return stdout, stderr, runErr
+}
+
+// TestTemplateGet_ExampleWarnsOnStrippedVariant pins that --example applies the
+// optional-key stripping check `akb template write` runs: a mockup whose rule
+// stops holding once a schema-optional key it supplies is removed warns on
+// stderr, while the mockup itself is still displayed.
+func TestTemplateGet_ExampleWarnsOnStrippedVariant(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templateBody := `name: sourced
+description: Template whose rule demands an optional key
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    sources:
+      type: list
+      required: false
+validations:
+  - id: sources_present
+    rule: 'has(page.frontmatter.sources)'
+    expect: sources must be set
+`
+	mockupBody := `---
+type: sourced
+title: Sourced
+sources: [raw/data.csv]
+---
+
+# Sourced
+`
+	if err := os.WriteFile(filepath.Join(templatesDir, "sourced.yaml"), []byte(templateBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "sourced_pass.md"), []byte(mockupBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := runTemplateGetExample(t, "sourced")
+	if err != nil {
+		t.Fatalf("template get --example failed: %v", err)
+	}
+	if !strings.Contains(stdout, "type: sourced") {
+		t.Errorf("stdout = %q, want the mockup displayed", stdout)
+	}
+	for _, want := range []string{
+		"This mockup no longer validates without optional key sources.",
+		"Failed rule(s): [sources_present]",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr = %q, want it to contain %q", stderr, want)
+		}
+	}
+}
+
+// TestTemplateGet_ExampleWarnsOnNoOpUpdate pins that --example applies the
+// self-succession check `akb template write` runs: a mockup that stops
+// validating when it is its own old_page warns on stderr, while the mockup
+// itself is still displayed.
+func TestTemplateGet_ExampleWarnsOnNoOpUpdate(t *testing.T) {
+	kbRoot := setupTemplateTestKB(t)
+
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templateBody := `name: noop
+description: Template that demands a change on every update
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+    updated:
+      type: string
+      required: false
+validations:
+  - id: updated_must_change
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.updated) || page.frontmatter.updated != old_page.frontmatter.updated'
+    expect: updated must change on every update
+`
+	mockupBody := `---
+type: noop
+title: Noop
+updated: 2024-01-01
+---
+
+# Noop
+`
+	if err := os.WriteFile(filepath.Join(templatesDir, "noop.yaml"), []byte(templateBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "noop_pass.md"), []byte(mockupBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := runTemplateGetExample(t, "noop")
+	if err != nil {
+		t.Fatalf("template get --example failed: %v", err)
+	}
+	if !strings.Contains(stdout, "type: noop") {
+		t.Errorf("stdout = %q, want the mockup displayed", stdout)
+	}
+	for _, want := range []string{
+		"This mockup no longer validates as an update of itself.",
+		"Failed rule(s): [updated_must_change]",
+	} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr = %q, want it to contain %q", stderr, want)
+		}
+	}
+}
+
 func TestTemplateGet_Full(t *testing.T) {
 	setupTemplateTestKB(t)
 
