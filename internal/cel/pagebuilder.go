@@ -236,7 +236,7 @@ func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 			// [[[a]]](notes/x.md) the parser keeps the token plain while goldmark
 			// still parses a real inline link; there the goldmark destination is
 			// normalized into that same spelling rather than reported as written.
-			// A destination that normalizes away ("", ".md", "./") leaves the
+			// A destination that normalizes away (".md", "./") leaves the
 			// token a plain wikilink, which is how the link graph records it.
 			target := wl.Destination
 			if target == "" && len(l.Destination) > 0 {
