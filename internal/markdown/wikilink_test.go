@@ -1169,4 +1169,21 @@ func TestParseWikilinksIndentedCodeBelowItemContentColumn(t *testing.T) {
 	t.Run("a line four columns past the remaining outer item is code", func(t *testing.T) {
 		assertWikilinkTargets(t, "- outer\n      - inner\n\n      [[a]](notes/x.md)")
 	})
+
+	// A marker line indented below the innermost open item's content column
+	// closes that item after a blank; judged against the remaining item the line
+	// is prose rather than code, so the marker still opens a nested item and the
+	// next line at that item's content column is its prose.
+	t.Run("a marker below the innermost item closes it and opens a nested item", func(t *testing.T) {
+		assertWikilinkTargets(t, "- outer\n   - inner\n\n    - x\n        [[a]](notes/x.md)", "notes/x")
+	})
+
+	// An indented code block cannot interrupt a paragraph, so the six-space line
+	// directly after the outer item's paragraph is a lazy continuation and opens
+	// no item. The marker after the blank stays inside the outer item and is not
+	// indented four columns past its content column, so it opens a nested item,
+	// and the eight-space link line is prose inside that item.
+	t.Run("a marker after a blank opens a nested item under the outer item", func(t *testing.T) {
+		assertWikilinkTargets(t, "- outer\n      - inner\n\n    - x\n        [[a]](notes/x.md)", "notes/x")
+	})
 }
