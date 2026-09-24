@@ -426,11 +426,12 @@ func computeExclusions(content string) exclusionSet {
 // code. An indented line that follows a paragraph without an intervening blank
 // line continues that paragraph — a lazy continuation — so only a block
 // reaching the start of the content or following a blank line is code. Lines
-// inside a fenced code block are literal text and leave the list bookkeeping
-// untouched.
+// strictly inside a fenced code block are literal text and leave the list
+// bookkeeping untouched; the fence delimiter lines are ordinary markdown and
+// run it like any other line.
 func indentedCodeBlockRanges(content string) []exclusion {
 	var ranges []exclusion
-	fenced := fencedCodeBlockRanges(content)
+	fencedInterior := fencedCodeBlockInteriors(content, fencedCodeBlockRanges(content))
 	blockStart := -1
 	prevBlank := true
 
@@ -445,10 +446,12 @@ func indentedCodeBlockRanges(content string) []exclusion {
 		}
 		line := content[lineStart:lineEnd]
 
-		if lineOverlapsRanges(fenced, lineStart, lineEnd) {
-			// A fenced code block is opaque: its lines are literal text, so
-			// they neither open nor close list items and leave the blank-line
-			// state and any pending indented block untouched.
+		if lineOverlapsRanges(fencedInterior, lineStart, lineEnd) {
+			// The lines strictly inside a fenced code block are opaque: they
+			// are literal text, so they neither open nor close list items and
+			// leave the blank-line state and any pending indented block
+			// untouched. The delimiter lines fall through to the bookkeeping
+			// below.
 			lineStart = lineEnd + 1
 			continue
 		}
@@ -677,6 +680,33 @@ func fencedCodeBlockRanges(content string) []exclusion {
 	}
 
 	return ranges
+}
+
+// fencedCodeBlockInteriors narrows each fenced code block range to the lines
+// strictly between its delimiter lines: the interior begins just past the
+// newline that ends the opening delimiter's line and ends at the start of the
+// line holding the closing delimiter. A range whose delimiters share a line —
+// an inline backtick span that the fence detector paired — has an empty
+// interior and is dropped.
+func fencedCodeBlockInteriors(content string, fences []exclusion) []exclusion {
+	var interiors []exclusion
+	for _, r := range fences {
+		openLineEnd := strings.IndexByte(content[r.start:], '\n')
+		if openLineEnd < 0 {
+			continue
+		}
+		interiorStart := r.start + openLineEnd + 1
+
+		// The closing delimiter is the range's final three backticks, so its
+		// line starts at the last newline before them.
+		closeLineStart := strings.LastIndexByte(content[:r.end-3], '\n') + 1
+
+		if interiorStart >= closeLineStart {
+			continue
+		}
+		interiors = append(interiors, exclusion{start: interiorStart, end: closeLineStart})
+	}
+	return interiors
 }
 
 func inlineCodeRanges(content string) []exclusion {

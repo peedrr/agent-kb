@@ -1092,9 +1092,13 @@ func TestParseWikilinksLazyContinuationListBookkeeping(t *testing.T) {
 	})
 }
 
-// A fenced code block is opaque to the list tracker: its lines neither open nor
-// close items, so a marker inside a fence is literal text and a blank line
-// inside a fence is not a paragraph break.
+// Only the lines strictly inside a fenced code block are opaque to the list
+// tracker: they neither open nor close items, and a blank line inside a fence
+// is not a paragraph break. The delimiter lines are ordinary markdown, so a
+// fence opened below an open item's content column closes that item while a
+// fence indented to the item's content column leaves it open. A mid-line
+// backtick pair that the fence detector pairs is a fence with no interior, so
+// the line carrying it opens its item normally.
 func TestParseWikilinksFencedCodeInListTracking(t *testing.T) {
 	t.Run("a marker inside a fence opens no item", func(t *testing.T) {
 		assertWikilinkTargets(t, "```\n- item\n  ```\n\n    [[a]](notes/x.md)")
@@ -1106,6 +1110,26 @@ func TestParseWikilinksFencedCodeInListTracking(t *testing.T) {
 
 	t.Run("a real list still keeps its four-space item content prose", func(t *testing.T) {
 		assertWikilinkTargets(t, "- item\n\n    [[a]](notes/x.md)", "notes/x")
+	})
+
+	t.Run("a column-zero fence closes the item above it", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n```\ncode\n```\n\n    [[b]](notes/x.md)")
+	})
+
+	t.Run("a fence at the item content column leaves the item open", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item\n  ```\n  code\n  ```\n\n  [[a]](notes/x.md)", "notes/x")
+	})
+
+	t.Run("inline code spans in a bullet open its item", func(t *testing.T) {
+		assertWikilinkTargets(t, "- toggle ```a``` and ```b``` now\n\n    [[note]](x.md)", "x")
+	})
+
+	t.Run("a single inline code span in a bullet opens its item", func(t *testing.T) {
+		assertWikilinkTargets(t, "- item ```code``` end\n\n    [[a]](notes/x.md)", "notes/x")
+	})
+
+	t.Run("a single-line fence still excludes its own backtick span", func(t *testing.T) {
+		assertWikilinkTargets(t, "- toggle ```[[a]]``` now\n\n[[real]]", "real")
 	})
 }
 
