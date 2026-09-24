@@ -221,3 +221,17 @@ path loads templates with the same fail-closed behavior.
 **Why deferred:** a broken template file is a base-level fault the author must repair;
 silently skipping unloadable templates would hide real corruption.
 **Reported, deliberately deferred: 2026-09-24.**
+
+## Lint coverage gaps
+
+### A page with frontmatter but an empty type escapes every checker
+
+**What happens.** A page whose frontmatter carries an empty `type` value is skipped by every
+checker that could flag it: the required-fields check skips it (there is no template to check
+it against), the type-orphan check skips it through its pre-existing empty-type exclusion, and
+the missing-frontmatter check skips it (frontmatter is present). No checker reports the page.
+
+**Why deferred:** the page is degenerate — a type-less page cannot be validated against any
+schema — and closing the gap means deciding which checker owns empty-type pages, a
+checker-responsibility design call rather than a local fix.
+**Reported, deliberately deferred: 2026-09-24.**
