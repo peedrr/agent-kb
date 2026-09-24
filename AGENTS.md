@@ -1,6 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Status:** v0.17.0 — template CRUD complete (the version string is kept in lockstep with `Makefile` and `flake.nix` by `scripts/check-version-lockstep.sh`)
+**Status:** v0.18.0 — wikilink target convergence complete: CEL and the link graph report one normalized target spelling (behavior spec in `docs/wikilinks.md`, deliberate deferrals in `KNOWN-LIMITATIONS.md`; the version string is kept in lockstep with `Makefile` and `flake.nix` by `scripts/check-version-lockstep.sh`)
 
 ## OVERVIEW
 
