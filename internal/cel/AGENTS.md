@@ -21,7 +21,7 @@ CEL expression evaluation engine for template-based page validation and linting.
 |------|---------|
 | `ValidationError` | Structured error: RuleID/Message/Line/Severity |
 | `Heading` | `level`, `text`, `line` — for CEL `page.ast.headings` |
-| `Link` | `target`, `text`, `is_wikilink`, `line` — for CEL `page.ast.links`; `is_wikilink` is true for every wikilink form |
+| `Link` | `target`, `text`, `is_wikilink`, `line` — for CEL `page.ast.links`; `is_wikilink` is true for every wikilink form, and `target` carries the link graph's spelling |
 | `CodeBlock` | `language`, `line` — for CEL `page.ast.code_blocks` |
 
 ## KEY FUNCTIONS
@@ -55,7 +55,7 @@ page.content.raw
 page.content.word_count
 page.content.char_count
 page.ast.headings   — []{level, text, line}
-page.ast.links      — []{target, text, is_wikilink, line}; is_wikilink true for all four wikilink forms
+page.ast.links      — []{target, text, is_wikilink, line}; is_wikilink true for all four wikilink forms, target in the link graph's spelling
 page.ast.code_blocks — []{language, line}
 page.akb.provenance_markers
 page.akb.annotations
@@ -71,6 +71,6 @@ page.akb.annotations
 - `pagebuilder.go` walks the Goldmark AST itself to build `page.ast`
 - `page.ast.links` covers all four wikilink forms — `[[target]]`, `[[target|display]]`, `[[target#heading]]`, and `[[display]](dest)`. `flattenLinks` merges `markdown.ParseWikilinks` into the Goldmark `ast.Link` walk, so `is_wikilink` is true for every wikilink and false for a plain markdown link.
 - The pipe and heading forms take `target` from the bracket target and `text` from the display: `[[target|display]]` → text `display`, `[[target#heading]]` → text `heading`.
-- The explicit-destination form takes `target` from the destination, which beats the bracket label (`[[a|b]](dest)` → target `dest`, display `b`). Goldmark supplies that destination as parsed, so a trailing `.md` survives: `[[display]](notes/page.md)` → target `notes/page.md`. The wikilink parser normalizes the destination it records for the link graph instead (`normalizeDest`: surrounding whitespace trimmed, angle brackets stripped, leading `./` stripped, trailing `.md` stripped), and the graph resolves that. For this form `text` is Goldmark's rendered link label — bracketed, `[display]` — not the bare display text.
-- Empty-destination hybrids — `[[g]]()`, `[[g]](   )`, `[[g]](<>)`, and an unclosed `(` — are plain wikilinks: one entry whose `target` is the bracket target, the parens ignored.
+- The explicit-destination form takes `target` from the destination, which beats the bracket label (`[[a|b]](dest)` → target `dest`, display `b`). `target` carries the one spelling the link graph records, so `[[display]](notes/page.md)` → target `notes/page` and the graph resolves that spelling to the page. The spelling is normalized by dropping surrounding whitespace and angle brackets, a leading `./`, a trailing `.md`, and an optional trailing CommonMark link title; where only Goldmark reports a destination, it is normalized the same way except that a scheme-qualified destination (`://`) is left as written. `text` still preserves the raw source token: for this form it is Goldmark's rendered link label — bracketed, `[display]` — not the bare display text, so only `target` changes spelling.
+- Empty-destination hybrids — `[[g]]()`, `[[g]](   )`, `[[g]](<>)`, an unclosed `(`, and a destination that normalizes away (`[[g]](.md)`, `[[g]](./)`) — are plain wikilinks: one entry whose `target` is the bracket target, the parens ignored, which is the target the link graph records for them.
 - Dedupe is start-equality on the token offset, which keeps nesting deterministic: `[text [[f]]](dest)` yields the outer Goldmark entry plus the wikilink's own entry, while `[[a [b](c)]]` yields only the inner Goldmark entry (target `c`, text `b`, `is_wikilink: false`) and no wikilink entry, because the wikilink token regex cannot span the inner `]` of `[b]`.

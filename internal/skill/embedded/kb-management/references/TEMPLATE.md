@@ -89,12 +89,12 @@ Any frontmatter string that parses as RFC3339 or a date-only `2006-01-02` is aut
 | `[[target]]` | `target` | `target` |
 | `[[target\|display]]` | `target` | `display` |
 | `[[target#heading]]` | `target` | `heading` |
-| `[[display]](dest)` | `dest` as written | `[display]` |
+| `[[display]](dest)` | `dest`, normalized | `[display]` |
 
 - **Adjacency:** the explicit-destination form needs `(` immediately after `]]`, with no whitespace. `[[Paris]] (the city)` stays a plain wikilink.
-- **Precedence:** the destination beats the bracket label — `[[a|b]](concepts/a.md)` has target `concepts/a.md` and display `b`. A `#heading` in the bracket part is discarded when a destination is present.
-- **Normalization:** the destination a page is *resolved* through is normalized — surrounding whitespace and angle brackets, a leading `./`, and a trailing `.md` are stripped — so `[[Paris]](concepts/paris.md)` resolves to `concepts/paris`. The CEL `target` is not that normalized value: it is the destination as written (`concepts/paris.md` keeps its `.md`), and for this form `text` is the rendered link label `[Paris]`.
-- **Empty destinations:** `[[g]]()`, `[[g]](   )`, and `[[g]](<>)` are plain wikilinks whose target is the bracket target.
+- **Precedence:** the destination beats the bracket label — `[[a|b]](concepts/a.md)` has target `concepts/a` and display `b`. A `#heading` in the bracket part is discarded when a destination is present.
+- **Normalization:** `target` is the normalized destination — the one spelling the link graph records and resolves through. Surrounding whitespace and angle brackets, a leading `./`, and a trailing `.md` are stripped, and an optional trailing link title is dropped, so `[[Paris]](concepts/paris.md)`, `[[Paris]](<concepts/paris.md>)`, `[[Paris]](./concepts/paris.md)`, and `[[Paris]](concepts/paris.md "Paris")` all have target `concepts/paris` and resolve to the same page. `text` is untouched by that normalization: for this form it is the rendered link label `[Paris]`, the label of the raw source token, so only `target` changes spelling.
+- **Empty destinations:** `[[g]]()`, `[[g]](   )`, and `[[g]](<>)` are plain wikilinks whose target is the bracket target. A destination that normalizes away (`[[g]](.md)`, `[[g]](./)`) behaves the same way.
 - Every wikilink yields exactly one entry, so `.all()` and `.exists()` over `page.ast.links` see each token once.
 
 ### Guarding frontmatter reads with has()
