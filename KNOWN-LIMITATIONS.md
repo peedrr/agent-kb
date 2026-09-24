@@ -62,10 +62,10 @@ closes that item and every deeper one, except a lazy continuation of an open par
 closes nothing whatever its indent. A marker line opens an item and opens a paragraph only
 when it carries item content; a paragraph interrupt — a fence delimiter, a thematic break, an
 ATX heading, a block quote, or an HTML block of CommonMark type 1-6 — closes the items it
-falls outside of. The lazy-continuation test keys on the previous line being non-blank rather
-than on a paragraph actually being open, so a line indented four or more columns directly
-after a paragraph-interrupting block is prose here where goldmark renders an indented code
-block (`- item`, `# H`, `    [[a]]` records `a`).
+falls outside of. By the same lazy-continuation test described in *An indented line after a
+paragraph-interrupting block is a lazy continuation*, a line indented four or more columns
+directly after a paragraph-interrupting block is prose here where goldmark renders an
+indented code block (`- item`, `# H`, `    [[a]]` records `a`).
 
 **Why deferred:** the 4-column rule and the paragraph-state approximation are deliberate
 simplifications; full container-stack modelling with per-item paragraph state is a larger
@@ -87,11 +87,12 @@ consequence of the paragraph-open tracking, not a separate mechanism.
 
 ### An indented line after a fence's closing delimiter stays a lazy continuation
 
-**What happens.** The list bookkeeping's lazy-continuation test keys on the previous line
-being non-blank, and a closing fence delimiter is a non-blank line, so a line indented four
-or more columns directly after the closing delimiter of a fenced block is read as prose: the
-parser records the link where goldmark renders an indented code block (zero links). A fenced
-block is not a paragraph, so there is nothing to continue.
+**What happens.** A closing fence delimiter is a non-blank line, so by the same
+lazy-continuation test described in *An indented line after a paragraph-interrupting
+block is a lazy continuation*, a line indented four or more columns directly after the
+closing delimiter of a fenced block is read as prose: the parser records the link where
+goldmark renders an indented code block (zero links). A fenced block is not a paragraph,
+so there is nothing to continue.
 
 **Why deferred:** the spec-freeze classifies the residual lazy-continuation approximation as
 documented, not patched.
