@@ -172,7 +172,7 @@ func (g *GitProvider) List(_ context.Context, dir string, ext string) ([]string,
 }
 
 func (g *GitProvider) checkMergeConflicts() error {
-	out, err := runGit(g.kbRoot, "check git status", "status", "--porcelain")
+	out, err := RunGit(g.kbRoot, "check git status", "status", "--porcelain")
 	if err != nil {
 		return err
 	}
@@ -342,7 +342,7 @@ func CommitFiles(kbRoot, commitMsg string, paths ...string) error {
 	if err != nil {
 		return err
 	}
-	_, err = runGit(kbRoot, "git commit", args...)
+	_, err = RunGit(kbRoot, "git commit", args...)
 	return err
 }
 
@@ -353,7 +353,7 @@ func CommitFiles(kbRoot, commitMsg string, paths ...string) error {
 // reaching git with an empty change set.
 func NothingToCommit(kbRoot string, paths ...string) (bool, error) {
 	args := append([]string{"status", "--porcelain", "--"}, paths...)
-	out, err := runGit(kbRoot, "git status", args...)
+	out, err := RunGit(kbRoot, "git status", args...)
 	if err != nil {
 		return false, err
 	}
@@ -388,7 +388,7 @@ func recordablePaths(kbRoot string, paths []string) ([]string, error) {
 // while another process holds the repository index lock.
 func StageFiles(kbRoot string, paths ...string) error {
 	args := append([]string{"add", "-A", "--"}, paths...)
-	_, err := runGit(kbRoot, "git add", args...)
+	_, err := RunGit(kbRoot, "git add", args...)
 	return err
 }
 
@@ -467,7 +467,7 @@ func isInHEAD(kbRoot, relPath string) (bool, error) {
 }
 
 func (g *GitProvider) gitAdd(relPath string) error {
-	_, err := runGit(g.kbRoot, "git add "+relPath, "add", relPath)
+	_, err := RunGit(g.kbRoot, "git add "+relPath, "add", relPath)
 	return err
 }
 
@@ -487,7 +487,7 @@ func (g *GitProvider) gitCommit(msg string, relPath string) error {
 		return err
 	}
 
-	_, err = runGit(g.kbRoot, "git commit", args...)
+	_, err = RunGit(g.kbRoot, "git commit", args...)
 	return err
 }
 
@@ -497,7 +497,7 @@ func (g *GitProvider) gitCommit(msg string, relPath string) error {
 // falls back to the akb identity. The identity is never written to repository
 // config.
 func CommitIdentityArgs(kbRoot string) ([]string, error) {
-	out, err := runGit(kbRoot, "git config user.name", "config", "user.name")
+	out, err := RunGit(kbRoot, "git config user.name", "config", "user.name")
 	if err != nil || strings.TrimSpace(out) == "" {
 		return akbCommitIdentity, nil
 	}
@@ -517,12 +517,14 @@ func commitArgs(kbRoot, msg string, paths []string) ([]string, error) {
 	return append(args, paths...), nil
 }
 
-// runGit runs a git subcommand in kbRoot and returns its combined output. A
+// RunGit runs a git subcommand in kbRoot and returns its combined output. A
 // command that writes or refreshes the repository index fails while another
 // process holds the index lock, so contention is retried with backoff; the
 // holder — akb working on another KB, or any other tool — usually releases the
-// lock within milliseconds.
-func runGit(kbRoot, op string, args ...string) (string, error) {
+// lock within milliseconds. It is the runner the provider uses, and the one a
+// command outside this package uses for the git steps that package does not
+// wrap (the bootstrap staging and commit of `akb init`).
+func RunGit(kbRoot, op string, args ...string) (string, error) {
 	for attempt := 0; ; attempt++ {
 		cmd := exec.Command("git", args...) //nolint:gosec // launching trusted git binary with controlled args
 		cmd.Dir = kbRoot

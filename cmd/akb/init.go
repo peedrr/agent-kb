@@ -12,6 +12,7 @@ import (
 
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/db"
+	"github.com/peedrr/agent-kb/internal/storage"
 )
 
 var initCmd = &cobra.Command{
@@ -189,17 +190,18 @@ func gitInitAndCommit(name string) error {
 		return err
 	}
 
-	gitAdd := exec.Command("git", "add", "-A")
-	gitAdd.Dir = absPath
-	if out, err := gitAdd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git add: %s: %w", strings.TrimSpace(string(out)), err)
+	// Both steps touch the repository index, so they run through the retry
+	// runner every other staging and commit step uses: another process holding
+	// the index lock is waited out instead of failing the fresh base.
+	if _, err := storage.RunGit(absPath, "git add", "add", "-A"); err != nil {
+		//nolint:wrapcheck // RunGit's error already names the git step and its output
+		return err
 	}
 
 	commitMsg := fmt.Sprintf("akb: init %s", name)
-	gitCommit := exec.Command("git", "commit", "-m", commitMsg) //nolint:gosec // launching trusted git binary with controlled args
-	gitCommit.Dir = absPath
-	if out, err := gitCommit.CombinedOutput(); err != nil {
-		return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)
+	if _, err := storage.RunGit(absPath, "git commit", "commit", "-m", commitMsg); err != nil {
+		//nolint:wrapcheck // RunGit's error already names the git step and its output
+		return err
 	}
 
 	return nil
