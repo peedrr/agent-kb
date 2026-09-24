@@ -136,6 +136,8 @@ such as `[a`. Pinned outcomes:
 | `[[[a]]]` | one link: target `a`, display `a`, span `[0,7)` |
 | `[[[a]]](notes/x.md)` | one link: target `notes/x` in **both** the link graph and `page.ast.links` (never the bracket fragment `[a`), display `a`, span covers the whole token |
 | `[[[[a]]]](x.md)` | one link: target `x`, display `a`, span covers the whole token |
+| `[[[[a]]` | one link: target `a`, display `a`, span `[2,7)` — the four-bracket run never closes, so the retry pairs the innermost `[[a]]` inside it |
+| `[[[a]]](x.md "t")` | one link: target `x`, display `a`, span covers the whole token — the destination's trailing link title is stripped by normalization |
 | `[[a]]([[b]])` | `page.ast.links` emits one entry, target `b`, text `b` — the outer token and its goldmark link are dropped. The link graph still records the bracket-shaped `[[b]]`; ledgered in [`KNOWN-LIMITATIONS.md`](../KNOWN-LIMITATIONS.md) |
 | `[[a]](notes/[[weird]].md)` | one entry, the outer link: target `notes/[[weird]]`, text `[a]` — a bracket run inside the destination path is path text, so the parser records no token for it and both readers name only the outer link |
 | `[[a]](x.md "see [[b]]")` | one entry, the outer link: target `x`, text `[a]` — a bracket run inside the quoted title is title text, so the parser records no token for it and both readers name only the outer link |

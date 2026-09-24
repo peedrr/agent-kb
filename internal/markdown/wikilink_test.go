@@ -817,6 +817,39 @@ func TestParseWikilinksDegenerateBracketRuns(t *testing.T) {
 			t.Errorf("span = [%d,%d), want [0,%d) (the whole token including the dest)", wl.Start, wl.End, len(content))
 		}
 	})
+
+	t.Run("triple brackets with a titled dest take the dest as target", func(t *testing.T) {
+		content := `[[[a]]](x.md "t")`
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "x" || wl.Destination != "x" {
+			t.Errorf("Target = %q, Destination = %q, want %q for both", wl.Target, wl.Destination, "x")
+		}
+		if wl.Display != "a" {
+			t.Errorf("Display = %q, want %q", wl.Display, "a")
+		}
+		if wl.Start != 0 || wl.End != len(content) {
+			t.Errorf("span = [%d,%d), want [0,%d) (the whole token including the dest)", wl.Start, wl.End, len(content))
+		}
+	})
+
+	t.Run("an unterminated deep run retries to the innermost pair", func(t *testing.T) {
+		content := "[[[[a]]"
+		links := ParseWikilinks(content)
+		if len(links) != 1 {
+			t.Fatalf("len(links) = %d, want 1", len(links))
+		}
+		wl := links[0]
+		if wl.Target != "a" || wl.Display != "a" {
+			t.Errorf("Target = %q, Display = %q, want %q for both", wl.Target, wl.Display, "a")
+		}
+		if wl.Start != 2 || wl.End != len(content) {
+			t.Errorf("span = [%d,%d), want [2,%d) (the retry opens inside the four-bracket run)", wl.Start, wl.End, len(content))
+		}
+	})
 }
 
 // Spec-literal display outcomes for the explicit-destination form. Both are
