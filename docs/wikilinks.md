@@ -119,7 +119,10 @@ inside:
   closes no list item, whatever its indent. A line that opens a block which interrupts a
   paragraph — a fence delimiter, a thematic break, an ATX heading, a block quote, or an HTML
   block of CommonMark type 1-6 — instead runs the list bookkeeping and closes the items it
-  falls outside of; a setext heading underline never interrupts.
+  falls outside of; a setext heading underline never interrupts. A line immediately after
+  such an interrupting block, with no blank line between them, is still judged a lazy
+  continuation — its wikilink is recorded where goldmark renders the line as an indented
+  code block — a divergence ledgered in [`KNOWN-LIMITATIONS.md`](../KNOWN-LIMITATIONS.md).
 
 The exclusion is line-structured while a token's span can cross lines: a token whose span
 merely crosses an indented line (a quoted title spanning a newline) is still recorded; only

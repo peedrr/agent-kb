@@ -97,6 +97,21 @@ lowercase spelling inside a list item to fire, and spec-frozen divergences on de
 input are documented, not patched.
 **Reported, deliberately deferred: 2026-09-24.**
 
+### An indented line after a paragraph-interrupting block is a lazy continuation
+
+**What happens.** The lazy-continuation check keys on the previous line being non-blank,
+not on whether a paragraph is still open, so an indented line immediately after a
+paragraph-interrupting block — an ATX heading, a block quote, a fence delimiter, a thematic
+break, or an HTML block of CommonMark type 1-6 — with no blank line between them is judged
+a lazy paragraph continuation and its wikilink is recorded. A `- item` or `para` line,
+followed immediately by `# H` and then by an indented `    [[a]]` line, records link `a`;
+goldmark renders that indented line as an indented code block (zero links).
+
+**Why deferred:** pre-existing — the parent of the paragraph-interrupt fix behaved
+identically. The parser is spec-frozen as of v0.19.0, so divergences on such input are
+documented, not patched.
+**Reported, deliberately deferred: 2026-09-24.**
+
 ## Exclusions not shared with the marker parsers
 
 ### Provenance and annotation parsers keep their own, narrower exclusion set
