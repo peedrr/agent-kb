@@ -458,7 +458,9 @@ func indentedCodeBlockRanges(content string) []exclusion {
 	// paragraphOpen reports whether the previous line left a paragraph open.
 	// Its text continues on a later line even when that line is indented below
 	// the open item's content column — a lazy continuation, which closes no
-	// item. A line that opens a block which interrupts a paragraph closes items
+	// item. A marker line opens a paragraph only when it carries item content:
+	// an empty item such as "-" ends, and the lines that follow are no part of
+	// it. A line that opens a block which interrupts a paragraph closes items
 	// the way any other block-start line does.
 	paragraphOpen := false
 
@@ -535,7 +537,7 @@ func indentedCodeBlockRanges(content string) []exclusion {
 				ranges = append(ranges, exclusion{start: blockStart, end: lineStart})
 				blockStart = -1
 			}
-			paragraphOpen = true
+			paragraphOpen = hasItemContent(line, itemContentColumn)
 		case trimmed != "":
 			// A non-blank line below an open item's content column lies outside
 			// the item, so it closes the item and any deeper ones. Blank lines
@@ -688,6 +690,28 @@ func startsParagraphInterrupt(line string) bool {
 		return false
 	}
 	return isThematicBreak(trimmed, trimmed[0])
+}
+
+// hasItemContent reports whether line carries non-whitespace text at or past
+// the column contentColumn, the content column of the list item the line opens
+// with. A marker-only line such as "-" or "100." has none: the item is empty,
+// so it opens no paragraph.
+func hasItemContent(line string, contentColumn int) bool {
+	column := 0
+	for i := 0; i < len(line); i++ {
+		if column >= contentColumn {
+			return strings.TrimSpace(line[i:]) != ""
+		}
+		switch line[i] {
+		case ' ':
+			column++
+		case '\t':
+			column += 4 - column%4
+		default:
+			column++
+		}
+	}
+	return false
 }
 
 // escapedBracketRanges returns the inner range of every wikilink-shaped token

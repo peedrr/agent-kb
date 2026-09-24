@@ -1172,6 +1172,10 @@ func TestParseWikilinksLazyContinuationListBookkeeping(t *testing.T) {
 	t.Run("a low-indent lazy continuation keeps the item open", func(t *testing.T) {
 		assertWikilinkTargets(t, "- item\ncontinuation\n\n    [[a]]", "a")
 	})
+
+	t.Run("an empty item opens no paragraph", func(t *testing.T) {
+		assertWikilinkTargets(t, "-\ncontinuation\n\n    [[a]]")
+	})
 }
 
 // Only the lines strictly inside a fenced code block are opaque to the list
