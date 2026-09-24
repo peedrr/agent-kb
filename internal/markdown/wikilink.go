@@ -322,15 +322,14 @@ func isPunct(c byte) bool {
 	return c >= '!' && c <= '/' || c >= ':' && c <= '@' || c >= '[' && c <= '`' || c >= '{' && c <= '~'
 }
 
-// normalizeDest cleans an explicit destination: an optional trailing link
-// title is dropped, then surrounding whitespace and angle brackets, as are a
-// leading "./" and a trailing ".md" (the link graph's resolution step re-adds
-// the extension). Repeated affixes collapse, so "././a.md.md" becomes "a".
-func normalizeDest(dest string) string {
+// NormalizeBareDestination cleans a link destination that carries no link
+// title — the form goldmark reports, because it keeps a title in a field of
+// its own rather than inside the destination. Surrounding whitespace and angle
+// brackets are dropped, as are a leading "./" and a trailing ".md" (the link
+// graph's resolution step re-adds the extension). Repeated affixes collapse,
+// so "././a.md.md" becomes "a".
+func NormalizeBareDestination(dest string) string {
 	d := strings.TrimSpace(dest)
-	if parsed, _, ok := parseLinkDestination(d); ok {
-		d = parsed
-	}
 	if len(d) >= 2 && strings.HasPrefix(d, "<") && strings.HasSuffix(d, ">") {
 		d = d[1 : len(d)-1]
 	}
@@ -342,6 +341,17 @@ func normalizeDest(dest string) string {
 		d = strings.TrimSuffix(d, ".md")
 	}
 	return d
+}
+
+// normalizeDest cleans an explicit destination: an optional trailing link
+// title is dropped, then NormalizeBareDestination strips the surrounding
+// whitespace and angle brackets, the leading "./", and the trailing ".md".
+func normalizeDest(dest string) string {
+	d := strings.TrimSpace(dest)
+	if parsed, _, ok := parseLinkDestination(d); ok {
+		d = parsed
+	}
+	return NormalizeBareDestination(d)
 }
 
 // parseWikilinkInner parses the text between the brackets. It also reports

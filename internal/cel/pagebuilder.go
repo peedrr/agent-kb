@@ -160,6 +160,12 @@ func flattenHeadings(doc ast.Node, source []byte) []map[string]any {
 // merged in from markdown.ParseWikilinks because goldmark yields no ast.Link
 // node for a bare [[...]]. Entries are sorted by source offset so CEL
 // evaluation order is deterministic.
+//
+// A wikilink-form entry reports the target in the one normalized spelling the
+// link graph records: the parser's destination when it has one, and otherwise
+// goldmark's destination run through normalizeWikilinkTarget. A plain markdown
+// link keeps goldmark's destination as written, because the link graph ignores
+// those links entirely.
 func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 	type mergedLink struct {
 		offset int
@@ -225,15 +231,20 @@ func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 		if matched {
 			consumed[i] = true
 			l := goldmarkLinks[i]
-			// goldmark's destination wins whenever it is non-empty. For an
-			// explicit-destination wikilink the two parsers describe the same
-			// token; for degenerate bracket nesting such as [[[a]]](notes/x.md)
-			// the wikilink parser treats the token as plain while goldmark still
-			// parses a real inline link, so keep goldmark's destination rather
-			// than emit a bracket-fragment target.
-			if wl.Destination != "" || len(l.Destination) > 0 {
+			// The parser's destination is the link graph's spelling, so it wins
+			// whenever it exists. For degenerate bracket nesting such as
+			// [[[a]]](notes/x.md) the parser keeps the token plain while goldmark
+			// still parses a real inline link; there the goldmark destination is
+			// normalized into that same spelling rather than reported as written.
+			// A destination that normalizes away ("", ".md", "./") leaves the
+			// token a plain wikilink, which is how the link graph records it.
+			target := wl.Destination
+			if target == "" && len(l.Destination) > 0 {
+				target = normalizeWikilinkTarget(string(l.Destination))
+			}
+			if target != "" {
 				merged = append(merged, mergedLink{offset: wl.Start, entry: map[string]any{
-					"target":      string(l.Destination),
+					"target":      target,
 					"text":        extractText(l, source),
 					"is_wikilink": true,
 					"line":        offsetToLine(source, wl.Start),
@@ -241,9 +252,9 @@ func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 				continue
 			}
 		}
-		// Plain wikilink: bare, or followed by empty, whitespace-only, or
-		// angle-only parens that the parser ignores. Goldmark's empty-
-		// destination entry for the latter is dropped, so the token still
+		// Plain wikilink: bare, or carrying parens the parser ignores — empty,
+		// whitespace-only, angle-only, unclosed, or a destination that normalizes
+		// away. Goldmark's entry for such a token is dropped, so the token still
 		// yields exactly one entry, carrying the bracket target.
 		merged = append(merged, mergedLink{offset: wl.Start, entry: map[string]any{
 			"target":      wl.Target,
@@ -259,8 +270,16 @@ func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 		}
 		pos := l.Pos()
 		isWikilink := pos+1 < len(source) && source[pos] == '[' && source[pos+1] == '['
+		target := string(l.Destination)
+		if isWikilink {
+			// A destination that normalizes away is not a spelling the link
+			// graph would record, so goldmark's spelling is kept as written.
+			if normalized := normalizeWikilinkTarget(target); normalized != "" {
+				target = normalized
+			}
+		}
 		merged = append(merged, mergedLink{offset: pos, entry: map[string]any{
-			"target":      string(l.Destination),
+			"target":      target,
 			"text":        extractText(l, source),
 			"is_wikilink": isWikilink,
 			"line":        offsetToLine(source, pos),
@@ -278,6 +297,17 @@ func flattenLinks(doc ast.Node, source []byte) []map[string]any {
 		links = append(links, m.entry)
 	}
 	return links
+}
+
+// normalizeWikilinkTarget normalizes a wikilink-form destination reported by
+// goldmark, which carries no link title (goldmark keeps a title in a field of
+// its own). A scheme-qualified destination is a URL rather than a KB path, so
+// it is left as written.
+func normalizeWikilinkTarget(dest string) string {
+	if strings.Contains(dest, "://") {
+		return dest
+	}
+	return markdown.NormalizeBareDestination(dest)
 }
 
 func flattenCodeBlocks(doc ast.Node, source []byte) []map[string]any {

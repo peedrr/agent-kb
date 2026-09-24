@@ -490,30 +490,58 @@ func TestFlattenLinksWikilinkForms(t *testing.T) {
 			wantLine:   1,
 		},
 		{
-			name:       "explicit destination keeps goldmark target and text",
+			name:       "explicit destination target is normalized",
 			source:     "See [[the page]](notes/page.md).\n",
-			wantTarget: "notes/page.md",
+			wantTarget: "notes/page",
 			wantText:   "[the page]",
 			wantLine:   1,
 		},
 		{
 			name:       "explicit destination wins over heading",
 			source:     "See [[notes/page#Details]](other/page.md).\n",
-			wantTarget: "other/page.md",
+			wantTarget: "other/page",
 			wantText:   "[notes/page#Details]",
 			wantLine:   1,
 		},
 		{
-			name:       "degenerate nested brackets keep goldmark destination",
+			name:       "angle-bracketed destination is normalized",
+			source:     "See [[the page]](<notes/page.md>).\n",
+			wantTarget: "notes/page",
+			wantText:   "[the page]",
+			wantLine:   1,
+		},
+		{
+			name:       "relative destination is normalized",
+			source:     "See [[the page]](./notes/page.md).\n",
+			wantTarget: "notes/page",
+			wantText:   "[the page]",
+			wantLine:   1,
+		},
+		{
+			name:       "titled destination drops the title",
+			source:     "See [[the page]](notes/page.md \"title\").\n",
+			wantTarget: "notes/page",
+			wantText:   "[the page]",
+			wantLine:   1,
+		},
+		{
+			name:       "repeated .md affixes collapse",
+			source:     "See [[the page]](notes/page.md.md).\n",
+			wantTarget: "notes/page",
+			wantText:   "[the page]",
+			wantLine:   1,
+		},
+		{
+			name:       "degenerate nested brackets normalize the destination",
 			source:     "See [[[a]]](notes/x.md).\n",
-			wantTarget: "notes/x.md",
+			wantTarget: "notes/x",
 			wantText:   "[[a]]",
 			wantLine:   1,
 		},
 		{
-			name:       "deeper degenerate nesting at offset 0 keeps goldmark destination",
+			name:       "deeper degenerate nesting at offset 0 normalizes the destination",
 			source:     "[[[[a]]]](x.md)\n",
-			wantTarget: "x.md",
+			wantTarget: "x",
 			wantText:   "[[[a]]]",
 			wantLine:   1,
 		},
@@ -636,9 +664,9 @@ func TestFlattenLinksExplicitDestinationSharesGoldmarkLinkStart(t *testing.T) {
 
 // The link graph reads markdown.ParseWikilinks while page.ast.links merges that
 // output with goldmark. Both readers must name the destination of
-// [[[a]]](notes/x.md): the link graph records the normalized "notes/x" and
-// page.ast.links reports goldmark's destination as written — never the
-// bracket fragment "[a".
+// [[[a]]](notes/x.md) in the one normalized spelling: the link graph records
+// "notes/x" and page.ast.links reports that same target — never the bracket
+// fragment "[a" and never goldmark's unnormalized "notes/x.md".
 func TestFlattenLinksDegenerateBracketRunNamesTheDestination(t *testing.T) {
 	source := "See [[[a]]](notes/x.md).\n"
 
@@ -657,7 +685,79 @@ func TestFlattenLinksDegenerateBracketRunNamesTheDestination(t *testing.T) {
 	if len(links) != 1 {
 		t.Fatalf("links = %+v, want exactly 1 entry", links)
 	}
-	assertLinkEntry(t, links[0], "notes/x.md", "[[a]]", true, 1)
+	assertLinkEntry(t, links[0], "notes/x", "[[a]]", true, 1)
+}
+
+// page.ast.links must spell a wikilink target exactly as the link graph does.
+// The graph records markdown.ParseWikilinks' Target, so the CEL target for the
+// same token must equal it — including .md-bearing destinations, the
+// angle-bracketed form, and a destination whose title-like suffix is part of
+// the destination rather than a link title.
+func TestFlattenLinksMatchesLinkGraphTargetSpelling(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{name: "explicit destination with .md", source: "[[a]](notes/x.md).\n"},
+		{name: "angle-bracketed destination with .md", source: "[[a]](<notes/x.md>).\n"},
+		{name: "relative destination with .md", source: "[[a]](./notes/x.md).\n"},
+		{name: "titled destination with .md", source: "[[a]](notes/x.md \"title\").\n"},
+		{name: "repeated .md affixes", source: "[[a]](notes/x.md.md).\n"},
+		{name: "angle-bracketed destination holding a title-like suffix", source: "[[a]](<foo (bar)>).\n"},
+		{name: "destination that normalizes away", source: "[[a]](.md).\n"},
+		{name: "relative destination that normalizes away", source: "[[a]](./).\n"},
+		{name: "empty angle-bracketed destination", source: "[[a]](<>).\n"},
+		{name: "degenerate nested brackets", source: "[[[a]]](notes/x.md).\n"},
+		{name: "deeper degenerate nesting at offset 0", source: "[[[[a]]]](x.md)\n"},
+		{name: "pipe display with an explicit destination", source: "[[a|A]](notes/x.md).\n"},
+		{name: "heading in the bracket part with an explicit destination", source: "[[a#h]](notes/x.md).\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wikilinks := markdown.ParseWikilinks(tt.source)
+			if len(wikilinks) != 1 {
+				t.Fatalf("wikilinks = %+v, want exactly 1", wikilinks)
+			}
+
+			links := flattenLinksForTest(t, tt.source)
+			if len(links) != 1 {
+				t.Fatalf("links = %+v, want exactly 1 entry", links)
+			}
+			if links[0]["target"] != wikilinks[0].Target {
+				t.Errorf("page.ast.links target = %v, want the link graph's %q", links[0]["target"], wikilinks[0].Target)
+			}
+		})
+	}
+}
+
+// normalizeWikilinkTarget serves the goldmark-only path, where goldmark
+// reports the destination without a link title. It must not strip a
+// title-like suffix, which is part of the destination, and it must leave a
+// scheme-qualified destination alone.
+func TestNormalizeWikilinkTarget(t *testing.T) {
+	tests := []struct {
+		name string
+		dest string
+		want string
+	}{
+		{name: "trailing .md is stripped", dest: "notes/x.md", want: "notes/x"},
+		{name: "angle brackets and .md are stripped", dest: "<notes/x.md>", want: "notes/x"},
+		{name: "leading ./ is stripped", dest: "./notes/x.md", want: "notes/x"},
+		{name: "repeated affixes collapse", dest: "././notes/x.md.md", want: "notes/x"},
+		{name: "a title-like suffix survives", dest: "foo (bar)", want: "foo (bar)"},
+		{name: "a destination that normalizes away is empty", dest: ".md", want: ""},
+		{name: "a scheme-qualified destination is left as written", dest: "https://example.com/x.md", want: "https://example.com/x.md"},
+		{name: "a scheme-qualified destination without an extension is left as written", dest: "https://example.com/x", want: "https://example.com/x"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeWikilinkTarget(tt.dest); got != tt.want {
+				t.Errorf("normalizeWikilinkTarget(%q) = %q, want %q", tt.dest, got, tt.want)
+			}
+		})
+	}
 }
 
 // A wikilink whose parenthesized destination is itself a wikilink token —
@@ -741,7 +841,7 @@ func TestFlattenLinksSortedBySourceOffset(t *testing.T) {
 	}{
 		{"alpha", "alpha", true},
 		{"https://example.com", "plain", false},
-		{"notes/beta.md", "[beta|B]", true},
+		{"notes/beta", "[beta|B]", true},
 	}
 	for i, w := range want {
 		if links[i]["target"] != w.target {
@@ -798,7 +898,7 @@ Also a [plain link](https://example.com).
 		{"alpha", "alpha", true, 6},
 		{"beta", "Beta", true, 6},
 		{"gamma", "Section", true, 6},
-		{"notes/delta.md", "[display]", true, 6},
+		{"notes/delta", "[display]", true, 6},
 		{"https://example.com", "plain link", false, 8},
 	}
 	for i, w := range want {
@@ -835,6 +935,26 @@ func TestBuildPageWikilinkLinksInCELRule(t *testing.T) {
 		{
 			name: "plain markdown link does not",
 			body: "See [alpha](notes/alpha.md).\n",
+			want: false,
+		},
+		{
+			name: "explicit destination with .md satisfies the rule",
+			body: "See [[alpha]](notes/alpha.md).\n",
+			want: true,
+		},
+		{
+			name: "angle-bracketed explicit destination satisfies the rule",
+			body: "See [[alpha]](<notes/alpha.md>).\n",
+			want: true,
+		},
+		{
+			name: "explicit destination naming another page does not",
+			body: "See [[alpha]](notes/beta.md).\n",
+			want: false,
+		},
+		{
+			name: "destination that normalizes away keeps the bracket target",
+			body: "See [[alpha]](.md).\n",
 			want: false,
 		},
 	}

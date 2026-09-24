@@ -54,9 +54,9 @@ stdout '  probe-target -> kb/notes/probe-target.md'
 
 # --- FORM 4: [[display]](dest) — the destination beats the bracket label ---
 
-# CEL reports the destination as written (notes/probe-target.md); the link
-# graph stores the normalized destination (notes/probe-target) and resolves it
-# to the same page.
+# Both readers report the destination in one normalized spelling: CEL's `target`
+# and the target the link graph records are the same string, and the graph
+# resolves that spelling to the destination page.
 stdin ../explicit.md
 exec akb write probes/explicit.md
 stdout 'Written to kb/probes/explicit.md'
@@ -162,7 +162,7 @@ The heading form links [[probe-target#Rationale]] and names its own heading.
 ---
 type: probe
 title: Explicit destination wikilink
-expect_target: notes/probe-target.md
+expect_target: notes/probe-target
 ---
 
 # Explicit destination wikilink
