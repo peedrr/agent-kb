@@ -19,6 +19,7 @@ import (
 	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/search"
 	"github.com/peedrr/agent-kb/internal/storage"
+	"github.com/peedrr/agent-kb/internal/template"
 )
 
 var approveAllDrafts bool
@@ -65,8 +66,15 @@ func runApprove(_ *cobra.Command, args []string) error {
 	}
 	defer dbConn.Close() //nolint:errcheck // DB close error non-critical on command exit
 
+	// The approval gate reads the same schemas the write path enforces, so both
+	// paths refuse the same pages.
+	templates, err := approveTemplates(kbRoot)
+	if err != nil {
+		return err
+	}
+
 	if approveAllDrafts {
-		return approveAllDraftPages(ctx, dbConn, kbRoot)
+		return approveAllDraftPages(ctx, dbConn, kbRoot, templates)
 	}
 
 	inputPath := args[0]
@@ -75,7 +83,7 @@ func runApprove(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve path: %w", err)
 	}
 
-	approved, err := approvePage(ctx, dbConn, kbRoot, fullPath, inputPath)
+	approved, err := approvePage(ctx, dbConn, kbRoot, templates, fullPath, inputPath)
 	if err != nil {
 		return err
 	}
@@ -87,7 +95,24 @@ func runApprove(_ *cobra.Command, args []string) error {
 	return nil
 }
 
-func approvePage(ctx context.Context, dbConn *sql.DB, kbRoot, fullPath, inputPath string) (bool, error) {
+// approveTemplates reads the templates of the base the way `akb write` reads
+// them, so the approval gate answers to the same schema the write path enforces.
+func approveTemplates(kbRoot string) (map[string]template.Template, error) {
+	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
+		return nil, fmt.Errorf("resolve templates directory: %w", err)
+	}
+	if err := assertTemplateFilesContained(kbRoot, templatesDir); err != nil {
+		return nil, fmt.Errorf("resolve templates directory: %w", err)
+	}
+	templates, err := template.LoadTemplates(templatesDir)
+	if err != nil {
+		return nil, fmt.Errorf("load templates: %w", err)
+	}
+	return templates, nil
+}
+
+func approvePage(ctx context.Context, dbConn *sql.DB, kbRoot string, templates map[string]template.Template, fullPath, inputPath string) (bool, error) {
 	// Hold the repository lock from the read of the page through its commit and
 	// the search and link-graph updates, so the approved body is the body that
 	// gets committed.
@@ -114,6 +139,10 @@ func approvePage(ctx context.Context, dbConn *sql.DB, kbRoot, fullPath, inputPat
 
 	if !frontmatter.IsDraft(fm.Fields) {
 		return false, nil
+	}
+
+	if err := requiredFieldsRefusal(templates, fm, inputPath); err != nil {
+		return false, err
 	}
 
 	bodyStr := markdown.StripAnnotations(string(body))
@@ -175,6 +204,28 @@ func approvePage(ctx context.Context, dbConn *sql.DB, kbRoot, fullPath, inputPat
 	return true, nil
 }
 
+// requiredFieldsRefusal returns the validation failure that blocks the approval
+// of a page leaving a schema-required frontmatter field unset, and nil when the
+// page may be approved. The missing fields and the template declaring them are
+// reported through the write path's helpers, so the wording and the exit code
+// match `akb write`; the page is named as well because a batch approval covers
+// many pages at once. A page whose type has no template declares no required
+// fields and passes: an unknown type belongs to the type checks, not here.
+func requiredFieldsRefusal(templates map[string]template.Template, fm *frontmatter.ParsedFrontmatter, inputPath string) error {
+	tmpl, ok := templates[fm.Type]
+	if !ok {
+		return nil
+	}
+
+	missing := checkRequiredFields(tmpl, fm)
+	if len(missing) == 0 {
+		return nil
+	}
+
+	fmt.Fprintf(os.Stderr, "cannot approve '%s': %s\n", inputPath, requiredFieldsMessage(tmpl, missing))
+	return validationFailure{}
+}
+
 // draftCandidate is a page the batch approve validated and is ready to approve:
 // the page's full path and the base-relative path that names it in the approval
 // commit and in the approval report.
@@ -189,17 +240,27 @@ type draftCandidate struct {
 // validation reaches the second phase, which approves each candidate through
 // approvePage. A rejected candidate therefore cannot leave the base
 // half-approved with approval commits already landed.
-func approveAllDraftPages(ctx context.Context, dbConn *sql.DB, kbRoot string) error {
+//
+// A draft the required-field gate refuses is the one per-page failure that does
+// not stop the run: the refused draft keeps its draft state while the remaining
+// drafts are approved, and the run then fails so a refusal is never reported as
+// part of a successful batch.
+func approveAllDraftPages(ctx context.Context, dbConn *sql.DB, kbRoot string, templates map[string]template.Template) error {
 	candidates, err := collectDraftCandidates(ctx, kbRoot)
 	if err != nil {
 		return err
 	}
 
-	var approvedCount int
+	var approvedCount, refusedCount int
 	for _, candidate := range candidates {
-		approved, err := approvePage(ctx, dbConn, kbRoot, candidate.fullPath, candidate.relPath)
+		approved, err := approvePage(ctx, dbConn, kbRoot, templates, candidate.fullPath, candidate.relPath)
 		if err != nil {
-			return err
+			var validationErr validationFailure
+			if !errors.As(err, &validationErr) {
+				return err
+			}
+			refusedCount++
+			continue
 		}
 		if approved {
 			approvedCount++
@@ -207,6 +268,10 @@ func approveAllDraftPages(ctx context.Context, dbConn *sql.DB, kbRoot string) er
 	}
 
 	fmt.Printf("Approved %d drafts\n", approvedCount)
+	if refusedCount > 0 {
+		fmt.Fprintf(os.Stderr, "%d draft(s) not approved\n", refusedCount)
+		return validationFailure{}
+	}
 	return nil
 }
 

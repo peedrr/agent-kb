@@ -638,3 +638,132 @@ func TestApproveAllDraftsApprovesEveryValidDraft(t *testing.T) {
 		}
 	}
 }
+
+// TestApproveRefusesDraftMissingRequiredField pins the approval gate: a draft
+// that leaves a schema-required frontmatter field unset is not approved, the
+// missing fields are reported the way the write path reports them, and the run
+// exits 1 as a validation failure. The planted page never passed write
+// validation, so it models the pre-existing pages the gate has to cover.
+func TestApproveRefusesDraftMissingRequiredField(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const relPath = "kb/decisions/planted.md"
+	writeRawPage(t, kbRoot, relPath, adrMissingStatus)
+
+	out, err := approveRun(kbRoot, "decisions/planted.md")
+	if err == nil {
+		t.Fatalf("expected approve to refuse the incomplete draft, got: %s", out)
+	}
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected an exit error, got %T: %v", err, err)
+	}
+	if code := exitErr.ExitCode(); code != exitFailure {
+		t.Errorf("exit code = %d, want %d; output: %s", code, exitFailure, out)
+	}
+	if !strings.Contains(out, "cannot approve 'decisions/planted.md'") {
+		t.Errorf("output = %q, want it to name the page", out)
+	}
+	if want := `missing required frontmatter field(s): status (declared required by template "adr")`; !strings.Contains(out, want) {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+
+	data, readErr := os.ReadFile(filepath.Join(kbRoot, filepath.FromSlash(relPath))) //nolint:gosec // test reading a known temp file
+	if readErr != nil {
+		t.Fatalf("read the planted page: %v", readErr)
+	}
+	if string(data) != adrMissingStatus {
+		t.Errorf("refused page changed:\nbefore: %q\nafter:  %q", adrMissingStatus, data)
+	}
+
+	if log := gitLogOneline(t, kbRoot); strings.Contains(log, "akb: approve") {
+		t.Errorf("git log carries an approval commit although the draft was refused:\n%s", log)
+	}
+}
+
+// TestApproveAllDraftsRefusesOnlyIncompleteDrafts pins the batch semantics of
+// the gate: the drafts that pass are approved, a draft the gate refuses keeps
+// its draft state and its content, and the run fails so the refusal is never
+// reported as part of a successful batch.
+func TestApproveAllDraftsRefusesOnlyIncompleteDrafts(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	approveDraftsFixture(t, kbRoot, "alpha.md")
+
+	const refusedRel = "kb/decisions/planted.md"
+	writeRawPage(t, kbRoot, refusedRel, adrMissingStatus)
+	before := snapshotPages(t, kbRoot, []string{refusedRel})
+
+	out, err := approveAllDraftsRun(kbRoot)
+	if err == nil {
+		t.Fatalf("expected approve --all-drafts to fail on the refused draft, got: %s", out)
+	}
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected an exit error, got %T: %v", err, err)
+	}
+	if code := exitErr.ExitCode(); code != exitFailure {
+		t.Errorf("exit code = %d, want %d; output: %s", code, exitFailure, out)
+	}
+	if !strings.Contains(out, "Approved 1 drafts") {
+		t.Errorf("output = %q, want the count of the approved drafts", out)
+	}
+	if !strings.Contains(out, "1 draft(s) not approved") {
+		t.Errorf("output = %q, want the count of the refused drafts", out)
+	}
+	if !strings.Contains(out, "cannot approve 'decisions/planted.md'") {
+		t.Errorf("output = %q, want it to name the refused page", out)
+	}
+	if want := `missing required frontmatter field(s): status (declared required by template "adr")`; !strings.Contains(out, want) {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+
+	approvedData, readErr := os.ReadFile(filepath.Join(kbRoot, "kb", "notes", "alpha.md")) //nolint:gosec // test reading a known temp file
+	if readErr != nil {
+		t.Fatalf("read the approved draft: %v", readErr)
+	}
+	if !strings.Contains(string(approvedData), "is_draft: false") {
+		t.Errorf("approved draft = %q, want is_draft: false", string(approvedData))
+	}
+	assertPagesUnchanged(t, kbRoot, before)
+
+	log := gitLogOneline(t, kbRoot)
+	if !strings.Contains(log, "akb: approve notes/alpha.md") {
+		t.Errorf("git log is missing the approval commit of the passing draft:\n%s", log)
+	}
+	if strings.Contains(log, "akb: approve decisions/planted.md") {
+		t.Errorf("git log carries an approval commit of the refused draft:\n%s", log)
+	}
+}
+
+// TestApproveAcceptsPageTypeWithoutTemplate pins the boundary of the gate: a
+// page whose type has no template declares no required fields, so its approval
+// is left to the type checks rather than refused here.
+func TestApproveAcceptsPageTypeWithoutTemplate(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	const relPath = "kb/notes/legacy.md"
+	content := "---\ntype: retired-type\ntitle: Legacy Page\n---\nContent of a page whose type has no template."
+	writeRawPage(t, kbRoot, relPath, content)
+
+	out, err := approveRun(kbRoot, "notes/legacy.md")
+	if err != nil {
+		t.Fatalf("approve failed: %s: %v", out, err)
+	}
+	if !strings.Contains(out, "Approved 'notes/legacy.md'") {
+		t.Errorf("output = %q, want the approval message", out)
+	}
+
+	data, readErr := os.ReadFile(filepath.Join(kbRoot, filepath.FromSlash(relPath))) //nolint:gosec // test reading a known temp file
+	if readErr != nil {
+		t.Fatalf("read the approved page: %v", readErr)
+	}
+	if !strings.Contains(string(data), "is_draft: false") {
+		t.Errorf("approved page = %q, want is_draft: false", string(data))
+	}
+}
