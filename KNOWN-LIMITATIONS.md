@@ -255,3 +255,17 @@ present` when untracked files exist).
 git-state machinery than this pre-existing edge justifies, and the failure message already
 names the cause.
 **Reported, deliberately deferred: 2026-09-24.**
+
+### `NothingToCommit` hands git unnormalized OS-specific pathspecs
+
+**What happens.** KB-relative git pathspecs are built with `filepath.Join`
+(`templateCommitPaths`), so on Windows they carry backslash separators.
+`storage.NothingToCommit` passes them to `git status --porcelain --` unnormalized, so the
+status pathspecs of the template-write no-op detection would use backslashes and mismatch
+git's slash-separated pathspec format; the no-op check would misbehave on Windows.
+`storage.CommitFiles` is not affected: it normalizes paths via `recordablePaths`
+(`filepath.ToSlash`) before staging and committing.
+
+**Why deferred:** a pre-existing convention across the storage layer; the project's toolchain
+(Makefile, Nix flake) targets unix and Windows is not a supported platform.
+**Reported, deliberately deferred: 2026-09-24.**
