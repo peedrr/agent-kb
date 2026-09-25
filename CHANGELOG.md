@@ -2,6 +2,17 @@
 
 Behavior changes and fixes worth acting on. Versions before 0.18.0 predate this file.
 
+## [0.21.0] — 2026-09-25
+
+### Added
+
+- **`akb init` accepts `--description` to record what a knowledge base holds.**
+  The description is stored as `description` in the base's `akb.yaml` and shown
+  by `akb discover` (text and `--json`) next to the base's name and path, so a
+  listing of discovered bases says what each contains. The flag is optional; a
+  base without one discovers exactly as before, and a description can be added
+  later by editing `akb.yaml` directly.
+
 ## [0.20.0] — 2026-09-25
 
 ### Changed

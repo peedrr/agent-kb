@@ -6,10 +6,11 @@
 
 1. Initialize the KB:
    ```bash
-   akb init <kb-name>
+   akb init <kb-name>                # optional: --description "what this KB holds"
    ```
    Replace `<kb-name>` with a short identifier (no slashes, no `..`). The KB
    lands at `<working directory>/<kb-name>`. `akb init` does not select it.
+   `--description` is optional; `akb discover` displays it.
 
 2. Verify (every command below addresses the new KB with `--kb`):
    ```bash

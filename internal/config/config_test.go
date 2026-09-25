@@ -6,6 +6,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -151,6 +152,58 @@ func TestSave(t *testing.T) {
 		}
 		if loaded.Created != cfg.Created {
 			t.Errorf("Created = %q, want %q", loaded.Created, cfg.Created)
+		}
+	})
+
+	t.Run("round-trips description", func(t *testing.T) {
+		f, err := os.CreateTemp("", "*akb.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := f.Name()
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(path) //nolint:errcheck // test cleanup — failure is non-fatal
+
+		cfg := &Config{
+			Name:        "described",
+			Created:     "2024-01-15T10:30:00Z",
+			Description: "notes on the project",
+		}
+		if err := Save(path, cfg); err != nil {
+			t.Fatalf("Save failed: %v", err)
+		}
+
+		loaded, err := Load(path)
+		if err != nil {
+			t.Fatalf("Load after save failed: %v", err)
+		}
+		if loaded.Description != cfg.Description {
+			t.Errorf("Description = %q, want %q", loaded.Description, cfg.Description)
+		}
+	})
+
+	t.Run("omits empty description", func(t *testing.T) {
+		f, err := os.CreateTemp("", "*akb.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := f.Name()
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(path) //nolint:errcheck // test cleanup — failure is non-fatal
+
+		if err := Save(path, &Config{Name: "bare", Created: "2024-01-15T10:30:00Z"}); err != nil {
+			t.Fatalf("Save failed: %v", err)
+		}
+		data, err := os.ReadFile(path) //nolint:gosec // test temp file
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), "description") {
+			t.Errorf("saved config contains a description key: %s", data)
 		}
 	})
 }

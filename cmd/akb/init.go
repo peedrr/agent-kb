@@ -20,6 +20,8 @@ import (
 	"github.com/peedrr/agent-kb/internal/storage"
 )
 
+var initDescription string
+
 var initCmd = &cobra.Command{
 	Use:   "init <name>",
 	Short: "Initialize a new Agent Knowledge Base",
@@ -27,10 +29,17 @@ var initCmd = &cobra.Command{
 	Example: `  # Initialize a new KB
   akb init my-kb
 
+  # Initialize a KB with a description (shown by akb discover)
+  akb init my-kb --description "Project notes and decisions"
+
   # Initialize a KB in a specific directory
   akb init projects/knowledge`,
 	Args: cobra.ExactArgs(1),
 	RunE: runInit,
+}
+
+func init() {
+	initCmd.Flags().StringVar(&initDescription, "description", "", "short description of the knowledge base's contents (optional; shown by akb discover)")
 }
 
 func runInit(_ *cobra.Command, args []string) error {
@@ -57,7 +66,7 @@ func runInit(_ *cobra.Command, args []string) error {
 	}
 
 	now := time.Now().Format(time.RFC3339)
-	if err := writeAkbConfig(name, now); err != nil {
+	if err := writeAkbConfig(name, now, initDescription); err != nil {
 		return err
 	}
 
@@ -137,10 +146,11 @@ func writeSeedFiles(name string) error {
 	return nil
 }
 
-func writeAkbConfig(name, created string) error {
+func writeAkbConfig(name, created, description string) error {
 	cfg := &config.Config{
-		Name:    name,
-		Created: created,
+		Name:        name,
+		Created:     created,
+		Description: strings.TrimSpace(description),
 	}
 	if err := config.Save(path.ConfigPath(name), cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)

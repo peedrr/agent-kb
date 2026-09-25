@@ -16,8 +16,9 @@ import (
 
 // Config holds the akb.yaml configuration.
 type Config struct {
-	Name    string `yaml:"name"`
-	Created string `yaml:"created"`
+	Name        string `yaml:"name"`
+	Created     string `yaml:"created"`
+	Description string `yaml:"description,omitempty"`
 }
 
 // Load reads a Config from the given path.

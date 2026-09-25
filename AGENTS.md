@@ -1,6 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Status:** v0.20.0 — BREAKING: the KB state directory is renamed `.akb/` → `.agent-kb/` and its config is now `akb.yaml` (no leading dot), with the layout centralized behind `internal/path` helpers; no compatibility shim (behavior recorded in `CHANGELOG.md`; the version lives in `VERSION`, is derived into `flake.nix` and the `justfile`, and the human-facing copies — this line, the CHANGELOG section, the git tag — are checked by `scripts/check-version-lockstep.sh`)
+**Status:** v0.21.0 — `akb init --description` records what a KB holds in `akb.yaml`, shown by `akb discover` (previous release, v0.20.0, BREAKING: the KB state directory is renamed `.akb/` → `.agent-kb/` and its config is now `akb.yaml` (no leading dot), with the layout centralized behind `internal/path` helpers; no compatibility shim). The version lives in `VERSION`, is derived into `flake.nix` and the `justfile`, and the human-facing copies — this line, the CHANGELOG section, the git tag — are checked by `scripts/check-version-lockstep.sh`
 
 ## OVERVIEW
 

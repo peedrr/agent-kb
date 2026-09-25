@@ -45,6 +45,41 @@ func TestInitDoesNotRegisterOrSetDefault(t *testing.T) {
 	}
 }
 
+// TestInitDescription covers the --description flag: when given, akb.yaml
+// records it (trimmed) and `akb discover` reports it; when omitted, akb.yaml
+// carries no description key at all.
+func TestInitDescription(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	described := exec.Command(akbBinPath, "init", "described-kb", "--description", "  project notes  ") //nolint:gosec // test helper launching akb binary
+	described.Dir = tmpDir
+	if out, err := described.CombinedOutput(); err != nil {
+		t.Fatalf("akb init --description failed: %s: %v", out, err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(tmpDir, "described-kb", ".agent-kb", "akb.yaml")) //nolint:gosec // test temp file
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "description: project notes") {
+		t.Errorf("akb.yaml = %q, want trimmed description", data)
+	}
+
+	bare := exec.Command(akbBinPath, "init", "bare-kb") //nolint:gosec // test helper launching akb binary
+	bare.Dir = tmpDir
+	if out, err := bare.CombinedOutput(); err != nil {
+		t.Fatalf("akb init failed: %s: %v", out, err)
+	}
+
+	data, err = os.ReadFile(filepath.Join(tmpDir, "bare-kb", ".agent-kb", "akb.yaml")) //nolint:gosec // test temp file
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "description") {
+		t.Errorf("akb.yaml = %q, want no description key", data)
+	}
+}
+
 // TestInitWaitsOutAnIndexLock pins that `akb init` stages and commits through
 // the index-lock retry runner: a bootstrap whose `git add` meets a lock another
 // process holds and releases a moment later completes and records its init commit

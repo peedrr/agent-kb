@@ -21,7 +21,7 @@ write is committed.
 ## Quick start
 
 ```bash
-akb init my-kb                                  # directory, git repo, search index
+akb init my-kb --description "Project notes"   # directory, git repo, search index
 akb --kb my-kb status
 
 # init seeds no templates: install the note type before the first write
