@@ -4,11 +4,13 @@
 # drift are the human-facing copies — the AGENTS.md Status line, the CHANGELOG
 # section — and the git tag. This script checks those against VERSION.
 #
-# Tag semantics: before a release the tag must not exist; after `just release`
-# it points at HEAD. A tag for the current VERSION that points anywhere else
-# means VERSION was bumped without retagging, or the tag was moved — both are
-# errors. An absent tag is fine mid-cycle (checked again at release time by
-# `git tag -a`, which refuses to overwrite).
+# Tag semantics: `just release` tags HEAD, and development then continues past
+# the tag — so a tag for the current VERSION pointing at an ANCESTOR of HEAD is
+# the normal post-release state, not an error. The anomaly this guards against
+# is a tag that is NOT reachable from HEAD: that means the tag was moved, or it
+# points at rewritten/divergent history. An absent tag is fine mid-cycle;
+# re-tagging at release time is refused by `git tag -a` itself. (In CI the
+# checkout fetches no tags, so this check is skipped there.)
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -39,11 +41,10 @@ fi
 tag="v$version"
 if git -C "$root_dir" rev-parse -q --verify "refs/tags/$tag" >/dev/null 2>&1; then
   tag_commit="$(git -C "$root_dir" rev-parse "$tag^{commit}")"
-  head_commit="$(git -C "$root_dir" rev-parse HEAD)"
-  if [ "$tag_commit" != "$head_commit" ]; then
-    echo "error: version lockstep check failed: tag $tag does not point at HEAD" >&2
+  if ! git -C "$root_dir" merge-base --is-ancestor "$tag_commit" HEAD; then
+    echo "error: version lockstep check failed: tag $tag is not an ancestor of HEAD (moved or stranded tag)" >&2
     printf '  %-18s %s\n' "tag $tag" "$tag_commit" >&2
-    printf '  %-18s %s\n' "HEAD" "$head_commit" >&2
+    printf '  %-18s %s\n' "HEAD" "$(git -C "$root_dir" rev-parse HEAD)" >&2
     fail=1
   fi
 fi
