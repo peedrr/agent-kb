@@ -314,7 +314,7 @@ created: "2024-01-01T00:00:00Z"
 	initTestSearchDB(t, kbRoot)
 
 	if err := initGitRepo(kbRoot); err != nil {
-		t.Logf("git not available, skipping git-related tests: %v", err)
+		t.Fatalf("set up git repo: %v", err)
 	}
 
 	if err := addToGit(kbRoot, "."); err != nil {
@@ -340,12 +340,20 @@ func initGitRepo(kbRoot string) error {
 		cmd := exec.Command( //nolint:gosec // test helper launching akb binary
 			"git", args...)
 		cmd.Dir = kbRoot
-		_, err := cmd.CombinedOutput()
-		return err
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git %s: %s: %w", strings.Join(args, " "), strings.TrimSpace(string(out)), err)
+		}
+		return nil
 	}
 
-	_ = setGitConfig("user.name", "akb-test")
-	_ = setGitConfig("user.email", "akb-test@local")
+	// The call sites must spell out the config subcommand: setGitConfig runs
+	// `git <args>` verbatim, and `git user.name ...` is not a git command.
+	if err := setGitConfig("config", "user.name", "akb-test"); err != nil {
+		return err
+	}
+	if err := setGitConfig("config", "user.email", "akb-test@local"); err != nil {
+		return err
+	}
 
 	return nil
 }

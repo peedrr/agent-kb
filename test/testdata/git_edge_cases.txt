@@ -8,7 +8,10 @@ cd git-kb
 exec akb template get note --full --examples
 cp stdout .akb/templates/note.yaml
 exec git add .akb/templates
-exec git commit -m 'seed note template'
+# The scenario's own commit carries per-command identity flags: it must not
+# set repository config, which the fallback section below asserts is empty,
+# and it must not rely on ambient identity, which CI runners do not have.
+exec git -c user.name=tester -c user.email=tester@local commit -m 'seed note template'
 
 # === VERIFY GIT REPO EXISTS ===
 exists .git
