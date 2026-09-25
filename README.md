@@ -222,3 +222,10 @@ resolved per invocation and never persisted.
 | `AGENTS.md` | project structure, conventions, and anti-patterns for contributors |
 | `internal/skill/embedded/kb-management/SKILL.md` | agent-facing task router, installed with `akb skill install --location <dir> kb-management` |
 | `test/AGENTS.md` | integration-test conventions |
+
+## License
+
+[MPL-2.0](LICENSE) — modifications to MPL-covered source files stay under the
+MPL (improvements flow back), while larger works may combine this code with
+other terms freely. Source files carry the Exhibit A notice; the full text is
+in [LICENSE](LICENSE).

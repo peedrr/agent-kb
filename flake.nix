@@ -105,6 +105,13 @@
 
             # Required for integration tests that run git commands
             nativeCheckInputs = [ pkgs.git ];
+
+            meta = {
+              description = "Agent KB: a git-tracked knowledge base CLI with SQLite search, link graph, and CEL validation";
+              homepage = "https://github.com/peedrr/agent-kb";
+              license = pkgs.lib.licenses.mpl20;
+              mainProgram = "akb";
+            };
           };
         }
       );

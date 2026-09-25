@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 // Package manifest manages the raw/files.log manifest that tracks
 // uploaded files with their SHA-256 hashes and timestamps.
 package manifest
