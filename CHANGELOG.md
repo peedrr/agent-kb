@@ -2,6 +2,26 @@
 
 Behavior changes and fixes worth acting on. Versions before 0.18.0 predate this file.
 
+## [0.19.1] — 2026-09-25
+
+### Fixed
+
+- **`akb init` stages and commits the new base through the index-lock retry.** A concurrent
+  process holding the git index lock no longer aborts the initial staging of base files;
+  the retry now covers both stages.
+- **The compute-budget error is identified by sentinel, not by text.** `internal/cel`
+  exports `ErrComputeBudget`, and a rule's evaluation error embeds the key names the rule
+  reads — so text matching handed the budget remedy to rules whose field names collide with
+  the phrase. Write-path dispatch now matches with `errors.Is`.
+- **`akb template get --example` warns about every broken mockup rule, not just the first.**
+  Revalidation previously stopped at the first unevaluable rule, hiding later failures and
+  dropping the variant's staleness headline. Every failed rule is collected, then named.
+- **The template-load failure is the error reported, not a stale page-read error.** When
+  `akb index add` falls back to templates and the template set fails to load, the wrapped
+  load error is surfaced — it names the cause where the old message named only the page;
+  the per-file guard at the append, index-add, lint, and type-directory call sites keeps
+  its own error, its classification, and its exit code.
+
 ## [0.19.0] — 2026-09-24
 
 ### Added

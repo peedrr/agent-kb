@@ -1,6 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Status:** v0.19.0 — schema required-field enforcement holds across write, append, approve, and lint: the `required_fields` check reports on-disk pages missing a required frontmatter field, and `akb approve` refuses to publish one (behavior recorded in `CHANGELOG.md`; the version string is kept in lockstep with `Makefile` and `flake.nix` by `scripts/check-version-lockstep.sh`)
+**Status:** v0.19.1 — error-reporting fixes across the git staging path, CEL budget diagnosis, mockup revalidation, and template-load failures (behavior recorded in `CHANGELOG.md`; the version string is kept in lockstep with `Makefile` and `flake.nix` by `scripts/check-version-lockstep.sh`)
 
 ## OVERVIEW
 

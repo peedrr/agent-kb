@@ -1,6 +1,6 @@
 .PHONY: build test lint clean release
 
-VERSION := 0.19.0
+VERSION := 0.19.1
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 # Untracked files count as dirty here too, so the marker means the same thing
 # as the clean-tree guard in scripts/check-release-preconditions.sh.
