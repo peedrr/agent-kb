@@ -22,6 +22,13 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # The test suite shells out to `git commit` in temp repos and needs an
+      # identity; locally that comes from the developer's global git config.
+      - name: Git identity for tests
+        run: |
+          git config --global user.name "akb-ci"
+          git config --global user.email "akb-ci@localhost"
+
       - name: Unit and integration tests
         env:
           CGO_ENABLED: "0"
@@ -60,7 +67,8 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           out="dist/akb_${version}_${GOOS}_${GOARCH}"
           mkdir -p "$out"
-          go build -ldflags "-X main.version=${version}" -o "$out/akb" ./cmd/akb/
+          go build -ldflags "-X main.version=${version}" \
+            -o "$out/akb" ./cmd/akb/
           cp LICENSE README.md "$out/"
 
       - uses: actions/upload-artifact@v4
@@ -96,7 +104,10 @@ jobs:
             found && /^## \[/ { exit }
             found { print }
           ' CHANGELOG.md > notes.md
-          test -s notes.md || { echo "error: no CHANGELOG section for [$version]" >&2; exit 1; }
+          if [ ! -s notes.md ]; then
+            echo "error: no CHANGELOG section for [$version]" >&2
+            exit 1
+          fi
 
       - name: Create GitHub Release
         env:

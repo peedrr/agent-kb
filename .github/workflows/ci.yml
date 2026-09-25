@@ -21,6 +21,13 @@ jobs:
       - name: Version lockstep
         run: scripts/check-version-lockstep.sh
 
+      # The test suite shells out to `git commit` in temp repos and needs an
+      # identity; locally that comes from the developer's global git config.
+      - name: Git identity for tests
+        run: |
+          git config --global user.name "akb-ci"
+          git config --global user.email "akb-ci@localhost"
+
       - name: Unit and integration tests
         env:
           CGO_ENABLED: "0"
