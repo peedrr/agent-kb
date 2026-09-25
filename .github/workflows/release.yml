@@ -1,0 +1,108 @@
+name: release
+
+# Triggered by pushing a v* tag (created locally by `just release`, which runs
+# the precondition and version-lockstep guards first). The tag is the release:
+# this workflow tests the tagged commit, cross-compiles the binaries, and
+# creates the GitHub Release with the CHANGELOG section as its notes.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Unit and integration tests
+        env:
+          CGO_ENABLED: "0"
+        run: go test ./...
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Matches supportedSystems in flake.nix (no Windows: Nix does not
+        # target it, and the test suite is only exercised on unix).
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          out="dist/akb_${version}_${GOOS}_${GOARCH}"
+          mkdir -p "$out"
+          go build -ldflags "-X main.version=${version}" -o "$out/akb" ./cmd/akb/
+          cp LICENSE README.md "$out/"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: akb_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: akb_*
+          path: dist/
+
+      - name: Package and checksum
+        run: |
+          cd dist
+          for d in akb_*/; do
+            tar -czf "${d%/}.tar.gz" "${d%/}"
+          done
+          sha256sum akb_*.tar.gz > checksums.txt
+
+      - name: Extract changelog section as release notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          test -s notes.md || { echo "error: no CHANGELOG section for [$version]" >&2; exit 1; }
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          --title "akb $GITHUB_REF_NAME"
+          --notes-file notes.md
+          dist/akb_*.tar.gz dist/checksums.txt

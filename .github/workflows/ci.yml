@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Version lockstep
+        run: scripts/check-version-lockstep.sh
+
+      - name: Unit and integration tests
+        env:
+          CGO_ENABLED: "0"
+        run: go test ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          # Keep in step with the devShell's golangci-lint (flake.nix)
+          version: v2.11
