@@ -42,3 +42,5 @@ release:
     scripts/check-release-preconditions.sh
     scripts/check-version-lockstep.sh
     git tag -a v{{version}} -m "akb v{{version}}"
+    @echo "tag v{{version}} created. Publish with: git push --follow-tags"
+    @echo "(the tag push triggers .github/workflows/release.yml: test, build, GitHub Release)"
