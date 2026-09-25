@@ -57,7 +57,9 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build
+      # Package in this job, not in publish: the artifact round-trip is
+      # zip-based and drops the executable bit, while tar preserves it.
+      - name: Build and package
         run: |
           version="${GITHUB_REF_NAME#v}"
           out="dist/akb_${version}_${GOOS}_${GOARCH}"
@@ -65,11 +67,13 @@ jobs:
           go build -ldflags "-X main.version=${version}" \
             -o "$out/akb" ./cmd/akb/
           cp LICENSE README.md "$out/"
+          tar -czf "dist/akb_${version}_${GOOS}_${GOARCH}.tar.gz" \
+            -C dist "$(basename "$out")"
 
       - uses: actions/upload-artifact@v4
         with:
           name: akb_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: dist/
+          path: dist/*.tar.gz
           if-no-files-found: error
 
   publish:
@@ -82,13 +86,11 @@ jobs:
         with:
           pattern: akb_*
           path: dist/
+          merge-multiple: true
 
-      - name: Package and checksum
+      - name: Checksum
         run: |
           cd dist
-          for d in akb_*/; do
-            tar -czf "${d%/}.tar.gz" "${d%/}"
-          done
           sha256sum akb_*.tar.gz > checksums.txt
 
       - name: Extract changelog section as release notes
