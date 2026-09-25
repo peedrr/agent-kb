@@ -881,7 +881,7 @@ func TestAppendValidationSeesPreAppendOldPage(t *testing.T) {
 	defer appendCleanup(kbRoot)
 
 	const relPath = "kb/notes/old-page-probe.md"
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	if err := os.WriteFile(filepath.Join(templatesDir, "append-old-page-probe.yaml"), []byte(appendOldPageProbeTemplate), 0600); err != nil {
 		t.Fatalf("write probe template: %v", err)
 	}

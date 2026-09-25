@@ -33,14 +33,14 @@ func discoverTestRoot(t *testing.T) string {
 func makeDiscoverKB(t *testing.T, dir, config string) {
 	t.Helper()
 
-	if err := os.MkdirAll(filepath.Join(dir, ".akb"), 0750); err != nil {
-		t.Fatalf("create .akb directory: %v", err)
+	if err := os.MkdirAll(filepath.Join(dir, ".agent-kb"), 0750); err != nil {
+		t.Fatalf("create .agent-kb directory: %v", err)
 	}
 	if config == "" {
 		return
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".akb", ".akb.yaml"), []byte(config), 0600); err != nil {
-		t.Fatalf("write .akb.yaml: %v", err)
+	if err := os.WriteFile(filepath.Join(dir, ".agent-kb", "akb.yaml"), []byte(config), 0600); err != nil {
+		t.Fatalf("write akb.yaml: %v", err)
 	}
 }
 

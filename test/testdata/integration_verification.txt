@@ -9,20 +9,20 @@ cd test-kb
 
 exists kb
 exists raw
-exists .akb
-exists .akb/templates
+exists .agent-kb
+exists .agent-kb/templates
 
 exists kb/index.md
 exists kb/log.md
 exists raw/files.log
 
-exists .akb/.akb.yaml
+exists .agent-kb/akb.yaml
 
 # init seeds no templates: the directory is created empty.
-exec ls -A .akb/templates
+exec ls -A .agent-kb/templates
 stdout ''
-! exists .akb/templates/note.yaml
-! exists .akb/templates/adr.yaml
+! exists .agent-kb/templates/note.yaml
+! exists .agent-kb/templates/adr.yaml
 
 exec akb template list
 stdout 'No templates found'
@@ -31,16 +31,16 @@ stdout 'No templates found'
 stdin ../unknown-note.md
 ! exec akb write notes/first.md
 stderr 'unknown type .note.'
-stderr 'Author .akb/templates/note.yaml'
+stderr 'Author .agent-kb/templates/note.yaml'
 stderr 'akb template list --examples'
 ! exists kb/notes/first.md
 
-exists .akb/search.db
+exists .agent-kb/search.db
 
-exists .akb/.gitignore
+exists .agent-kb/.gitignore
 exists .gitignore
 
-grep 'search\.db' .akb/.gitignore
+grep 'search\.db' .agent-kb/.gitignore
 grep '\.akb\.bak' .gitignore
 
 exec git log --oneline

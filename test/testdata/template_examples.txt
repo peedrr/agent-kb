@@ -48,7 +48,7 @@ stdout 'No templates found'
 stdin ../copy-note.md
 ! exec akb write notes/copied.md
 stderr 'unknown type .note.'
-stderr 'Author .akb/templates/note.yaml'
+stderr 'Author .agent-kb/templates/note.yaml'
 stderr 'kb-management skill'
 stderr 'akb template list --examples'
 ! exists kb/notes/copied.md
@@ -62,9 +62,9 @@ cp stdout note_pass.md
 # Install the copy; the fail mockup proves the rule still catches a bad page.
 exec akb template write note --template note.yaml --pass note_pass.md --fail ../note-fail.md
 stdout 'Template .note. written'
-exists .akb/templates/note.yaml
-exists .akb/templates/note_pass.md
-exists .akb/templates/note_fail.md
+exists .agent-kb/templates/note.yaml
+exists .agent-kb/templates/note_pass.md
+exists .agent-kb/templates/note_fail.md
 
 exec akb template list
 stdout 'note: General knowledge note'

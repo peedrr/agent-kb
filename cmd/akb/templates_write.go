@@ -61,7 +61,7 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := path.TemplatesDir(kbRoot)
 	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
 		return fmt.Errorf("resolve templates directory: %w", err)
 	}
@@ -310,7 +310,7 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	// path that is a symlink is replaced rather than followed and the rename
 	// cannot write through a link. Containment for this command comes from the
 	// path.AssertContained checks above on the templates directory, the target
-	// YAML path, and the mockups read back from .akb/templates. A future
+	// YAML path, and the mockups read back from .agent-kb/templates. A future
 	// refactor that writes finalYAML/finalPass/finalFail in place (os.WriteFile
 	// instead of the temp-file plus rename swap) would follow a symlinked
 	// destination rather than replace it and must re-check containment first.

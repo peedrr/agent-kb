@@ -40,7 +40,7 @@ func typeDirsFromTemplates(templates map[string]template.Template) typeDirsProvi
 // the provider, not before it.
 func typeDirsFromDisk(kbRoot string) typeDirsProvider {
 	return func() ([]string, error) {
-		templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+		templatesDir := path.TemplatesDir(kbRoot)
 		if err := path.AssertContained(kbRoot, templatesDir); err != nil {
 			return nil, fmt.Errorf("resolve templates directory: %w", err)
 		}

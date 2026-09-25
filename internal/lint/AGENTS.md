@@ -49,5 +49,5 @@ ProvenanceDriftThreshold = 0.20   // |frontmatter - inline| ratio
 - `akb lint --json` outputs `LintReport` JSON with `rule_id` field
 - Retired checkers (replaced by CEL): `type_exists`, `frontmatter_schema`, `category_dirs`
 - Removed checkers: `freshness`, `confidence`, `summary_length`
-- `type_orphan` detects pages whose `type` frontmatter has no matching template in `.akb/templates/`; excludes pages without frontmatter or empty type; severity: error
+- `type_orphan` detects pages whose `type` frontmatter has no matching template in `.agent-kb/templates/`; excludes pages without frontmatter or empty type; severity: error
 - `required_fields` detects pages leaving a schema-required frontmatter field unset; presence only, so a set-but-empty value passes and type and enum constraints stay with the template's CEL rules; excludes pages without frontmatter and pages whose type has no template; severity: error

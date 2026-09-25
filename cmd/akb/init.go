@@ -16,6 +16,7 @@ import (
 
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/db"
+	"github.com/peedrr/agent-kb/internal/path"
 	"github.com/peedrr/agent-kb/internal/storage"
 )
 
@@ -39,7 +40,7 @@ func runInit(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	if _, err := os.Stat(filepath.Join(name, ".akb")); err == nil {
+	if _, err := os.Stat(path.StateDir(name)); err == nil {
 		return fmt.Errorf("kb already initialized at %s. Use a different name or remove existing kb", name)
 	}
 
@@ -112,7 +113,7 @@ func createDirectoryStructure(name string) error {
 	dirs := []string{
 		filepath.Join(name, "kb"),
 		filepath.Join(name, "raw"),
-		filepath.Join(name, ".akb", "templates"),
+		path.TemplatesDir(name),
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0750); err != nil {
@@ -141,14 +142,14 @@ func writeAkbConfig(name, created string) error {
 		Name:    name,
 		Created: created,
 	}
-	if err := config.Save(filepath.Join(name, ".akb", ".akb.yaml"), cfg); err != nil {
+	if err := config.Save(path.ConfigPath(name), cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
 	return nil
 }
 
 func initSearchDB(name string) error {
-	dbPath := filepath.Join(name, ".akb", "search.db")
+	dbPath := path.SearchDBPath(name)
 	conn, err := db.InitDB(dbPath)
 	if err != nil {
 		return fmt.Errorf("init database: %w", err)
@@ -167,13 +168,13 @@ func initSearchDB(name string) error {
 }
 
 func writeGitignoreFiles(name string) error {
-	akbGitignore := filepath.Join(name, ".akb", ".gitignore")
+	akbGitignore := filepath.Join(path.StateDir(name), ".gitignore")
 	if err := os.WriteFile(akbGitignore, []byte("search.db*\n"), 0600); err != nil {
-		return fmt.Errorf("write .akb/.gitignore: %w", err)
+		return fmt.Errorf("write .agent-kb/.gitignore: %w", err)
 	}
 
 	rootGitignore := filepath.Join(name, ".gitignore")
-	if err := os.WriteFile(rootGitignore, []byte("*.akb.bak\n.akb/search.db*\n"), 0600); err != nil {
+	if err := os.WriteFile(rootGitignore, []byte("*.akb.bak\n.agent-kb/search.db*\n"), 0600); err != nil {
 		return fmt.Errorf("write .gitignore: %w", err)
 	}
 	return nil

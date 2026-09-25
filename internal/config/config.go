@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-// Package config handles .akb.yaml configuration loading and validation.
+// Package config handles akb.yaml configuration loading and validation.
 package config
 
 import (
@@ -14,7 +14,7 @@ import (
 	yaml "github.com/goccy/go-yaml"
 )
 
-// Config holds the .akb.yaml configuration.
+// Config holds the akb.yaml configuration.
 type Config struct {
 	Name    string `yaml:"name"`
 	Created string `yaml:"created"`
@@ -29,7 +29,7 @@ func Load(path string) (*Config, error) {
 
 	content := string(data)
 	if strings.Contains(content, "<<<<<<<") {
-		return nil, errors.New("resolve merge conflicts in .akb.yaml before proceeding")
+		return nil, errors.New("resolve merge conflicts in akb.yaml before proceeding")
 	}
 
 	var cfg Config
@@ -38,7 +38,7 @@ func Load(path string) (*Config, error) {
 	}
 
 	if cfg.Name == "" {
-		return nil, errors.New("missing required field 'name' in .akb.yaml")
+		return nil, errors.New("missing required field 'name' in akb.yaml")
 	}
 
 	return &cfg, nil

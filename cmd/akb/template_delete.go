@@ -47,9 +47,9 @@ var templateNameRe = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 // operation on name records: the template and its pass and fail mockups.
 func templateCommitPaths(name string) []string {
 	return []string{
-		filepath.Join(".akb", "templates", name+".yaml"),
-		filepath.Join(".akb", "templates", name+"_pass.md"),
-		filepath.Join(".akb", "templates", name+"_fail.md"),
+		filepath.Join(path.StateDirName, "templates", name+".yaml"),
+		filepath.Join(path.StateDirName, "templates", name+"_pass.md"),
+		filepath.Join(path.StateDirName, "templates", name+"_fail.md"),
 	}
 }
 
@@ -65,7 +65,7 @@ func runTemplateDelete(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
-	tmplPath := filepath.Join(kbRoot, ".akb", "templates", name+".yaml")
+	tmplPath := filepath.Join(path.TemplatesDir(kbRoot), name+".yaml")
 	if err := path.AssertContained(kbRoot, tmplPath); err != nil {
 		return fmt.Errorf("resolve template path: %w", err)
 	}

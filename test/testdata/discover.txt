@@ -14,7 +14,7 @@ stdout 'Initialized KB .kb.'
 cd $WORK
 
 # Knowledge bases below skipped directories are not discovered.
-mkdir .git/nested/.akb node_modules/nested/.akb vendor/nested/.akb .hidden/nested/.akb
+mkdir .git/nested/.agent-kb node_modules/nested/.agent-kb vendor/nested/.agent-kb .hidden/nested/.agent-kb
 
 # Discovery starts at the working directory and reports nearest first.
 exec akb discover
@@ -40,8 +40,8 @@ exec akb discover docs
 exec akb --kb project status
 stdout 'Git: clean'
 
-# The name comes from .akb.yaml, and its optional description is reported.
-cp described.yaml project/.akb/.akb.yaml
+# The name comes from akb.yaml, and its optional description is reported.
+cp described.yaml project/.agent-kb/akb.yaml
 exec akb discover
 stdout '^  project  .*/project  project knowledge base$'
 

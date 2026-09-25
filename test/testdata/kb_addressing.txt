@@ -32,13 +32,13 @@ cd $WORK
 exec akb --kb ~/kb-home status
 stdout 'Name: kb-home'
 
-# A selected path that exists but holds no .akb/.akb.yaml marker is an
+# A selected path that exists but holds no .agent-kb/akb.yaml marker is an
 # invocation mistake: the command refuses to run, names the path and the
 # missing marker, and points at `akb discover`.
 mkdir not-a-kb
 exec bash -c 'akb --kb not-a-kb status; echo "akb-exit=$?"'
 stdout 'akb-exit=2$'
-stderr 'usage: resolve knowledge base: not a knowledge base: '${WORK@R}'/not-a-kb has no \.akb/\.akb\.yaml; run `akb discover` to list nearby knowledge bases'
+stderr 'usage: resolve knowledge base: not a knowledge base: '${WORK@R}'/not-a-kb has no \.agent-kb/akb\.yaml; run `akb discover` to list nearby knowledge bases'
 
 # With neither selection, the command reports a usage mistake and lists the
 # nearby bases, nearest first, with the remediation for selecting one.

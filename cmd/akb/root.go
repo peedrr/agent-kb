@@ -7,7 +7,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -101,9 +100,9 @@ func reportKBIdentity(cmd *cobra.Command, _ []string) error {
 }
 
 // kbIdentityLine renders the identity line of a knowledge base: the name from
-// its .akb.yaml and its absolute path.
+// its akb.yaml and its absolute path.
 func kbIdentityLine(kbRoot string) (string, error) {
-	cfg, err := config.Load(filepath.Join(kbRoot, ".akb", ".akb.yaml"))
+	cfg, err := config.Load(path.ConfigPath(kbRoot))
 	if err != nil {
 		return "", fmt.Errorf("load config: %w", err)
 	}

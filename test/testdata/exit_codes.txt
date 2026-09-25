@@ -14,10 +14,10 @@ cd exit-kb
 
 # init seeds no templates: copy the ones this scenario writes pages of.
 exec akb template get note --full --examples
-cp stdout .akb/templates/note.yaml
+cp stdout .agent-kb/templates/note.yaml
 exec akb template get adr --full --examples
-cp stdout .akb/templates/adr.yaml
-exec git add .akb/templates
+cp stdout .agent-kb/templates/adr.yaml
+exec git add .agent-kb/templates
 exec git commit -m 'seed note and adr templates'
 
 stdin ../ok-note.md
@@ -44,7 +44,7 @@ stderr -count=6 '^\['
 
 # === VALIDATION FAILURE: an unevaluable rule, exit 1 with an author-directed report ===
 
-cp ../unguarded-template.yaml .akb/templates/sourced.yaml
+cp ../unguarded-template.yaml .agent-kb/templates/sourced.yaml
 
 exec bash -c 'akb write sourced/unguarded.md <../unguarded-page.md; echo "akb-exit=$?"'
 stdout 'akb-exit=1$'
@@ -112,7 +112,7 @@ stdout 'akb-exit=1$'
 
 # === INTERNAL FAULT: exit 2 with internal: prefix ===
 
-cp ../broken-template.yaml .akb/templates/broken.yaml
+cp ../broken-template.yaml .agent-kb/templates/broken.yaml
 
 exec bash -c 'akb write broken/page.md <../broken-page.md; echo "akb-exit=$?"'
 stdout 'akb-exit=2$'

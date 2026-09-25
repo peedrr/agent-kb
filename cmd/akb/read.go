@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -40,7 +39,7 @@ func runRead(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
-	_, err = config.Load(filepath.Join(kbRoot, ".akb", ".akb.yaml"))
+	_, err = config.Load(path.ConfigPath(kbRoot))
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}

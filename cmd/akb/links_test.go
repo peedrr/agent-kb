@@ -38,7 +38,7 @@ func setupLinksTestKB(t *testing.T) string {
 
 func setupLinkGraphDB(t *testing.T, kbRoot string) *sql.DB {
 	t.Helper()
-	akbDir := filepath.Join(kbRoot, ".akb")
+	akbDir := filepath.Join(kbRoot, ".agent-kb")
 	dbPath := filepath.Join(akbDir, "search.db")
 	d, err := db.InitDB(dbPath)
 	if err != nil {
@@ -54,7 +54,7 @@ func setupLinkGraphDB(t *testing.T, kbRoot string) *sql.DB {
 func corruptSearchDB(t *testing.T, kbRoot string) {
 	t.Helper()
 	garbage := bytes.Repeat([]byte("not a sqlite database;"), 64)
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "search.db"), garbage, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "search.db"), garbage, 0600); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -382,7 +382,7 @@ func TestBacklinks_NonexistentPage(t *testing.T) {
 
 func TestLinksShow_MissingDB(t *testing.T) {
 	kbRoot := setupLinksTestKB(t)
-	_ = os.Remove(filepath.Join(kbRoot, ".akb", "search.db")) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
+	_ = os.Remove(filepath.Join(kbRoot, ".agent-kb", "search.db")) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	err := runLinksShow(nil, []string{"some.md"})
 	if err == nil {
@@ -395,7 +395,7 @@ func TestLinksShow_MissingDB(t *testing.T) {
 
 func TestBacklinks_MissingDB(t *testing.T) {
 	kbRoot := setupLinksTestKB(t)
-	_ = os.Remove(filepath.Join(kbRoot, ".akb", "search.db")) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
+	_ = os.Remove(filepath.Join(kbRoot, ".agent-kb", "search.db")) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	err := runBacklinks(nil, []string{"some.md"})
 	if err == nil {
@@ -408,7 +408,7 @@ func TestBacklinks_MissingDB(t *testing.T) {
 
 func TestOrphans_MissingDB(t *testing.T) {
 	kbRoot := setupLinksTestKB(t)
-	_ = os.Remove(filepath.Join(kbRoot, ".akb", "search.db")) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
+	_ = os.Remove(filepath.Join(kbRoot, ".agent-kb", "search.db")) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
 
 	err := runOrphans(nil, nil)
 	if err == nil {

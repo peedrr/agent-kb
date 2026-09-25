@@ -102,7 +102,7 @@ func runApprove(_ *cobra.Command, args []string) error {
 // approveTemplates reads the templates of the base the way `akb write` reads
 // them, so the approval gate answers to the same schema the write path enforces.
 func approveTemplates(kbRoot string) (map[string]template.Template, error) {
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := path.TemplatesDir(kbRoot)
 	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
 		return nil, fmt.Errorf("resolve templates directory: %w", err)
 	}

@@ -394,7 +394,7 @@ evidence.
 
 **What happens.** `akb approve` loads the base's templates fail-closed (`approveTemplates` →
 `template.LoadTemplates`) before it approves anything, so a single corrupt or unparseable YAML
-file in `.akb/templates/` makes every approve fail — including approvals of a page whose type
+file in `.agent-kb/templates/` makes every approve fail — including approvals of a page whose type
 is unrelated to the broken template — with the load error naming the offending file. The write
 path loads templates with the same fail-closed behavior.
 

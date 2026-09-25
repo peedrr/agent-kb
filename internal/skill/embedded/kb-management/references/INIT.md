@@ -20,7 +20,7 @@
 3. (Optional) Create an overview page — copy the `note` showcase first, because
    a fresh KB has no templates and refuses writes of unknown types:
    ```bash
-   akb template get note --full --examples > <kb-name>/.akb/templates/note.yaml
+   akb template get note --full --examples > <kb-name>/.agent-kb/templates/note.yaml
    akb --kb <kb-name> write overview.md <<'EOF'
    ---
    title: Overview
@@ -45,7 +45,7 @@
 
 ## Notes
 
-- `akb init` sets up everything but the page types — structure, an **empty** template directory, search index, and version control. No template is seeded, so every typed page write is refused with `unknown type` until a template exists for that type. Copy a showcase (`akb template get note --full --examples > .akb/templates/note.yaml`) or author one; see `TEMPLATE.md`.
+- `akb init` sets up everything but the page types — structure, an **empty** template directory, search index, and version control. No template is seeded, so every typed page write is refused with `unknown type` until a template exists for that type. Copy a showcase (`akb template get note --full --examples > .agent-kb/templates/note.yaml`) or author one; see `TEMPLATE.md`.
 - Run `akb init` from the directory where you want the KB to live.
 - After `akb init` (which does not select a base), address the KB on every
   invocation with `--kb <path>` or `AKB_KB=<path>`; a relative path resolves

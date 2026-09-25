@@ -6,8 +6,8 @@ cd test-kb
 
 # init seeds no templates: copy the ones this scenario writes pages of.
 exec akb template get note --full --examples
-cp stdout .akb/templates/note.yaml
-exec git add .akb/templates
+cp stdout .agent-kb/templates/note.yaml
+exec git add .agent-kb/templates
 exec git commit -m 'seed note template'
 
 # --- raw/ prefix on write ---
@@ -83,7 +83,7 @@ stderr 'page not found'
 # the harness reports it.
 [symlink] mkdir -p kb/notes
 [symlink] cp ../template-page.md kb/notes/template-page.md
-[symlink] symlink .akb/templates/evil.yaml -> ../../../outside-template.yaml
+[symlink] symlink .agent-kb/templates/evil.yaml -> ../../../outside-template.yaml
 
 # append resolved through the type directories, which are read from disk
 [symlink] stdin ../append-input.md

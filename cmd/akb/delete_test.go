@@ -292,7 +292,7 @@ func setupTestKBWithGit(t *testing.T, kbRoot string) {
 	dirs := []string{
 		filepath.Join(kbRoot, "kb"),
 		filepath.Join(kbRoot, "raw"),
-		filepath.Join(kbRoot, ".akb"),
+		filepath.Join(kbRoot, ".agent-kb"),
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0750); err != nil {
@@ -303,7 +303,7 @@ func setupTestKBWithGit(t *testing.T, kbRoot string) {
 	configContent := `name: test-kb
 created: "2024-01-01T00:00:00Z"
 `
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", ".akb.yaml"), []byte(configContent), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "akb.yaml"), []byte(configContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 

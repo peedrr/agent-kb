@@ -8,9 +8,10 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"path/filepath"
 
 	_ "modernc.org/sqlite" // SQLite driver
+
+	"github.com/peedrr/agent-kb/internal/path"
 )
 
 // sqliteDSN builds the DSN used for every SQLite connection of a knowledge
@@ -128,7 +129,7 @@ func CreateSchema(db *sql.DB) error {
 
 // OpenKB opens the search database for a knowledge base.
 func OpenKB(kbRoot string) (*sql.DB, error) {
-	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
+	dbPath := path.SearchDBPath(kbRoot)
 	db, err := sql.Open("sqlite", sqliteDSN(dbPath))
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)

@@ -1,6 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Status:** v0.19.1 — error-reporting fixes across the git staging path, CEL budget diagnosis, mockup revalidation, and template-load failures (behavior recorded in `CHANGELOG.md`; the version lives in `VERSION`, is derived into `flake.nix` and the `justfile`, and the human-facing copies — this line, the CHANGELOG section, the git tag — are checked by `scripts/check-version-lockstep.sh`)
+**Status:** v0.20.0 — BREAKING: the KB state directory is renamed `.akb/` → `.agent-kb/` and its config is now `akb.yaml` (no leading dot), with the layout centralized behind `internal/path` helpers; no compatibility shim (behavior recorded in `CHANGELOG.md`; the version lives in `VERSION`, is derived into `flake.nix` and the `justfile`, and the human-facing copies — this line, the CHANGELOG section, the git tag — are checked by `scripts/check-version-lockstep.sh`)
 
 ## OVERVIEW
 
@@ -13,7 +13,7 @@ agent-kb/
 ├── cmd/akb/        # CLI commands (Cobra, 25+ commands)
 ├── internal/       # Core packages
 │   ├── cel/        # CEL expression engine (validation + lint)
-│   ├── config/     # .akb.yaml handling
+│   ├── config/     # akb.yaml handling
 │   ├── db/         # SQLite schema + WAL mode
 │   ├── frontmatter/# YAML frontmatter parsing (goldmark + goccy/go-yaml)
 │   ├── index/      # kb/index.md management
@@ -38,7 +38,7 @@ agent-kb/
 | Task | Location | Notes |
 |------|----------|-------|
 | Add command | `cmd/akb/` | New subcommand = new file |
-| KB path logic | `internal/path/path.go` | `ResolveKB()` selects the invocation's base; `KBRoot()` walks up to the nearest `.akb/` root, the check that marks a directory as a knowledge base |
+| KB path logic | `internal/path/path.go` | `ResolveKB()` selects the invocation's base; `KBRoot()` walks up to the nearest `.agent-kb/` root, the check that marks a directory as a knowledge base |
 | Page write flow | `cmd/akb/write.go` | stdin → frontmatter → CEL validation → git → search → links |
 | Index management | `internal/index/index.go` | kb/index.md parsing/rendering |
 | Search | `internal/search/sqlite.go` | SQLite FTS5 with BM25 ranking |
@@ -53,7 +53,7 @@ agent-kb/
 | Template delete | `cmd/akb/template_delete.go` | Impact analysis (page count), `--force`, path traversal prevention |
 | Git integration | `internal/storage/git.go` | Auto-commit, merge conflict detection |
 | DB schema | `internal/db/db.go` | documents, pages, links tables + FTS5 |
-| Config format | `internal/config/config.go` | YAML .akb.yaml |
+| Config format | `internal/config/config.go` | YAML akb.yaml |
 | Lint engine | `internal/lint/engine.go` | LintEngine, LintChecker interface |
 | Lint checks | `internal/lint/*.go` | 10 checkers (broken_links, orphans, empty_pages, missing_frontmatter, required_fields, index_consistency, citations, provenance, cel_lint, type_orphan) |
 | CEL lint checker | `internal/lint/cel.go` | Evaluates template `lint_rules` with `now` injection |
@@ -104,20 +104,23 @@ agent-kb/
 | Entry | struct | internal/manifest/manifest.go:17 | Filename, SHA256, LastUpdated |
 | Manager | struct | internal/manifest/manifest.go:24 | Read/Write/Add/Remove/Update entries |
 | Skill | struct | internal/skill/skill.go:17 | Name, Files map |
-| Config | struct | internal/config/config.go:14 | .akb.yaml |
+| Config | struct | internal/config/config.go:14 | akb.yaml |
+| StateDirName | const | internal/path/path.go:29 | KB state dir name (`.agent-kb`) |
+| ConfigFileName | const | internal/path/path.go:34 | KB config file name (`akb.yaml`) |
+| StateDir/ConfigPath/TemplatesDir/SearchDBPath | funcs | internal/path/path.go | Layout constructors — the only definition site for on-disk state paths |
 
 ## CONVENTIONS (THIS PROJECT)
 
-- **KB root**: Selected per invocation by the `--kb <path>` flag, falling back to the `AKB_KB` environment variable; with neither, commands fail with a usage error that lists the bases discovered nearby. The resolved path must hold the `.akb/.akb.yaml` config file that marks a base — a regular file, not a directory; without it the command fails with a usage error (exit 2) naming the missing marker and pointing at `akb discover`. No registry and no stored default (`akb use`/`akb registry` are removed; `akb discover` only reports). A relative path resolves against the working directory and `~` expands to the home directory (`internal/path.ResolveKB()`).
+- **KB root**: Selected per invocation by the `--kb <path>` flag, falling back to the `AKB_KB` environment variable; with neither, commands fail with a usage error that lists the bases discovered nearby. The resolved path must hold the `.agent-kb/akb.yaml` config file that marks a base — a regular file, not a directory; without it the command fails with a usage error (exit 2) naming the missing marker and pointing at `akb discover`. No registry and no stored default (`akb use`/`akb registry` are removed; `akb discover` only reports). A relative path resolves against the working directory and `~` expands to the home directory (`internal/path.ResolveKB()`).
 - **Paths**: Always relative to KB root; `kb/` prefix stripped
 - **Managed files**: `index.md`, `log.md` cannot be written directly
 - **Raw access**: `raw/` prefix → separate storage; use `akb raw` commands
 - **Commits**: Git commits auto-created with `akb: write/delete <path>` messages
 - **Merge conflicts**: Blocked; must resolve before any write/delete
 - **Git identity**: A commit is authored by the repository's configured `user.name`; a repository without one gets the per-invocation fallback `-c user.name=akb -c user.email=akb@local`. Repository config is never written, except by `akb init` (`ensureGitConfig`)
-- **DB path**: `.akb/search.db` with WAL mode, single connection
+- **DB path**: `.agent-kb/search.db` with WAL mode, single connection
 - **is_draft**: Auto-managed frontmatter field; new pages are implicit drafts; `akb approve` sets `is_draft: false`
-- **Type enforcement**: All pages MUST declare `type` in frontmatter matching a template in `.akb/templates/`. `akb write` and `akb append` also refuse a page that leaves out a field the template marks `required: true` (exit 1, every missing field listed) before the CEL rules run; `akb template write` requires its PASS mockup to carry every required field
+- **Type enforcement**: All pages MUST declare `type` in frontmatter matching a template in `.agent-kb/templates/`. `akb write` and `akb append` also refuse a page that leaves out a field the template marks `required: true` (exit 1, every missing field listed) before the CEL rules run; `akb template write` requires its PASS mockup to carry every required field
 - **Build output**: Always `-o bin/akb` (never project root)
 - **Template format**: TemplateV2 uses `schema.frontmatter`, `validations[]`, `lint_rules[]` (old `required[]`/`optional[]`/`body` rejected)
 - **CEL variables**: `page` (map), `old_page` (nullable map), `now` (timestamp) injected at evaluation time
@@ -165,7 +168,7 @@ nix develop                     # Dev shell (Go, gopls, delve, golangci-lint, ju
 - Integration tests use testscript framework (`.txt` files in testdata/)
 - 10 lint checks: 7 structural + 1 template-driven (cel_lint) + 2 semantic (provenance, citations)
 - Provenance drift threshold: 0.20 (still checked by provenance.go)
-- Lint thresholds are hardcoded constants (not configurable via `.akb.yaml` in v1)
+- Lint thresholds are hardcoded constants (not configurable via `akb.yaml` in v1)
 - CEL engine: programs cached in sync.Map, cost limit 100000, panics recovered as "exceeded compute budget"
 - `akb template get <name>` returns Writer View (schema + requirements only)
 - `akb template get <name> --example` returns `_pass.md` content (validates against current CEL rules; warns on stderr if stale, still displays mockup)

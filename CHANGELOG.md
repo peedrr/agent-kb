@@ -2,6 +2,27 @@
 
 Behavior changes and fixes worth acting on. Versions before 0.18.0 predate this file.
 
+## [0.20.0] — 2026-09-25
+
+### Changed
+
+- **BREAKING: the knowledge-base state directory is renamed `.akb/` → `.agent-kb/`,
+  and its config file loses the redundant leading dot: `.akb.yaml` → `akb.yaml`.**
+  The directory now carries the project's name; the tool-facing files inside it
+  keep the tool's. `akb init` creates the new layout, and every command —
+  discovery, path resolution, read/write, lint, templates, search — recognizes
+  only it. There is no compatibility shim: a base in the old layout is reported
+  as not a knowledge base, with the expected marker path named. Migrate an
+  existing base by renaming the directory and config file (`mv .akb .agent-kb &&
+  mv .agent-kb/.akb.yaml .agent-kb/akb.yaml`) and updating the `.akb/search.db*`
+  line in the base's `.gitignore`. Tool-named surfaces are unchanged: the
+  `AKB_KB` environment variable, the `*.akb.bak` backup extension, and the
+  `page.akb` CEL map key.
+- **The on-disk layout now has one definition site.** `internal/path` exports
+  `StateDirName`, `ConfigFileName`, and the `StateDir`/`ConfigPath`/
+  `TemplatesDir`/`SearchDBPath` helpers, replacing the `".akb"` string literals
+  scattered across the command and internal packages.
+
 ## [0.19.1] — 2026-09-25
 
 ### Fixed

@@ -143,7 +143,7 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 	content, err := os.ReadFile(fullPath) //nolint:gosec // path validated by ResolveKBPath
 	if err != nil {
 		// Direct path not found — try template-aware resolution
-		templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+		templatesDir := path.TemplatesDir(kbRoot)
 		if err := path.AssertContained(kbRoot, templatesDir); err != nil {
 			return fmt.Errorf("resolve templates directory: %w", err)
 		}
@@ -342,7 +342,7 @@ func runIndexRebuild(_ *cobra.Command, _ []string) error {
 
 // openOrCreateSearchDB opens the search database, creating it if it doesn't exist.
 func openOrCreateSearchDB(kbRoot string) (*sql.DB, error) {
-	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
+	dbPath := path.SearchDBPath(kbRoot)
 
 	// Try to open existing database
 	sqlDB, err := db.OpenKB(kbRoot)
@@ -355,10 +355,10 @@ func openOrCreateSearchDB(kbRoot string) (*sql.DB, error) {
 		return nil, fmt.Errorf("open search database: %w", err)
 	}
 
-	// Create the .akb directory if it doesn't exist
+	// Create the .agent-kb directory if it doesn't exist
 	akbDir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(akbDir, 0750); err != nil {
-		return nil, fmt.Errorf("create .akb directory: %w", err)
+		return nil, fmt.Errorf("create .agent-kb directory: %w", err)
 	}
 
 	// Initialize and create schema for new database
@@ -386,7 +386,7 @@ func isSearchDBMissing(kbRoot string, err error) bool {
 	if err == nil {
 		return false
 	}
-	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
+	dbPath := path.SearchDBPath(kbRoot)
 	if _, statErr := os.Stat(dbPath); os.IsNotExist(statErr) {
 		return true
 	}

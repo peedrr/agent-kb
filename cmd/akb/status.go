@@ -33,7 +33,7 @@ func runStatus(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
-	cfg, err := config.Load(filepath.Join(kbRoot, ".akb", ".akb.yaml"))
+	cfg, err := config.Load(path.ConfigPath(kbRoot))
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}

@@ -14,7 +14,7 @@ Templates are **contracts**, not documentation. They define what "valid" means f
 
 **Templates are the backbone of the KB.** Every page declares a `type` in its frontmatter. That type MUST map to an existing template. Without that mapping, `akb lint` reports `[type_orphan] error` and the page has no guardrails. Type-orphans are a real failure mode — frontmatter fields go missing, required sections vanish, the KB decays.
 
-**Templates must be readable to write at all.** `akb write` and `akb append` resolve the page's `type` against `.akb/templates/` on every invocation. A KB whose templates are missing or empty refuses the write (exit 1, `unknown type …`) even when the page is addressed by its path and already exists — there is no template-free append path.
+**Templates must be readable to write at all.** `akb write` and `akb append` resolve the page's `type` against `.agent-kb/templates/` on every invocation. A KB whose templates are missing or empty refuses the write (exit 1, `unknown type …`) even when the page is addressed by its path and already exists — there is no template-free append path.
 
 ## Template Lifecycle
 

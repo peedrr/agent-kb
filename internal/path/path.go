@@ -22,6 +22,40 @@ import (
 // the --kb flag is not given.
 const KBEnvVar = "AKB_KB"
 
+// StateDirName names the state directory at the root of every knowledge base:
+// it holds the base's config, search index, and page templates. The directory
+// carries the project's name; the tool-facing files inside it carry the
+// tool's.
+const StateDirName = ".agent-kb"
+
+// ConfigFileName names the akb configuration file inside the state directory.
+// A regular file at StateDirName/ConfigFileName is the marker that makes a
+// directory a knowledge base: discovery lists by it and ResolveKB requires it.
+const ConfigFileName = "akb.yaml"
+
+// StateDir returns the state directory of the knowledge base rooted at
+// kbRoot.
+func StateDir(kbRoot string) string {
+	return filepath.Join(kbRoot, StateDirName)
+}
+
+// ConfigPath returns the config file of the knowledge base rooted at kbRoot.
+func ConfigPath(kbRoot string) string {
+	return filepath.Join(kbRoot, StateDirName, ConfigFileName)
+}
+
+// TemplatesDir returns the page-template directory of the knowledge base
+// rooted at kbRoot.
+func TemplatesDir(kbRoot string) string {
+	return filepath.Join(kbRoot, StateDirName, "templates")
+}
+
+// SearchDBPath returns the search index database of the knowledge base rooted
+// at kbRoot.
+func SearchDBPath(kbRoot string) string {
+	return filepath.Join(kbRoot, StateDirName, "search.db")
+}
+
 // Common error messages
 var (
 	ErrEmptyPath      = errors.New("path must not be empty")
@@ -264,7 +298,7 @@ func contained(root, target string) bool {
 // invocation: the --kb flag when given, otherwise the AKB_KB environment
 // variable. A leading ~ is expanded to the home directory and a relative path
 // is resolved against the working directory. The resolved path must hold the
-// .akb/.akb.yaml config file that marks a knowledge base; a path without it is
+// .agent-kb/akb.yaml config file that marks a knowledge base; a path without it is
 // an invocation mistake, reported as a usage error. With neither selection
 // set, the command has no base to act on and ResolveKB reports a usage error.
 func ResolveKB(flagKB string) (string, error) {
@@ -293,23 +327,23 @@ func ResolveKB(flagKB string) (string, error) {
 }
 
 // requireKBConfig reports the usage error for a resolved path that is not a
-// knowledge base: the .akb/.akb.yaml config file that marks a base is missing
+// knowledge base: the .agent-kb/akb.yaml config file that marks a base is missing
 // there, or is not a regular file. The error names the path and the missing
 // marker, and points at `akb discover` for listing nearby bases.
 func requireKBConfig(absPath string) error {
 	if hasKBConfig(absPath) {
 		return nil
 	}
-	return &GuardError{rule: fmt.Errorf("%w: %s has no %s; run `akb discover` to list nearby knowledge bases", ErrNotAKB, absPath, filepath.Join(".akb", ".akb.yaml"))}
+	return &GuardError{rule: fmt.Errorf("%w: %s has no %s; run `akb discover` to list nearby knowledge bases", ErrNotAKB, absPath, filepath.Join(StateDirName, ConfigFileName))}
 }
 
-// hasKBConfig reports whether dir holds the .akb/.akb.yaml config file that
+// hasKBConfig reports whether dir holds the .agent-kb/akb.yaml config file that
 // makes it selectable as a knowledge base. The marker must be a regular file;
 // a directory or any other entry with that name does not count. Discovery
 // lists bases and ResolveKB selects them through this one predicate, so the
 // listing cannot offer a base the resolver rejects.
 func hasKBConfig(dir string) bool {
-	info, err := os.Stat(filepath.Join(dir, ".akb", ".akb.yaml")) //nolint:gosec // dir is a user-selected base or a scan candidate; the check only stats its marker
+	info, err := os.Stat(ConfigPath(dir)) //nolint:gosec // dir is a user-selected base or a scan candidate; the check only stats its marker
 	return err == nil && info.Mode().IsRegular()
 }
 
@@ -330,11 +364,11 @@ func expandHome(p string) (string, error) {
 }
 
 // KBRoot reports the root of the knowledge base that dir belongs to: dir
-// itself when it holds a .akb directory, otherwise the nearest ancestor that
+// itself when it holds a .agent-kb directory, otherwise the nearest ancestor that
 // does. It reports an error when no directory from dir up to the filesystem
 // root holds one. A directory is a knowledge base root exactly when KBRoot
 // reports the directory itself, which is how a discovery scan detects the
-// .akb/ marker.
+// .agent-kb/ marker.
 func KBRoot(dir string) (string, error) {
 	dir = filepath.Clean(dir)
 
@@ -353,17 +387,17 @@ func KBRoot(dir string) (string, error) {
 		dir = parent
 	}
 
-	return "", errors.New("not in a knowledge base directory (no .akb/ found)")
+	return "", errors.New("not in a knowledge base directory (no .agent-kb/ found)")
 }
 
-// isKBRoot reports whether dir itself holds the .akb directory that marks a
+// isKBRoot reports whether dir itself holds the .agent-kb directory that marks a
 // knowledge base root.
 func isKBRoot(dir string) bool {
-	info, err := os.Stat(filepath.Join(dir, ".akb"))
+	info, err := os.Stat(StateDir(dir))
 	return err == nil && info.IsDir()
 }
 
-// Discovery bounds: the scan checks every directory it visits for the .akb/
+// Discovery bounds: the scan checks every directory it visits for the .agent-kb/
 // marker, descends to discoverDepth levels below each visited directory, and
 // stops after discoverBudget filesystem entries, so a deep or crowded tree
 // cannot make an invocation crawl.
@@ -399,7 +433,7 @@ type DiscoveredKB struct {
 // Entries come nearest-first, by their distance in path components from root
 // and then by path, so the base a caller stands in is reported before the ones
 // further out. Only directories a caller can select are reported: a directory
-// with a bare .akb/ marker but no .akb/.akb.yaml config is left out, because
+// with a bare .agent-kb/ marker but no .agent-kb/akb.yaml config is left out, because
 // selecting it would be rejected. Discovery is read-only and never selects a
 // base: callers address what it finds with --kb or AKB_KB.
 func Discover(root string) []DiscoveredKB {
@@ -428,7 +462,7 @@ func Discover(root string) []DiscoveredKB {
 	for dir, distance := range candidates {
 		// A directory is a knowledge base root when it is its own KBRoot: a
 		// directory that merely lives inside a base is not reported. A root
-		// without the .akb/.akb.yaml marker is not selectable, so it stays out
+		// without the .agent-kb/akb.yaml marker is not selectable, so it stays out
 		// of the listing too.
 		kbRoot, err := KBRoot(dir)
 		if err != nil || kbRoot != dir {
@@ -546,7 +580,7 @@ func pathDistance(from, to string) int {
 	return len(strings.Split(rel, string(filepath.Separator)))
 }
 
-// kbMetadata is the part of a knowledge base's .akb.yaml that discovery
+// kbMetadata is the part of a knowledge base's akb.yaml that discovery
 // reports.
 type kbMetadata struct {
 	Name        string `yaml:"name"`
@@ -558,7 +592,7 @@ type kbMetadata struct {
 // without a name is still reported, under its directory name: discovery
 // informs, so a torn config must not hide the base.
 func readKBMetadata(root string) (name, description string) {
-	data, err := os.ReadFile(filepath.Join(root, ".akb", ".akb.yaml")) //nolint:gosec // KB root supplied by the scan
+	data, err := os.ReadFile(ConfigPath(root)) //nolint:gosec // KB root supplied by the scan
 	if err == nil {
 		var metadata kbMetadata
 		if err := yaml.Unmarshal(data, &metadata); err == nil {

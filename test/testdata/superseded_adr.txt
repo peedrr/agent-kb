@@ -24,8 +24,8 @@ cd sa-kb
 # init seeds no templates: copy the adr template for the pages this scenario
 # writes.
 exec akb template get adr --full --examples
-cp stdout .akb/templates/adr.yaml
-exec git add .akb/templates
+cp stdout .agent-kb/templates/adr.yaml
+exec git add .agent-kb/templates
 exec git commit -m 'seed adr template'
 
 # The record the superseded page names.

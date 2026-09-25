@@ -38,7 +38,7 @@ func setupSearchTestKB(t *testing.T) string {
 
 func setupSearchDB(t *testing.T, kbRoot string) *sql.DB {
 	t.Helper()
-	akbDir := filepath.Join(kbRoot, ".akb")
+	akbDir := filepath.Join(kbRoot, ".agent-kb")
 	dbPath := filepath.Join(akbDir, "search.db")
 
 	sqlDB, err := db.InitDB(dbPath)
@@ -220,7 +220,7 @@ func TestSearch_JSONOutput(t *testing.T) {
 func TestSearch_MissingDB(t *testing.T) {
 	kbRoot := t.TempDir()
 	kbDir := filepath.Join(kbRoot, "kb")
-	akbDir := filepath.Join(kbRoot, ".akb")
+	akbDir := filepath.Join(kbRoot, ".agent-kb")
 	if err := os.MkdirAll(kbDir, 0750); err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +228,7 @@ func TestSearch_MissingDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	configContent := "name: test-kb\ncreated: \"2024-01-01T00:00:00Z\"\n"
-	if err := os.WriteFile(filepath.Join(akbDir, ".akb.yaml"), []byte(configContent), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(akbDir, "akb.yaml"), []byte(configContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(kbDir, "index.md"), []byte("# Index\n\n"), 0600); err != nil {

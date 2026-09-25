@@ -25,7 +25,7 @@ akb init my-kb                                  # directory, git repo, search in
 akb --kb my-kb status
 
 # init seeds no templates: install the note type before the first write
-akb template get note --full --examples > my-kb/.akb/templates/note.yaml
+akb template get note --full --examples > my-kb/.agent-kb/templates/note.yaml
 
 akb --kb my-kb write notes/overview.md <<'EOF'
 ---
@@ -56,7 +56,7 @@ drafts; `akb approve` publishes them.
 3. Neither — the command fails with a usage error (exit 2) that lists the bases
    discovered near the working directory, nearest first.
 
-The resolved path must hold the `.akb/.akb.yaml` config file that marks a
+The resolved path must hold the `.agent-kb/akb.yaml` config file that marks a
 knowledge base — a regular file, not a directory. A path without it is a usage
 error (exit 2) whose report names the missing marker and points at
 `akb discover` for the bases nearby.
@@ -122,7 +122,7 @@ rm -rf notes/.git incidents/.git
 git add -A -- notes incidents && git commit -m "add knowledge bases"
 ```
 
-Each base keeps its own `.akb/` (config, templates, search index) and page
+Each base keeps its own `.agent-kb/` (config, templates, search index) and page
 tree, so command-level isolation is unchanged — one invocation addresses
 exactly one base:
 

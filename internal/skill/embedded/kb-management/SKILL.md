@@ -61,7 +61,7 @@ If the request matches multiple triggers, prefer the one higher in the table.
 3. Neither — the command fails with a usage error (exit 2) that lists the
    knowledge bases found near the working directory, nearest first.
 
-The selected path must hold the `.akb/.akb.yaml` config file that marks a base
+The selected path must hold the `.agent-kb/akb.yaml` config file that marks a base
 — a regular file, not a directory. A path without it fails with a usage error
 (exit 2) that names the missing marker and points at `akb discover`.
 

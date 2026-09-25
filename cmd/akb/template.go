@@ -77,7 +77,7 @@ func resolveTemplateSource() (map[string]template.Template, func(string) ([]byte
 		return nil, nil, fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := path.TemplatesDir(kbRoot)
 	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
 		return nil, nil, fmt.Errorf("resolve templates directory: %w", err)
 	}

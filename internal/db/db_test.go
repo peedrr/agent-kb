@@ -73,11 +73,11 @@ const (
 // seedSearchDB creates the search database with its full schema in kbRoot.
 func seedSearchDB(t *testing.T, kbRoot string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Join(kbRoot, ".akb"), 0750); err != nil {
-		t.Fatalf("create .akb dir: %v", err)
+	if err := os.MkdirAll(filepath.Join(kbRoot, ".agent-kb"), 0750); err != nil {
+		t.Fatalf("create .agent-kb dir: %v", err)
 	}
 
-	db, err := InitDB(filepath.Join(kbRoot, ".akb", "search.db"))
+	db, err := InitDB(filepath.Join(kbRoot, ".agent-kb", "search.db"))
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
@@ -277,9 +277,9 @@ func TestVerifySchema(t *testing.T) {
 func TestOpenKB(t *testing.T) {
 	t.Run("opens database with valid schema", func(t *testing.T) {
 		dir := t.TempDir()
-		akbDir := filepath.Join(dir, ".akb")
+		akbDir := filepath.Join(dir, ".agent-kb")
 		if err := os.MkdirAll(akbDir, 0750); err != nil {
-			t.Fatalf("create .akb dir: %v", err)
+			t.Fatalf("create .agent-kb dir: %v", err)
 		}
 		dbPath := filepath.Join(akbDir, "search.db")
 

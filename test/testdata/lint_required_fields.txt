@@ -9,8 +9,8 @@ cd required-fields-kb
 
 # init seeds no templates: copy the one this scenario writes pages of.
 exec akb template get adr --full --examples
-cp stdout .akb/templates/adr.yaml
-exec git add .akb/templates
+cp stdout .agent-kb/templates/adr.yaml
+exec git add .agent-kb/templates
 exec git commit -m 'seed adr template'
 
 # An ADR leaving out the schema-required status and deciders fields. akb write
@@ -44,8 +44,8 @@ cd other-checks-own-the-schema-kb
 
 # init seeds no templates: copy the one this scenario writes pages of.
 exec akb template get note --full --examples
-cp stdout .akb/templates/note.yaml
-exec git add .akb/templates
+cp stdout .agent-kb/templates/note.yaml
+exec git add .agent-kb/templates
 exec git commit -m 'seed note template'
 
 # A page whose type has no template and a page without frontmatter declare no

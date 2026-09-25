@@ -12,7 +12,7 @@ import (
 func TestLoad(t *testing.T) {
 	t.Run("loads valid config", func(t *testing.T) {
 		content := "name: test-agent\ncreated: \"2024-01-15T10:30:00Z\"\n"
-		f, err := os.CreateTemp("", "*.akb.yaml")
+		f, err := os.CreateTemp("", "*akb.yaml")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -45,7 +45,7 @@ name: other-agent
 name: test-agent
 >>>>>>> branch
 `
-		f, err := os.CreateTemp("", "*.akb.yaml")
+		f, err := os.CreateTemp("", "*akb.yaml")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -61,14 +61,14 @@ name: test-agent
 		if err == nil {
 			t.Fatal("Expected error for merge conflict")
 		}
-		if err.Error() != "resolve merge conflicts in .akb.yaml before proceeding" {
-			t.Errorf("Error = %q, want %q", err.Error(), "resolve merge conflicts in .akb.yaml before proceeding")
+		if err.Error() != "resolve merge conflicts in akb.yaml before proceeding" {
+			t.Errorf("Error = %q, want %q", err.Error(), "resolve merge conflicts in akb.yaml before proceeding")
 		}
 	})
 
 	t.Run("rejects missing name", func(t *testing.T) {
 		content := "created: \"2024-01-15T10:30:00Z\"\n"
-		f, err := os.CreateTemp("", "*.akb.yaml")
+		f, err := os.CreateTemp("", "*akb.yaml")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -84,14 +84,14 @@ name: test-agent
 		if err == nil {
 			t.Fatal("Expected error for missing name")
 		}
-		if err.Error() != "missing required field 'name' in .akb.yaml" {
-			t.Errorf("Error = %q, want %q", err.Error(), "missing required field 'name' in .akb.yaml")
+		if err.Error() != "missing required field 'name' in akb.yaml" {
+			t.Errorf("Error = %q, want %q", err.Error(), "missing required field 'name' in akb.yaml")
 		}
 	})
 
 	t.Run("ignores unknown fields", func(t *testing.T) {
 		content := "name: test-agent\ncreated: \"2024-01-15T10:30:00Z\"\nunknown: value\n"
-		f, err := os.CreateTemp("", "*.akb.yaml")
+		f, err := os.CreateTemp("", "*akb.yaml")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -113,7 +113,7 @@ name: test-agent
 	})
 
 	t.Run("returns error for missing file", func(t *testing.T) {
-		_, err := Load("/nonexistent/path/.akb.yaml")
+		_, err := Load("/nonexistent/path/akb.yaml")
 		if err == nil {
 			t.Fatal("Expected error for missing file")
 		}
@@ -122,7 +122,7 @@ name: test-agent
 
 func TestSave(t *testing.T) {
 	t.Run("saves config to file", func(t *testing.T) {
-		f, err := os.CreateTemp("", "*.akb.yaml")
+		f, err := os.CreateTemp("", "*akb.yaml")
 		if err != nil {
 			t.Fatal(err)
 		}

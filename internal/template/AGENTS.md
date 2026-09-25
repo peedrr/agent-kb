@@ -64,7 +64,7 @@ lint_rules:
 
 - Old format detection: rejects YAML with `required`, `optional`, or `body` keys
 - `//go:embed embedded/*` includes `.yaml` and `.md` mockup files
-- Templates loaded from `.akb/templates/` per KB
+- Templates loaded from `.agent-kb/templates/` per KB
 - `get --example` validates mockup against current CEL rules at read-time; warns on stderr if stale rules found (still displays mockup, exit 0)
 - `template write --force` bypasses existence warning only; stale mockups rejected with full content in error
 - On overwrite, `template write` reuses existing `_pass.md`/`_fail.md` if `--pass`/`--fail` flags omitted

@@ -7,8 +7,8 @@
 exec akb init old-fmt-kb
 cd old-fmt-kb
 
-# Place old-format template in .akb/templates/
-exec cp ../old-format-template.yaml .akb/templates/legacy.yaml
+# Place old-format template in .agent-kb/templates/
+exec cp ../old-format-template.yaml .agent-kb/templates/legacy.yaml
 
 # Run lint — should fail when loading templates
 ! exec akb lint

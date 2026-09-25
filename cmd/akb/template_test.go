@@ -25,7 +25,7 @@ func setupTemplateTestKB(t *testing.T) string {
 	kbRoot := t.TempDir()
 	setupTestKBWithGit(t, kbRoot)
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	if err := os.MkdirAll(templatesDir, 0750); err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestTemplateGet_WriterView(t *testing.T) {
 func TestTemplateGet_WriterView_NoRequirements(t *testing.T) {
 	kbRoot := setupTemplateTestKB(t)
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	yamlNoReq := `name: minimal
 description: Minimal template
 schema:
@@ -291,7 +291,7 @@ func runTemplateGetExample(t *testing.T, name string) (string, string, error) {
 func TestTemplateGet_ExampleWarnsOnStrippedVariant(t *testing.T) {
 	kbRoot := setupTemplateTestKB(t)
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	templateBody := `name: sourced
 description: Template whose rule demands an optional key
 schema:
@@ -346,7 +346,7 @@ sources: [raw/data.csv]
 func TestTemplateGet_ExampleWarnsOnNoOpUpdate(t *testing.T) {
 	kbRoot := setupTemplateTestKB(t)
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	templateBody := `name: noop
 description: Template that demands a change on every update
 schema:
@@ -401,7 +401,7 @@ updated: 2024-01-01
 func TestTemplateGet_ExampleWarnsOnUnevaluableAndFailingRule(t *testing.T) {
 	kbRoot := setupTemplateTestKB(t)
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	templateBody := `name: mixed
 description: Template with one unevaluable rule and one failing rule
 schema:
@@ -457,7 +457,7 @@ title: Mixed
 func TestTemplateGet_ExampleWarnsOnEachBrokenRule(t *testing.T) {
 	kbRoot := setupTemplateTestKB(t)
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	templateBody := `name: broken
 description: Template whose rules can neither compile nor evaluate
 schema:
@@ -515,7 +515,7 @@ title: Broken
 func TestTemplateGet_ExampleWarnsForEveryVariant(t *testing.T) {
 	kbRoot := setupTemplateTestKB(t)
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	templateBody := `name: variantprobe
 description: Template whose three mockup variants each break a different rule
 schema:
@@ -619,7 +619,7 @@ func TestTemplateGet_MissingTemplate(t *testing.T) {
 func TestTemplateGet_MissingPassMockup(t *testing.T) {
 	kbRoot := setupTemplateTestKB(t)
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	yamlNoPass := `name: nopass
 description: Template without pass mockup
 schema:
@@ -672,12 +672,12 @@ func TestTemplateList(t *testing.T) {
 func TestTemplateList_Empty(t *testing.T) {
 	kbRoot := setupTemplateTestKB(t)
 
-	entries, err := os.ReadDir(filepath.Join(kbRoot, ".akb", "templates"))
+	entries, err := os.ReadDir(filepath.Join(kbRoot, ".agent-kb", "templates"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, entry := range entries {
-		if err := os.Remove(filepath.Join(kbRoot, ".akb", "templates", entry.Name())); err != nil {
+		if err := os.Remove(filepath.Join(kbRoot, ".agent-kb", "templates", entry.Name())); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -721,7 +721,7 @@ func TestTemplateDeleteCommitIsScopedToItsFiles(t *testing.T) {
 		}
 	})
 
-	want := []string{".akb/templates/note.yaml", ".akb/templates/note_pass.md"}
+	want := []string{".agent-kb/templates/note.yaml", ".agent-kb/templates/note_pass.md"}
 	if files := commitFilesIn(t, kbRoot); !reflect.DeepEqual(files, want) {
 		t.Errorf("commit recorded %v, want only the deleted template files", files)
 	}
@@ -738,7 +738,7 @@ func symlinkTemplatesOutOfBase(t *testing.T, kbRoot string) string {
 	t.Helper()
 
 	outsideDir := t.TempDir()
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	if err := os.RemoveAll(templatesDir); err != nil {
 		t.Fatal(err)
 	}
@@ -765,7 +765,7 @@ func TestTemplateGet_RejectsSymlinkedMockup(t *testing.T) {
 	if err := os.WriteFile(outsideFile, []byte(secret), 0600); err != nil {
 		t.Fatal(err)
 	}
-	passPath := filepath.Join(kbRoot, ".akb", "templates", "note_pass.md")
+	passPath := filepath.Join(kbRoot, ".agent-kb", "templates", "note_pass.md")
 	if err := os.Remove(passPath); err != nil {
 		t.Fatal(err)
 	}
@@ -809,7 +809,7 @@ func TestTemplateGet_RejectsSymlinkedTemplateFile(t *testing.T) {
 	if err := os.WriteFile(outsideFile, []byte(outsideYAML), 0600); err != nil {
 		t.Fatal(err)
 	}
-	notePath := filepath.Join(kbRoot, ".akb", "templates", "note.yaml")
+	notePath := filepath.Join(kbRoot, ".agent-kb", "templates", "note.yaml")
 	if err := os.Remove(notePath); err != nil {
 		t.Fatal(err)
 	}
@@ -886,7 +886,7 @@ schema:
 	if err := os.WriteFile(aliasTarget, []byte(aliasYAML), 0600); err != nil {
 		t.Fatal(err)
 	}
-	symlinkFixture(t, filepath.Join(kbRoot, ".akb", "templates", "alias.yaml"), aliasTarget)
+	symlinkFixture(t, filepath.Join(kbRoot, ".agent-kb", "templates", "alias.yaml"), aliasTarget)
 
 	var runErr error
 	out := captureStdout(t, func() { runErr = runTemplateGet(nil, []string{"alias"}) })

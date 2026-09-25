@@ -8,8 +8,8 @@ cd adr-write-kb
 
 # init seeds no templates: copy the ones this scenario writes pages of.
 exec akb template get adr --full --examples
-cp stdout .akb/templates/adr.yaml
-exec git add .akb/templates
+cp stdout .agent-kb/templates/adr.yaml
+exec git add .agent-kb/templates
 exec git commit -m 'seed adr template'
 
 stdin ../adr-missing-status.md

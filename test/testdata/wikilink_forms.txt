@@ -20,9 +20,9 @@ cd wk-kb
 # init seeds no templates: copy the note template for the linked-to page, and
 # the probe template whose rule pins the CEL view of a wikilink target.
 exec akb template get note --full --examples
-cp stdout .akb/templates/note.yaml
-cp ../probe-template.yaml .akb/templates/probe.yaml
-exec git add .akb/templates
+cp stdout .agent-kb/templates/note.yaml
+cp ../probe-template.yaml .agent-kb/templates/probe.yaml
+exec git add .agent-kb/templates
 exec git commit -m 'seed note and probe templates'
 
 stdin ../target-note.md

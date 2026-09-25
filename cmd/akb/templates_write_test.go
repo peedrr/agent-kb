@@ -20,7 +20,7 @@ func setupTemplatesWriteTestKB(t *testing.T) string {
 	kbRoot := t.TempDir()
 	setupTestKBWithGit(t, kbRoot)
 
-	if err := os.MkdirAll(filepath.Join(kbRoot, ".akb", "templates"), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(kbRoot, ".agent-kb", "templates"), 0750); err != nil {
 		t.Fatal(err)
 	}
 
@@ -92,7 +92,7 @@ title: ""
 		t.Fatalf("expected success, got error: %v", err)
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"new.yaml", "new_pass.md", "new_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); os.IsNotExist(err) {
 			t.Errorf("expected file %s to exist", f)
@@ -159,7 +159,7 @@ title: ""
 		t.Errorf("expected compile error, got: %v", err)
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"bad.yaml", "bad_pass.md", "bad_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
 			t.Errorf("expected file %s to NOT exist", f)
@@ -231,7 +231,7 @@ title: ""
 		t.Errorf("expected the failed-rule rejection, got: %v", err)
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"badpass.yaml", "badpass_pass.md", "badpass_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
 			t.Errorf("expected file %s to NOT exist", f)
@@ -298,7 +298,7 @@ title: Hello
 		t.Errorf("expected fail mockup error, got: %v", err)
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"badfail.yaml", "badfail_pass.md", "badfail_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
 			t.Errorf("expected file %s to NOT exist", f)
@@ -361,7 +361,7 @@ title: Hello
 		t.Fatal("expected error, got nil")
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	entries, err := os.ReadDir(targetDir)
 	if err != nil {
 		t.Fatal(err)
@@ -442,9 +442,9 @@ title: ""
 	}
 
 	want := []string{
-		".akb/templates/scoped.yaml",
-		".akb/templates/scoped_fail.md",
-		".akb/templates/scoped_pass.md",
+		".agent-kb/templates/scoped.yaml",
+		".agent-kb/templates/scoped_fail.md",
+		".agent-kb/templates/scoped_pass.md",
 	}
 	if files := commitFilesIn(t, kbRoot); !reflect.DeepEqual(files, want) {
 		t.Errorf("commit recorded %v, want only the template files", files)
@@ -463,7 +463,7 @@ func TestTemplatesWrite_RejectsSymlinkedTemplatesDir(t *testing.T) {
 	kbRoot := setupTemplatesWriteTestKB(t)
 
 	outsideDir := t.TempDir()
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	if err := os.RemoveAll(templatesDir); err != nil {
 		t.Fatal(err)
 	}
@@ -531,7 +531,7 @@ validations:
 		t.Fatal(err)
 	}
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	if err := os.WriteFile(filepath.Join(templatesDir, "store.yaml"), []byte(templateBody), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -638,7 +638,7 @@ summary: A summary
 		}
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"summary.yaml", "summary_pass.md", "summary_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
 			t.Errorf("expected file %s to NOT exist", f)
@@ -689,7 +689,7 @@ summary: A summary
 		t.Fatalf("expected success, got error: %v", err)
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"guarded.yaml", "guarded_pass.md", "guarded_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); os.IsNotExist(err) {
 			t.Errorf("expected file %s to exist", f)
@@ -749,7 +749,7 @@ title: ""
 		}
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"createonly.yaml", "createonly_pass.md", "createonly_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
 			t.Errorf("expected file %s to NOT exist", f)
@@ -761,7 +761,7 @@ title: ""
 // only the overwrite confirmation: the variant checks still reject the write.
 func TestTemplatesWrite_ForceDoesNotBypassVariantChecks(t *testing.T) {
 	kbRoot := setupTemplatesWriteTestKB(t)
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 
 	templateBody := `name: forced
 description: Template with an unguarded optional read
@@ -927,7 +927,7 @@ title: ""
 		t.Fatalf("expected success, got error: %v", err)
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"loose.yaml", "loose_pass.md", "loose_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); os.IsNotExist(err) {
 			t.Errorf("expected file %s to exist", f)
@@ -983,7 +983,7 @@ summary: A summary
 		t.Errorf("expected the stripped-variant rejection, got: %v", err)
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"requires.yaml", "requires_pass.md", "requires_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
 			t.Errorf("expected file %s to NOT exist", f)
@@ -1039,7 +1039,7 @@ updated: 2024-01-01
 		t.Errorf("expected the self-succession rejection, got: %v", err)
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"noop.yaml", "noop_pass.md", "noop_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
 			t.Errorf("expected file %s to NOT exist", f)
@@ -1096,7 +1096,7 @@ title: ""
 		}
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"exemplar.yaml", "exemplar_pass.md", "exemplar_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); !os.IsNotExist(err) {
 			t.Errorf("expected file %s to NOT exist", f)
@@ -1144,7 +1144,7 @@ title: ""
 		t.Fatalf("expected the fail mockup's missing required fields to be exempt, got: %v", err)
 	}
 
-	targetDir := filepath.Join(kbRoot, ".akb", "templates")
+	targetDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	for _, f := range []string{"exempt.yaml", "exempt_pass.md", "exempt_fail.md"} {
 		if _, err := os.Stat(filepath.Join(targetDir, f)); os.IsNotExist(err) {
 			t.Errorf("expected file %s to exist", f)

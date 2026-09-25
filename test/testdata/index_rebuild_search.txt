@@ -7,10 +7,10 @@ cd test-kb
 
 # init seeds no templates: copy the ones this scenario writes pages of.
 exec akb template get note --full --examples
-cp stdout .akb/templates/note.yaml
+cp stdout .agent-kb/templates/note.yaml
 exec akb template get adr --full --examples
-cp stdout .akb/templates/adr.yaml
-exec git add .akb/templates
+cp stdout .agent-kb/templates/adr.yaml
+exec git add .agent-kb/templates
 exec git commit -m 'seed note and adr templates'
 
 stdin ../note-input.md
@@ -73,7 +73,7 @@ stdout 'Rebuild Search Decision'
 # --- Rebuild restores search after DB corruption ---
 
 # Simulate DB corruption by removing search.db
-exec rm .akb/search.db
+exec rm .agent-kb/search.db
 
 ! exec akb search 'microservices'
 stderr 'akb index rebuild'

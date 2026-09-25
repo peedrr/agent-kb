@@ -218,7 +218,7 @@ func TestIndexAdd_RejectsAbsolutePath(t *testing.T) {
 func TestIndexAddReportsTemplateLoadFailure(t *testing.T) {
 	kbRoot := setupIndexTestKB(t)
 
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	if err := os.MkdirAll(templatesDir, 0750); err != nil {
 		t.Fatal(err)
 	}
@@ -515,7 +515,7 @@ func TestIndexRebuild_CreatesSearchDB(t *testing.T) {
 	noCommit = true
 	t.Cleanup(func() { noCommit = origNoCommit })
 
-	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
+	dbPath := filepath.Join(kbRoot, ".agent-kb", "search.db")
 	if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}

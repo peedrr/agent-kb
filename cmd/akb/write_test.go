@@ -35,7 +35,7 @@ func writeSetupTestKB(t *testing.T) string {
 	dirs := []string{
 		filepath.Join(kbRoot, "kb"),
 		filepath.Join(kbRoot, "raw"),
-		filepath.Join(kbRoot, ".akb", "templates"),
+		filepath.Join(kbRoot, ".agent-kb", "templates"),
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0750); err != nil {
@@ -45,7 +45,7 @@ func writeSetupTestKB(t *testing.T) string {
 	}
 
 	configContent := "name: write-test\ncreated: \"2024-01-01T00:00:00Z\"\n"
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", ".akb.yaml"), []byte(configContent), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "akb.yaml"), []byte(configContent), 0600); err != nil {
 		_ = os.RemoveAll(tmpDir) //nolint:errcheck // cleanup on setup failure
 		t.Fatalf("write config: %v", err)
 	}
@@ -60,7 +60,7 @@ func writeSetupTestKB(t *testing.T) string {
 		t.Fatalf("write log.md: %v", err)
 	}
 
-	if err := template.CopyDefaults(filepath.Join(kbRoot, ".akb", "templates")); err != nil {
+	if err := template.CopyDefaults(filepath.Join(kbRoot, ".agent-kb", "templates")); err != nil {
 		_ = os.RemoveAll(tmpDir) //nolint:errcheck // cleanup on setup failure
 		t.Fatalf("copy templates: %v", err)
 	}
@@ -110,7 +110,7 @@ func writeCleanup(kbRoot string) {
 
 func initTestSearchDB(t *testing.T, kbRoot string) {
 	t.Helper()
-	dbPath := filepath.Join(kbRoot, ".akb", "search.db")
+	dbPath := filepath.Join(kbRoot, ".agent-kb", "search.db")
 	conn, err := db.InitDB(dbPath)
 	if err != nil {
 		t.Fatalf("init test search DB: %v", err)
@@ -260,7 +260,7 @@ func TestWriteUnknownType(t *testing.T) {
 	if !strings.Contains(out, "unknown type 'recipe'") {
 		t.Errorf("expected error to contain \"unknown type 'recipe'\", got: %s", out)
 	}
-	if !strings.Contains(out, ".akb/templates/recipe.yaml") {
+	if !strings.Contains(out, ".agent-kb/templates/recipe.yaml") {
 		t.Errorf("expected error to name the template path to author, got: %s", out)
 	}
 	if !strings.Contains(out, "akb template list --examples") {
@@ -816,7 +816,7 @@ validations:
     rule: 'old_page != null && old_page.frontmatter.updated == timestamp("2020-01-01T00:00:00Z") && page.frontmatter.updated > old_page.frontmatter.updated'
     expect: old_page must carry the pre-write updated timestamp
 `
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "oldpage.yaml"), []byte(tmplData), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "templates", "oldpage.yaml"), []byte(tmplData), 0600); err != nil {
 		t.Fatalf("write probe template: %v", err)
 	}
 
@@ -853,7 +853,7 @@ validations:
     rule: 'old_page != null && old_page.frontmatter.updated == timestamp("2020-01-01T00:00:00Z") && page.frontmatter.updated > old_page.frontmatter.updated'
     expect: old_page must carry the pre-write updated timestamp
 `
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "oldpage.yaml"), []byte(tmplData), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "templates", "oldpage.yaml"), []byte(tmplData), 0600); err != nil {
 		t.Fatalf("write probe template: %v", err)
 	}
 
@@ -890,7 +890,7 @@ validations:
     rule: 'old_page != null && old_page.frontmatter.status == "draft" && page.frontmatter.status == "accepted"'
     expect: status must move from the on-disk draft to accepted
 `
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "approval.yaml"), []byte(tmplData), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "templates", "approval.yaml"), []byte(tmplData), 0600); err != nil {
 		t.Fatalf("write probe template: %v", err)
 	}
 
@@ -979,7 +979,7 @@ validations:
     rule: 'old_page == null'
     expect: old_page must be null for a page that does not exist yet
 `
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "newest.yaml"), []byte(tmplData), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "templates", "newest.yaml"), []byte(tmplData), 0600); err != nil {
 		t.Fatalf("write probe template: %v", err)
 	}
 
@@ -1030,7 +1030,7 @@ validations:
     requirement: the title must differ from the probe title
     expect: title must differ from the probe title
 `
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "sourced.yaml"), []byte(tmplData), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "templates", "sourced.yaml"), []byte(tmplData), 0600); err != nil {
 		t.Fatalf("write probe template: %v", err)
 	}
 
@@ -1095,7 +1095,7 @@ validations:
     requirement: never satisfiable
     expect: never reported
 `
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "budget.yaml"), []byte(tmplData), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "templates", "budget.yaml"), []byte(tmplData), 0600); err != nil {
 		t.Fatalf("write probe template: %v", err)
 	}
 
@@ -1171,7 +1171,7 @@ validations:
     requirement: the colliding key must be set
     expect: the colliding key must be set
 `
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "colliding.yaml"), []byte(tmplData), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "templates", "colliding.yaml"), []byte(tmplData), 0600); err != nil {
 		t.Fatalf("write probe template: %v", err)
 	}
 
@@ -1238,7 +1238,7 @@ validations:
     requirement: never satisfiable
     expect: never reported
 `
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "broken.yaml"), []byte(tmplData), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "templates", "broken.yaml"), []byte(tmplData), 0600); err != nil {
 		t.Fatalf("write probe template: %v", err)
 	}
 
@@ -1669,7 +1669,7 @@ func TestWriteRejectsSymlinkedTemplatesDir(t *testing.T) {
 	defer writeCleanup(kbRoot)
 
 	outsideDir := t.TempDir()
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := filepath.Join(kbRoot, ".agent-kb", "templates")
 	if err := os.RemoveAll(templatesDir); err != nil {
 		t.Fatal(err)
 	}
@@ -2250,7 +2250,7 @@ A page whose type has an optional sources field it leaves out.`
 func plantUnguardedTemplate(t *testing.T, kbRoot string) string {
 	t.Helper()
 
-	if err := os.WriteFile(filepath.Join(kbRoot, ".akb", "templates", "sourced.yaml"), []byte(unguardedTemplate), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(kbRoot, ".agent-kb", "templates", "sourced.yaml"), []byte(unguardedTemplate), 0600); err != nil {
 		t.Fatalf("write probe template: %v", err)
 	}
 	const relPath = "kb/sourced/planted.md"

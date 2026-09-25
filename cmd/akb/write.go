@@ -106,13 +106,13 @@ func runWrite(_ *cobra.Command, args []string) error {
 	}
 	defer dbConn.Close() //nolint:errcheck // DB close error non-critical on command exit
 
-	_, err = config.Load(filepath.Join(kbRoot, ".akb", ".akb.yaml"))
+	_, err = config.Load(path.ConfigPath(kbRoot))
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
 
 	// Load templates
-	templatesDir := filepath.Join(kbRoot, ".akb", "templates")
+	templatesDir := path.TemplatesDir(kbRoot)
 	if err := path.AssertContained(kbRoot, templatesDir); err != nil {
 		return fmt.Errorf("resolve templates directory: %w", err)
 	}

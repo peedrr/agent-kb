@@ -168,14 +168,14 @@ title: Test
 
 // setupTestKB creates a minimal KB structure for testing
 func setupTestKBForRead(t *testing.T, tmpDir string) {
-	akbDir := filepath.Join(tmpDir, ".akb")
+	akbDir := filepath.Join(tmpDir, ".agent-kb")
 	if err := os.MkdirAll(akbDir, 0750); err != nil {
 		t.Fatal(err)
 	}
 
 	configContent := `name: test-kb
 created: "2024-01-01T00:00:00Z"`
-	if err := os.WriteFile(filepath.Join(akbDir, ".akb.yaml"), []byte(configContent), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(akbDir, "akb.yaml"), []byte(configContent), 0600); err != nil {
 		t.Fatal(err)
 	}
 

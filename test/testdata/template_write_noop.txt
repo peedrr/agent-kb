@@ -25,8 +25,8 @@ exec akb template write note --template note.yaml --pass note_pass.md --fail ../
 stdout 'Template .note. unchanged'
 exec git log --oneline
 cmp stdout history.txt
-cmp note.yaml .akb/templates/note.yaml
-cmp note_pass.md .akb/templates/note_pass.md
+cmp note.yaml .agent-kb/templates/note.yaml
+cmp note_pass.md .agent-kb/templates/note_pass.md
 
 # The same byte-identical re-run with the persistent --no-commit flag is
 # still a no-op: exit 0, the 'unchanged' message, and no new commit.
@@ -44,10 +44,10 @@ stdout 'akb: template write note'
 # Validation still runs before the no-op decision: a committed template whose
 # pass mockup violates its own rule is refused even though every byte matches
 # what the write would record.
-cp ../planted.yaml .akb/templates/planted.yaml
-cp ../planted_pass.md .akb/templates/planted_pass.md
-cp ../planted_fail.md .akb/templates/planted_fail.md
-exec git add .akb/templates
+cp ../planted.yaml .agent-kb/templates/planted.yaml
+cp ../planted_pass.md .agent-kb/templates/planted_pass.md
+cp ../planted_fail.md .agent-kb/templates/planted_fail.md
+exec git add .agent-kb/templates
 exec git commit -m 'plant a template whose pass mockup violates its rule'
 ! exec akb template write planted --template ../planted.yaml --pass ../planted_pass.md --fail ../planted_fail.md --force
 stderr 'pass mockup no longer validates'
@@ -71,16 +71,16 @@ exec akb --no-commit template write note --template note.yaml --pass note_pass.m
 stdout 'Template .note. written'
 exec git log --oneline
 cmp stdout history-nocommit.txt
-exec git status --porcelain -- .akb/templates
-stdout '\?\? .akb/templates/'
+exec git status --porcelain -- .agent-kb/templates
+stdout '\?\? .agent-kb/templates/'
 exec akb --no-commit template write note --template note.yaml --pass note_pass.md --fail ../note-fail.md --force
 stdout 'Template .note. written'
 ! stderr 'nothing to commit'
 exec git log --oneline
 cmp stdout history-nocommit.txt
-cmp note.yaml .akb/templates/note.yaml
-cmp note_pass.md .akb/templates/note_pass.md
-cmp ../note-fail.md .akb/templates/note_fail.md
+cmp note.yaml .agent-kb/templates/note.yaml
+cmp note_pass.md .agent-kb/templates/note_pass.md
+cmp ../note-fail.md .agent-kb/templates/note_fail.md
 
 -- note-fail.md --
 ---

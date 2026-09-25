@@ -854,10 +854,10 @@ func assertSymlinkEscape(t *testing.T, err error, got, link string) {
 }
 
 func TestKBRoot(t *testing.T) {
-	t.Run("reports a directory that holds .akb", func(t *testing.T) {
+	t.Run("reports a directory that holds .agent-kb", func(t *testing.T) {
 		root := t.TempDir()
-		if err := os.MkdirAll(filepath.Join(root, ".akb"), 0750); err != nil {
-			t.Fatalf("failed to create .akb dir: %v", err)
+		if err := os.MkdirAll(filepath.Join(root, ".agent-kb"), 0750); err != nil {
+			t.Fatalf("failed to create .agent-kb dir: %v", err)
 		}
 
 		got, err := KBRoot(root)
@@ -869,10 +869,10 @@ func TestKBRoot(t *testing.T) {
 		}
 	})
 
-	t.Run("reports the nearest ancestor that holds .akb", func(t *testing.T) {
+	t.Run("reports the nearest ancestor that holds .agent-kb", func(t *testing.T) {
 		root := t.TempDir()
-		if err := os.MkdirAll(filepath.Join(root, ".akb"), 0750); err != nil {
-			t.Fatalf("failed to create .akb dir: %v", err)
+		if err := os.MkdirAll(filepath.Join(root, ".agent-kb"), 0750); err != nil {
+			t.Fatalf("failed to create .agent-kb dir: %v", err)
 		}
 		subDir := filepath.Join(root, "docs", "notes")
 		if err := os.MkdirAll(subDir, 0750); err != nil {
@@ -1032,7 +1032,7 @@ func TestResolveKB(t *testing.T) {
 		assertNotAKB(t, err, dir)
 	})
 
-	t.Run("directory with .akb but no config is not a knowledge base", func(t *testing.T) {
+	t.Run("directory with .agent-kb but no config is not a knowledge base", func(t *testing.T) {
 		dir := t.TempDir()
 		makeKBFixture(t, dir, "")
 
@@ -1042,7 +1042,7 @@ func TestResolveKB(t *testing.T) {
 
 	t.Run("config that is not a regular file is not a knowledge base", func(t *testing.T) {
 		dir := t.TempDir()
-		if err := os.MkdirAll(filepath.Join(dir, ".akb", ".akb.yaml"), 0750); err != nil {
+		if err := os.MkdirAll(filepath.Join(dir, ".agent-kb", "akb.yaml"), 0750); err != nil {
 			t.Fatalf("create config directory: %v", err)
 		}
 
@@ -1066,7 +1066,7 @@ func TestResolveKB(t *testing.T) {
 
 // assertNotAKB pins the usage error for a selected path that is not a
 // knowledge base: a GuardError matching ErrNotAKB that names the path, the
-// missing .akb/.akb.yaml marker, and the `akb discover` pointer.
+// missing .agent-kb/akb.yaml marker, and the `akb discover` pointer.
 func assertNotAKB(t *testing.T, err error, path string) {
 	t.Helper()
 
@@ -1080,7 +1080,7 @@ func assertNotAKB(t *testing.T, err error, path string) {
 	if !errors.Is(err, ErrNotAKB) {
 		t.Fatalf("expected ErrNotAKB, got %v", err)
 	}
-	for _, want := range []string{path, filepath.Join(".akb", ".akb.yaml"), "akb discover"} {
+	for _, want := range []string{path, filepath.Join(".agent-kb", "akb.yaml"), "akb discover"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q does not contain %q", err.Error(), want)
 		}
@@ -1103,19 +1103,19 @@ func scanEnvironment(t *testing.T) (home, work string) {
 	return home, work
 }
 
-// makeKBFixture creates a minimal knowledge base in dir: the .akb directory
+// makeKBFixture creates a minimal knowledge base in dir: the .agent-kb directory
 // that marks a root, plus a config when one is given.
 func makeKBFixture(t *testing.T, dir, config string) {
 	t.Helper()
 
-	if err := os.MkdirAll(filepath.Join(dir, ".akb"), 0750); err != nil {
-		t.Fatalf("create .akb directory: %v", err)
+	if err := os.MkdirAll(filepath.Join(dir, ".agent-kb"), 0750); err != nil {
+		t.Fatalf("create .agent-kb directory: %v", err)
 	}
 	if config == "" {
 		return
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".akb", ".akb.yaml"), []byte(config), 0600); err != nil {
-		t.Fatalf("write .akb.yaml: %v", err)
+	if err := os.WriteFile(filepath.Join(dir, ".agent-kb", "akb.yaml"), []byte(config), 0600); err != nil {
+		t.Fatalf("write akb.yaml: %v", err)
 	}
 }
 
