@@ -1,6 +1,17 @@
 # Git Edge Cases — verify git behavior under unusual conditions
 
 # === INIT ===
+
+# Give the environment a throwaway identity so akb init does not seed repo
+# config. This keeps the scenario independent of the machine's git setup:
+# nix builds read a compiled-in identity config that survives HOME moves,
+# and CI runners have no identity at all.
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ambient
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ambient@local
+
 exec akb init git-kb
 cd git-kb
 
@@ -8,24 +19,24 @@ cd git-kb
 exec akb template get note --full --examples
 cp stdout .akb/templates/note.yaml
 exec git add .akb/templates
-# The scenario's own commit carries per-command identity flags: it must not
-# set repository config, which the fallback section below asserts is empty,
-# and it must not rely on ambient identity, which CI runners do not have.
-exec git -c user.name=tester -c user.email=tester@local commit -m 'seed note template'
+exec git commit -m 'seed note template'
 
 # === VERIFY GIT REPO EXISTS ===
 exists .git
 exec git log --oneline
 stdout 'akb: init git-kb'
 
-# === NO GIT USER CONFIGURED — WRITE STILL WORKS ===
+# init saw the ambient identity, so it wrote no repository config.
+! exec git config --local user.name
+! exec git config --local user.email
 
-# The environment supplies an empty user.name, so the merged git config has no
-# usable identity even when the machine sets one in its system or global
-# config.
-env GIT_CONFIG_COUNT=1
-env GIT_CONFIG_KEY_0=user.name
+# === NO USABLE GIT IDENTITY — WRITE STILL WORKS ===
+
+# Emptying the ambient values leaves the merged git config without a usable
+# identity, whatever the machine sets in its system or global config (the
+# identity resolution treats an empty value as unset).
 env GIT_CONFIG_VALUE_0=
+env GIT_CONFIG_VALUE_1=
 
 stdin ../note-input.md
 exec akb write no-user-note.md
@@ -35,14 +46,12 @@ stdout 'Written to kb/notes/no-user-note.md'
 exec git log --oneline -1
 stdout 'akb: write kb/notes/no-user-note.md'
 
-# Verify the commit used the akb identity
-
+# Verify the commit used the per-invocation akb fallback identity
 exec git log -1 --format='%an <%ae>'
 stdout 'akb <akb@local>'
 
 # and that the repository identity was left untouched
 ! exec git config --local user.name
-
 ! exec git config --local user.email
 
 # === DELETE ALSO WORKS WITHOUT USER CONFIG ===
