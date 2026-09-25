@@ -7,7 +7,13 @@
     { self, ... }@inputs:
 
     let
-      akbVersion = "0.19.1";
+      # Single source of truth: the VERSION file at the repo root. The justfile
+      # derives from the same file, so the two build paths cannot drift; the
+      # human-facing copies (AGENTS.md, CHANGELOG.md, the git tag) are checked
+      # by scripts/check-version-lockstep.sh. NOTE: readFile only sees
+      # git-tracked files in a flake source, so VERSION must be committed
+      # before `nix build` will pick up a bump.
+      akbVersion = inputs.nixpkgs.lib.removeSuffix "\n" (builtins.readFile ./VERSION);
 
       goVersion = 26; # Change this to update the whole stack
 
@@ -61,6 +67,9 @@
 
               # Go vulnerability database
               govulncheck
+
+              # task runner (build/test/lint/release recipes)
+              just
 
               self.formatter.${system}
               self.nixLsp.${system}

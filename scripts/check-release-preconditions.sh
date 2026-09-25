@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # Change this single value when the release branch moves.
-expected_branch="master"
+expected_branch="main"
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 

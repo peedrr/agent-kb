@@ -1,6 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Status:** v0.19.1 — error-reporting fixes across the git staging path, CEL budget diagnosis, mockup revalidation, and template-load failures (behavior recorded in `CHANGELOG.md`; the version string is kept in lockstep with `Makefile` and `flake.nix` by `scripts/check-version-lockstep.sh`)
+**Status:** v0.19.1 — error-reporting fixes across the git staging path, CEL budget diagnosis, mockup revalidation, and template-load failures (behavior recorded in `CHANGELOG.md`; the version lives in `VERSION`, is derived into `flake.nix` and the `justfile`, and the human-facing copies — this line, the CHANGELOG section, the git tag — are checked by `scripts/check-version-lockstep.sh`)
 
 ## OVERVIEW
 
@@ -29,7 +29,8 @@ agent-kb/
 │   └── template/   # Typed page templates (TemplateV2 with CEL rules)
 ├── test/           # Integration tests (testscript)
 ├── flake.nix       # Nix flake (dev shell + build package)
-└── Makefile        # Build, test, lint targets
+├── justfile        # Task runner (build/test/lint/release); version injected from VERSION
+└── VERSION         # Single source of truth for the release version
 ```
 
 ## WHERE TO LOOK
@@ -142,11 +143,16 @@ agent-kb/
 ## COMMANDS
 
 ```bash
-go build -o bin/akb ./cmd/akb/  # Build (NEVER in project root)
-go test ./...                   # Unit tests
+just build                      # Build with version injected (NEVER output to project root)
+just test                       # Unit tests
 go test ./test/ -test.v         # Integration tests (testscript)
-golangci-lint run ./...         # Lint
-nix develop                     # Dev shell (Go, gopls, delve, golangci-lint)
+just lint                       # Lint (golangci-lint)
+just release                    # Preconditions + lockstep + tag v$(cat VERSION)
+nix develop                     # Dev shell (Go, gopls, delve, golangci-lint, just)
+
+# Plain `go build -o bin/akb ./cmd/akb/` works but produces version "dev" —
+# the version reaches the binary only through -ldflags, which `just build`
+# and `nix build` inject from VERSION.
 ```
 
 ## NOTES
