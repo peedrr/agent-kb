@@ -264,6 +264,14 @@ func TestRawWriteCommitRefusesWithoutCommitIdentity(t *testing.T) {
 		}
 	}
 
+	// The refusal is reported before the raw write's first mutation, so neither
+	// the raw file nor the manifest was written.
+	for _, relPath := range []string{"raw/data.csv", "raw/files.log"} {
+		if _, err := os.Stat(filepath.Join(kbRoot, filepath.FromSlash(relPath))); !os.IsNotExist(err) {
+			t.Errorf("%s exists after the identity refusal: %v", relPath, err)
+		}
+	}
+
 	if headAfter := mustGitInDir(t, kbRoot, "log", "-1", "--format=%s"); headAfter != headBefore {
 		t.Errorf("HEAD message = %q, want it unchanged at %q", headAfter, headBefore)
 	}

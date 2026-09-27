@@ -68,13 +68,25 @@ func runRawDelete(_ *cobra.Command, args []string) error {
 	// Sources scan: find KB pages referencing this file (before deletion)
 	referencing := scanSources(kbRoot, relPath)
 
-	// Hold the repository lock across the file and manifest removals and the
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
+
+	// Hold the lock of the base across the file and manifest removals and the
 	// commit that records them.
-	repoLock, err := storage.LockRepo(kbRoot)
+	repoLock, err := store.Lock()
 	if err != nil {
 		return fmt.Errorf("lock repository: %w", err)
 	}
 	defer repoLock.Release()
+
+	// The commit identity and the merge state the removal's commit needs are
+	// checked before the file and the manifest are touched, so a refusal leaves
+	// both as they were.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
+	}
 
 	// Delete file from disk
 	if err := os.Remove(fullPath); err != nil {
@@ -87,12 +99,9 @@ func runRawDelete(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("remove manifest entry: %w", err)
 	}
 
-	// Git commit
-	if !noCommit {
-		commitMsg := fmt.Sprintf("akb: raw delete %s", relPath)
-		if err := storage.CommitFiles(kbRoot, commitMsg, filepath.Join("raw", relPath), filepath.Join("raw", "files.log")); err != nil {
-			return fmt.Errorf("commit raw delete: %w", err)
-		}
+	commitMsg := fmt.Sprintf("akb: raw delete %s", relPath)
+	if err := store.Commit(commitMsg, filepath.Join("raw", relPath), filepath.Join("raw", "files.log")); err != nil {
+		return fmt.Errorf("commit raw delete: %w", err)
 	}
 
 	fmt.Printf("Deleted raw/%s\n", relPath)

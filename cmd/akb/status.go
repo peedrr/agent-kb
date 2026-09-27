@@ -15,6 +15,7 @@ import (
 
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/storage"
 )
 
 var statusCmd = &cobra.Command{
@@ -48,14 +49,26 @@ func runStatus(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("count pages: %w", err)
 	}
 
-	gitStatus, err := getGitStatus(kbRoot)
+	mode, err := storage.ParseMode(cfg.Versioning)
 	if err != nil {
-		return fmt.Errorf("git status: %w", err)
+		return fmt.Errorf("parse versioning mode: %w", err)
 	}
 
 	fmt.Printf("Name: %s\n", cfg.Name)
 	fmt.Printf("Path: %s\n", absPath)
 	fmt.Printf("Pages: %d\n", pageCount)
+
+	// A base that is not versioned in git has no repository to report on, so
+	// the git status line is required only of a git-versioned base.
+	if mode == storage.ModeNone {
+		fmt.Printf("Versioning: none\n")
+		return nil
+	}
+
+	gitStatus, err := getGitStatus(kbRoot)
+	if err != nil {
+		return fmt.Errorf("git status: %w", err)
+	}
 	fmt.Printf("Git: %s\n", gitStatus)
 
 	return nil

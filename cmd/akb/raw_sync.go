@@ -39,13 +39,24 @@ func runRawSync(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("raw/ directory does not exist; run `akb init` first")
 	}
 
-	// Hold the repository lock across the manifest reconciliation and the commit
-	// that records it.
-	repoLock, err := storage.LockRepo(kbRoot)
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
+
+	// Hold the lock of the base across the manifest reconciliation and the
+	// commit that records it.
+	repoLock, err := store.Lock()
 	if err != nil {
 		return fmt.Errorf("lock repository: %w", err)
 	}
 	defer repoLock.Release()
+
+	// The commit identity and the merge state the sync's commit needs are
+	// checked before the manifest is touched, so a refusal leaves it as it was.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
+	}
 
 	// Read existing manifest
 	mgr := manifest.NewManager(kbRoot)
@@ -135,12 +146,12 @@ func runRawSync(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
-	// Git add and commit if there are changes
+	// Commit if there are changes
 	totalChanges := newCount + modifiedCount + deletedCount
-	if totalChanges > 0 && !noCommit {
+	if totalChanges > 0 {
 		commitMsg := fmt.Sprintf("akb: raw sync (%d new, %d modified, %d deleted, %d unchanged)",
 			newCount, modifiedCount, deletedCount, unchangedCount)
-		if err := storage.CommitFiles(kbRoot, commitMsg, "raw/"); err != nil {
+		if err := store.Commit(commitMsg, "raw/"); err != nil {
 			return fmt.Errorf("commit raw sync: %w", err)
 		}
 	}

@@ -253,14 +253,26 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("template %q exists; use --force to overwrite", name)
 	}
 
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
+
+	// The commit identity and the merge state the swap's commit needs are
+	// checked before any template file is touched, so a refusal leaves the
+	// template as it was.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
+	}
+
 	targetDir := templatesDir
 	if err := os.MkdirAll(targetDir, 0750); err != nil {
 		return fmt.Errorf("create templates directory: %w", err)
 	}
 
-	// Hold the repository lock across the swap of the template files and the
+	// Hold the lock of the base across the swap of the template files and the
 	// commit that records it.
-	repoLock, err := storage.LockRepo(kbRoot)
+	repoLock, err := store.Lock()
 	if err != nil {
 		return fmt.Errorf("lock repository: %w", err)
 	}
@@ -272,7 +284,7 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	// content it compares is the content the commit below would record. --force
 	// skips the overwrite confirmation only; validation has already run.
 	if templateExists && templateFilesMatch(templatesDir, name, tmplData, passData, failData) {
-		recordEmpty, err := storage.NothingToCommit(kbRoot, templateCommitPaths(name)...)
+		recordEmpty, err := store.NothingToCommit(templateCommitPaths(name)...)
 		if err != nil {
 			return fmt.Errorf("inspect template files in git: %w", err)
 		}
@@ -327,11 +339,9 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("write fail mockup: %w", err)
 	}
 
-	if !noCommit {
-		commitMsg := fmt.Sprintf("akb: template write %s", name)
-		if err := storage.CommitFiles(kbRoot, commitMsg, templateCommitPaths(name)...); err != nil {
-			return fmt.Errorf("commit template write: %w", err)
-		}
+	commitMsg := fmt.Sprintf("akb: template write %s", name)
+	if err := store.Commit(commitMsg, templateCommitPaths(name)...); err != nil {
+		return fmt.Errorf("commit template write: %w", err)
 	}
 
 	fmt.Printf("Template %q written. Run `akb lint` to evaluate existing pages.\n", name)

@@ -96,14 +96,26 @@ func runTemplateDelete(_ *cobra.Command, args []string) error {
 		return &usageError{msg: "deletion refused without --force"}
 	}
 
-	// Hold the repository lock across the removal of the template files and the
-	// commit that records them; the lint sweep that follows only reads the KB.
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
+
+	// Hold the lock of the base across the removal of the template files and
+	// the commit that records them; the lint sweep that follows only reads the KB.
 	removeErr := func() error {
-		repoLock, lockErr := storage.LockRepo(kbRoot)
+		repoLock, lockErr := store.Lock()
 		if lockErr != nil {
 			return fmt.Errorf("lock repository: %w", lockErr)
 		}
 		defer repoLock.Release()
+
+		// The commit identity and the merge state the removal's commit needs
+		// are checked before any template file is removed, so a refusal leaves
+		// them all as they were.
+		if err := store.Preflight(); err != nil {
+			return fmt.Errorf("commit preflight: %w", err)
+		}
 
 		for _, relPath := range templateCommitPaths(name) {
 			removalPath := filepath.Join(kbRoot, relPath)
@@ -115,11 +127,8 @@ func runTemplateDelete(_ *cobra.Command, args []string) error {
 			}
 		}
 
-		if noCommit {
-			return nil
-		}
 		commitMsg := fmt.Sprintf("akb: template delete %s", name)
-		if err := storage.CommitFiles(kbRoot, commitMsg, templateCommitPaths(name)...); err != nil {
+		if err := store.Commit(commitMsg, templateCommitPaths(name)...); err != nil {
 			return fmt.Errorf("commit template delete: %w", err)
 		}
 		return nil

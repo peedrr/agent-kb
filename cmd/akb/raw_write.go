@@ -74,13 +74,25 @@ func runRawWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("validate filename: %w", err)
 	}
 
-	// Hold the repository lock across the file and manifest writes and the
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
+
+	// Hold the lock of the base across the file and manifest writes and the
 	// commit that records them.
-	repoLock, err := storage.LockRepo(kbRoot)
+	repoLock, err := store.Lock()
 	if err != nil {
 		return fmt.Errorf("lock repository: %w", err)
 	}
 	defer repoLock.Release()
+
+	// The commit identity and the merge state the write's commit needs are
+	// checked before the file and the manifest are touched, so a refusal leaves
+	// both as they were.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
+	}
 
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0750); err != nil {
 		return fmt.Errorf("create parent directories: %w", err)
@@ -108,11 +120,9 @@ func runRawWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("update manifest: %w", err)
 	}
 
-	if !noCommit {
-		commitMsg := fmt.Sprintf("akb: raw write %s", relPath)
-		if err := storage.CommitFiles(kbRoot, commitMsg, filepath.Join("raw", relPath), filepath.Join("raw", "files.log")); err != nil {
-			return fmt.Errorf("commit raw write: %w", err)
-		}
+	commitMsg := fmt.Sprintf("akb: raw write %s", relPath)
+	if err := store.Commit(commitMsg, filepath.Join("raw", relPath), filepath.Join("raw", "files.log")); err != nil {
+		return fmt.Errorf("commit raw write: %w", err)
 	}
 
 	fmt.Printf("Written to raw/%s\n", relPath)
