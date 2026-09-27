@@ -135,6 +135,14 @@ func runLogAppend(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("open storage: %w", err)
 	}
 
+	// Hold the lock of the base from the append through its commit, so
+	// concurrent appends cannot overwrite each other's entries.
+	logLock, err := store.Lock()
+	if err != nil {
+		return fmt.Errorf("lock repository: %w", err)
+	}
+	defer logLock.Release()
+
 	// The commit identity and the merge state the appended entry's commit needs
 	// are checked before log.md is touched, so a refusal leaves it as it was.
 	if err := store.Preflight(); err != nil {
