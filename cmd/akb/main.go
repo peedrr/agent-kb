@@ -69,7 +69,9 @@ func (e commandFailure) Unwrap() error { return e.err }
 // classifyExit maps a command error to its process exit code and the text to
 // report on stderr. An empty report means the command already reported the
 // reason itself. A commit identity no source can name is a configuration fault
-// the caller fixes, so its refusal reports as a usage mistake.
+// the caller fixes, and a merge in progress in the repository hosting the KB is
+// the host project's work the KB never starts, so both refusals report as usage
+// mistakes.
 func classifyExit(err error) (code int, report string) {
 	var validationErr validationFailure
 	var driftErr driftDetected
@@ -83,7 +85,7 @@ func classifyExit(err error) (code int, report string) {
 	case errors.As(err, &validationErr), errors.As(err, &driftErr):
 		return exitFailure, ""
 	case errors.As(err, &usageErr), errors.As(err, &pathGuardErr),
-		errors.Is(err, storage.ErrNoCommitIdentity):
+		errors.Is(err, storage.ErrNoCommitIdentity), errors.Is(err, storage.ErrMergeInProgress):
 		return exitFault, "usage: " + commandMessage(err)
 	case errors.As(err, &internalErr):
 		return exitFault, "internal: " + internalErr.Error()

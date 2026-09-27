@@ -198,6 +198,16 @@ func (g *GitProvider) checkMergeConflicts() error {
 	return checkMergeState(g.kbRoot)
 }
 
+// ErrMergeInProgress reports that the repository hosting the KB carries a merge
+// that is not finished: akb blocks its commits until the host project completes
+// or aborts the merge. The refusal is self-sufficient — it names what was found
+// and what the caller can do about it — so the CLI maps the sentinel to the
+// usage exit code. It is the report the refusal appends after the merge's
+// location.
+//
+//nolint:staticcheck,revive // the sentinel ends the refusal's sentence; the period is part of its message
+var ErrMergeInProgress = errors.New("akb commits are blocked until it is completed or aborted. This merge belongs to the host project — do not resolve it from the KB; retry later or surface to the user.")
+
 // checkMergeState rejects a mutation while the repository of kbRoot carries a
 // merge that is not finished: a conflicted merge, or a clean one that is still
 // in progress. Git refuses a partial commit — the only kind akb makes — until
@@ -237,11 +247,10 @@ func checkMergeState(kbRoot string) error {
 	// A merge can touch files of the KB, but it belongs to the repository that
 	// hosts the KB: akb never starts one, and resolving it is the host
 	// project's work.
-	const report = ": akb commits are blocked until it is completed or aborted. This merge belongs to the host project — do not resolve it from the KB; retry later or surface to the user."
 	if changed == "" {
-		return fmt.Errorf("merge in progress in repository %s (outside the knowledge base)%s", repoTopLevel(kbRoot), report)
+		return fmt.Errorf("merge in progress in repository %s (outside the knowledge base): %w", repoTopLevel(kbRoot), ErrMergeInProgress)
 	}
-	return fmt.Errorf("merge in progress in repository %s (outside the knowledge base, in: %s)%s", repoTopLevel(kbRoot), changed, report)
+	return fmt.Errorf("merge in progress in repository %s (outside the knowledge base, in: %s): %w", repoTopLevel(kbRoot), changed, ErrMergeInProgress)
 }
 
 // mergeInProgress reports whether the repository of kbRoot carries a merge that

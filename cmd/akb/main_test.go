@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/storage"
 )
 
 var akbBinPath, akbTestBinPath string
@@ -353,6 +354,30 @@ func TestCommitIdentityRefusalClassifiesAsUsage(t *testing.T) {
 		if !strings.Contains(report, want) {
 			t.Errorf("report = %q does not name %q", report, want)
 		}
+	}
+}
+
+// TestMergeInProgressRefusalClassifiesAsUsage pins how the in-progress-merge
+// refusal classifies through the command's wrapping: the merge belongs to the
+// host project and akb cannot resolve it, while the refusal names what was
+// found and what the caller can do about it, so it exits 2 with the usage:
+// prefix and the refusal's own report. A layer between the refusal and
+// classifyExit that drops the sentinel fails the test.
+func TestMergeInProgressRefusalClassifiesAsUsage(t *testing.T) {
+	// checkMergeState words the refusal, and the command layers wrap it the way
+	// raw_write.go's preflight does; classification has to find the sentinel
+	// through both.
+	refusal := commandFailure{err: fmt.Errorf(
+		"commit preflight: merge in progress in repository /host/project (outside the knowledge base, in: src/app.go): %w",
+		storage.ErrMergeInProgress)}
+
+	code, report := classifyExit(refusal)
+	if code != exitFault {
+		t.Errorf("exit code = %d, want %d", code, exitFault)
+	}
+	want := "usage: commit preflight: merge in progress in repository /host/project (outside the knowledge base, in: src/app.go): " + storage.ErrMergeInProgress.Error()
+	if report != want {
+		t.Errorf("report = %q, want %q", report, want)
 	}
 }
 

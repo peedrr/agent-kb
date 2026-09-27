@@ -457,6 +457,9 @@ func TestGitProviderWriteRejectsCleanInProgressMerge(t *testing.T) {
 	if want := mergeInProgressReport(t, repo, changed); err.Error() != want {
 		t.Errorf("error = %q, want %q", err, want)
 	}
+	if !errors.Is(err, ErrMergeInProgress) {
+		t.Errorf("error %v does not wrap ErrMergeInProgress", err)
+	}
 	if _, err := os.Stat(page); !os.IsNotExist(err) {
 		t.Errorf("the page was written while the merge report was due (stat error: %v)", err)
 	}
