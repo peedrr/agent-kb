@@ -52,12 +52,6 @@ func runRawSync(_ *cobra.Command, _ []string) error {
 	}
 	defer repoLock.Release()
 
-	// The commit identity and the merge state the sync's commit needs are
-	// checked before the manifest is touched, so a refusal leaves it as it was.
-	if err := store.Preflight(); err != nil {
-		return fmt.Errorf("commit preflight: %w", err)
-	}
-
 	// Read existing manifest
 	mgr := manifest.NewManager(kbRoot)
 	existingEntries, err := mgr.ReadManifest()
@@ -141,28 +135,35 @@ func runRawSync(_ *cobra.Command, _ []string) error {
 		deletedCount++
 	}
 
+	totalChanges := newCount + modifiedCount + deletedCount
+
+	// A reconciliation that found nothing to change writes nothing and commits
+	// nothing, so it resolves no commit identity: the preflight below guards the
+	// manifest write and the commit that follow an actual change.
+	if totalChanges == 0 {
+		fmt.Println("No changes to sync.")
+		return nil
+	}
+
+	// The commit identity and the merge state the sync's commit needs are
+	// checked before the manifest is touched, so a refusal leaves it as it was.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
+	}
+
 	// Write the updated manifest
 	if err := mgr.WriteManifest(updatedEntries); err != nil {
 		return fmt.Errorf("write manifest: %w", err)
 	}
 
-	// Commit if there are changes
-	totalChanges := newCount + modifiedCount + deletedCount
-	if totalChanges > 0 {
-		commitMsg := fmt.Sprintf("akb: raw sync (%d new, %d modified, %d deleted, %d unchanged)",
-			newCount, modifiedCount, deletedCount, unchangedCount)
-		if err := store.Commit(commitMsg, "raw/"); err != nil {
-			return fmt.Errorf("commit raw sync: %w", err)
-		}
+	commitMsg := fmt.Sprintf("akb: raw sync (%d new, %d modified, %d deleted, %d unchanged)",
+		newCount, modifiedCount, deletedCount, unchangedCount)
+	if err := store.Commit(commitMsg, "raw/"); err != nil {
+		return fmt.Errorf("commit raw sync: %w", err)
 	}
 
-	// Print summary
-	if totalChanges == 0 {
-		fmt.Println("No changes to sync.")
-	} else {
-		fmt.Printf("Synced: %d new, %d modified, %d deleted, %d unchanged\n",
-			newCount, modifiedCount, deletedCount, unchangedCount)
-	}
+	fmt.Printf("Synced: %d new, %d modified, %d deleted, %d unchanged\n",
+		newCount, modifiedCount, deletedCount, unchangedCount)
 
 	return nil
 }

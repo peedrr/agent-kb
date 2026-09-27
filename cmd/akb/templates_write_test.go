@@ -5,6 +5,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -12,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/peedrr/agent-kb/internal/frontmatter"
+	"github.com/peedrr/agent-kb/internal/storage"
 	"github.com/peedrr/agent-kb/internal/template"
 )
 
@@ -453,6 +455,105 @@ title: ""
 	status := mustGitInDir(t, kbRoot, "status", "--porcelain")
 	if !strings.Contains(status, "A  src/app.go") {
 		t.Errorf("staged change lost from the index:\n%s", status)
+	}
+}
+
+// The template and mockups the unchanged and changed-content tests write: a
+// template that passes validation without depending on an optional key.
+const (
+	stableTemplateBody = `name: stable
+description: A template held stable across writes
+schema:
+  frontmatter:
+    title:
+      type: string
+      required: true
+validations:
+  - id: has_title
+    rule: 'page.frontmatter.title != ""'
+    expect: title must not be empty
+`
+	stablePassBody = `---
+type: stable
+title: Hello
+---
+# Hello
+`
+	stableFailBody = `---
+type: stable
+title: ""
+---
+# Empty
+`
+)
+
+// TestTemplatesWrite_UnchangedNeedsNoCommitIdentity pins that a write whose
+// template and mockups already hold exactly the content it would record is
+// decided before the commit preflight: no commit identity is resolvable, yet
+// the write reports the template unchanged and returns success.
+func TestTemplatesWrite_UnchangedNeedsNoCommitIdentity(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+	writeTemplatesWriteFixture(t, kbRoot, "stable", stableTemplateBody, stablePassBody, stableFailBody)
+
+	if err := runTemplatesWrite(nil, []string{"stable"}); err != nil {
+		t.Fatalf("first template write: %v", err)
+	}
+
+	mustGitInDir(t, kbRoot, "config", "--unset", "user.name")
+	mustGitInDir(t, kbRoot, "config", "--unset", "user.email")
+	useNoCommitIdentityEnv(t)
+
+	origForce := twForce
+	twForce = true
+	t.Cleanup(func() { twForce = origForce })
+
+	var runErr error
+	out := captureStdout(t, func() { runErr = runTemplatesWrite(nil, []string{"stable"}) })
+	if runErr != nil {
+		t.Fatalf("unchanged template write: %v", runErr)
+	}
+	if want := "Template \"stable\" unchanged.\n"; out != want {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+}
+
+// TestTemplatesWrite_ChangedContentRefusesWithoutCommitIdentity pins that the
+// preflight still guards a write that has something to record: an identity no
+// source can name is refused with the sentinel before any template file is
+// touched.
+func TestTemplatesWrite_ChangedContentRefusesWithoutCommitIdentity(t *testing.T) {
+	kbRoot := setupTemplatesWriteTestKB(t)
+	writeTemplatesWriteFixture(t, kbRoot, "stable", stableTemplateBody, stablePassBody, stableFailBody)
+
+	if err := runTemplatesWrite(nil, []string{"stable"}); err != nil {
+		t.Fatalf("first template write: %v", err)
+	}
+
+	mustGitInDir(t, kbRoot, "config", "--unset", "user.name")
+	mustGitInDir(t, kbRoot, "config", "--unset", "user.email")
+	useNoCommitIdentityEnv(t)
+
+	changedTemplateBody := strings.Replace(stableTemplateBody, "A template held stable across writes", "A template with a new description", 1)
+	writeTemplatesWriteFixture(t, kbRoot, "stable", changedTemplateBody, stablePassBody, stableFailBody)
+
+	origForce := twForce
+	twForce = true
+	t.Cleanup(func() { twForce = origForce })
+
+	err := runTemplatesWrite(nil, []string{"stable"})
+	if err == nil {
+		t.Fatal("template write with changed content succeeded without a commit identity")
+	}
+	if !errors.Is(err, storage.ErrNoCommitIdentity) {
+		t.Errorf("refusal = %v, want the commit-identity sentinel", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(kbRoot, ".agent-kb", "templates", "stable.yaml")) //nolint:gosec // test temp file
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != stableTemplateBody {
+		t.Errorf("on-disk template = %q, want it untouched at the committed content", data)
 	}
 }
 

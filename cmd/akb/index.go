@@ -265,19 +265,40 @@ func runIndexRemove(_ *cobra.Command, args []string) error {
 	}
 	defer repoLock.Release()
 
+	indexPath := filepath.Join(kbRoot, "kb", "index.md")
+
+	// Normalize path to kb/ prefix
+	cleanPath := strings.TrimPrefix(entryPath, "kb/")
+	relPath := filepath.Join("kb", cleanPath)
+	relPath = filepath.ToSlash(relPath)
+
+	// A removal of an entry the index does not carry changes nothing, so it
+	// resolves no commit identity: the check below renders the index without the
+	// entry in memory and returns before the preflight when the result is what
+	// kb/index.md already holds. An index file that is missing or unreadable
+	// falls through to the removal path, which reports its own error.
+	if current, readErr := os.ReadFile(indexPath); readErr == nil { //nolint:gosec // path validated by ResolveKBPath
+		if entries, parseErr := index.ReadIndex(kbRoot); parseErr == nil {
+			kept := make([]index.IndexEntry, 0, len(entries))
+			for _, entry := range entries {
+				if entry.Path != relPath {
+					kept = append(kept, entry)
+				}
+			}
+			if index.RenderIndex(kept) == string(current) {
+				fmt.Printf("Removed %s from index\n", relPath)
+				return nil
+			}
+		}
+	}
+
 	// The commit identity and the merge state the removal's commit needs are
 	// checked before kb/index.md is touched, so a refusal leaves it as it was.
 	if err := store.Preflight(); err != nil {
 		return fmt.Errorf("commit preflight: %w", err)
 	}
 
-	indexPath := filepath.Join(kbRoot, "kb", "index.md")
 	oldContent, _ := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
-
-	// Normalize path to kb/ prefix
-	cleanPath := strings.TrimPrefix(entryPath, "kb/")
-	relPath := filepath.Join("kb", cleanPath)
-	relPath = filepath.ToSlash(relPath)
 
 	if err := index.RemoveEntry(kbRoot, relPath); err != nil {
 		return fmt.Errorf("remove entry: %w", err)

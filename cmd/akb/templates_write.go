@@ -258,18 +258,6 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("open storage: %w", err)
 	}
 
-	// The commit identity and the merge state the swap's commit needs are
-	// checked before any template file is touched, so a refusal leaves the
-	// template as it was.
-	if err := store.Preflight(); err != nil {
-		return fmt.Errorf("commit preflight: %w", err)
-	}
-
-	targetDir := templatesDir
-	if err := os.MkdirAll(targetDir, 0750); err != nil {
-		return fmt.Errorf("create templates directory: %w", err)
-	}
-
 	// Hold the lock of the base across the swap of the template files and the
 	// commit that records it.
 	repoLock, err := store.Lock()
@@ -279,7 +267,8 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	defer repoLock.Release()
 
 	// A write that would record exactly the template already committed changes
-	// nothing, so it succeeds without reaching git with an empty change set. The
+	// nothing, so it succeeds without reaching git with an empty change set and
+	// without resolving the commit identity the preflight below requires. The
 	// check runs after every mockup validation above and under the lock, so the
 	// content it compares is the content the commit below would record. --force
 	// skips the overwrite confirmation only; validation has already run.
@@ -292,6 +281,18 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 			fmt.Printf("Template %q unchanged.\n", name)
 			return nil
 		}
+	}
+
+	// The commit identity and the merge state the swap's commit needs are
+	// checked before any template file is touched, so a refusal leaves the
+	// template as it was.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
+	}
+
+	targetDir := templatesDir
+	if err := os.MkdirAll(targetDir, 0750); err != nil {
+		return fmt.Errorf("create templates directory: %w", err)
 	}
 
 	tmpDir, err := os.MkdirTemp(targetDir, ".tmp-write-")

@@ -330,6 +330,44 @@ func TestIndexRemove_NonexistentPath(t *testing.T) {
 	}
 }
 
+// TestIndexRemove_NotPresentNeedsNoCommitIdentity pins that removing an entry
+// the index does not carry is decided before the commit preflight: no commit
+// identity is resolvable, yet the removal succeeds, reports itself, and leaves
+// kb/index.md byte-identical.
+func TestIndexRemove_NotPresentNeedsNoCommitIdentity(t *testing.T) {
+	kbRoot := setupIndexTestKB(t)
+
+	mustGitInDir(t, kbRoot, "config", "--unset", "user.name")
+	mustGitInDir(t, kbRoot, "config", "--unset", "user.email")
+	useNoCommitIdentityEnv(t)
+
+	origNoCommit := noCommit
+	noCommit = false
+	t.Cleanup(func() { noCommit = origNoCommit })
+
+	indexPath := filepath.Join(kbRoot, "kb", "index.md")
+	before, err := os.ReadFile(indexPath) //nolint:gosec // test temp file
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := captureOutput(func() error { return runIndexRemove(nil, []string{"notes/absent.md"}) })
+	if err != nil {
+		t.Fatalf("index remove of an absent entry: %v", err)
+	}
+	if want := "Removed kb/notes/absent.md from index\n"; out != want {
+		t.Errorf("output = %q, want %q", out, want)
+	}
+
+	after, err := os.ReadFile(indexPath) //nolint:gosec // test temp file
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Errorf("index.md = %q, want it unchanged at %q", after, before)
+	}
+}
+
 func TestIndexRemove_RejectsParentDir(t *testing.T) {
 	setupIndexTestKB(t)
 
