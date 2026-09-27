@@ -26,11 +26,6 @@ import (
 // join a commit's pathspec when the current operation staged them.
 var managedCommitPaths = []string{"kb/index.md", "kb/log.md"}
 
-// akbCommitIdentity is the fallback identity of an akb commit: it keeps the
-// commit attributable to akb without writing user.name/user.email into
-// repository config. Repositories that configure their own identity keep it.
-var akbCommitIdentity = []string{"-c", "user.name=akb", "-c", "user.email=akb@local"}
-
 const (
 	// indexLockRetryAttempts bounds the retries used when another process holds
 	// the repository index lock.
@@ -59,6 +54,11 @@ func (g *GitProvider) WriteWithCommitMsg(_ context.Context, path string, data []
 			return err
 		}
 
+		identity, err := g.commitIdentity()
+		if err != nil {
+			return err
+		}
+
 		if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 			return fmt.Errorf("create parent directories: %w", err)
 		}
@@ -80,7 +80,7 @@ func (g *GitProvider) WriteWithCommitMsg(_ context.Context, path string, data []
 			return nil
 		}
 
-		return g.gitCommit(commitMsg, relPath)
+		return g.gitCommit(commitMsg, relPath, identity)
 	})
 }
 
@@ -111,6 +111,11 @@ func (g *GitProvider) Delete(_ context.Context, path string) error {
 			return err
 		}
 
+		identity, err := g.commitIdentity()
+		if err != nil {
+			return err
+		}
+
 		if err := os.Remove(path); err != nil {
 			return fmt.Errorf("delete file: %w", err)
 		}
@@ -129,7 +134,7 @@ func (g *GitProvider) Delete(_ context.Context, path string) error {
 		}
 
 		commitMsg := fmt.Sprintf("akb: delete %s", filepath.ToSlash(relPath))
-		return g.gitCommit(commitMsg, relPath)
+		return g.gitCommit(commitMsg, relPath, identity)
 	})
 }
 
@@ -173,6 +178,17 @@ func (g *GitProvider) List(_ context.Context, dir string, ext string) ([]string,
 	}
 	sort.Strings(files)
 	return files, nil
+}
+
+// commitIdentity resolves the identity of the commit that ends an operation. It
+// runs before the operation writes anything, so an identity no source can name
+// fails the operation without leaving a half-written update behind. One that
+// leaves its commit to the caller (--no-commit) records no identity of its own.
+func (g *GitProvider) commitIdentity() (*Identity, error) {
+	if g.noCommit {
+		return nil, nil
+	}
+	return ResolveIdentity(g.kbRoot)
 }
 
 // checkMergeConflicts rejects a mutation while the repository that hosts the KB
@@ -339,9 +355,10 @@ func repoLockPath(kbRoot string) (string, error) {
 // CommitFiles stages and commits exactly the given KB-relative paths with
 // commitMsg while holding the repository lock. The pathspec keeps the commit
 // scoped to the operation's own files, so changes another tool staged stay
-// staged, and the commit carries the repository's configured identity or the
-// akb fallback identity. Paths git cannot record — absent from both the
-// worktree and the committed tree — are skipped.
+// staged. The commit carries the identity akb supplies — AKB_AUTHOR_NAME and
+// AKB_AUTHOR_EMAIL, or git-author and git-email in the base's akb.yaml — and
+// git's own identity when akb supplies none. Paths git cannot record — absent
+// from both the worktree and the committed tree — are skipped.
 func CommitFiles(kbRoot, commitMsg string, paths ...string) error {
 	lock, err := LockRepo(kbRoot)
 	if err != nil {
@@ -350,6 +367,11 @@ func CommitFiles(kbRoot, commitMsg string, paths ...string) error {
 	defer lock.Release()
 
 	if err := checkMergeState(kbRoot); err != nil {
+		return err
+	}
+
+	identity, err := ResolveIdentity(kbRoot)
+	if err != nil {
 		return err
 	}
 
@@ -365,11 +387,8 @@ func CommitFiles(kbRoot, commitMsg string, paths ...string) error {
 		return err
 	}
 
-	args, err := commitArgs(kbRoot, commitMsg, recorded)
-	if err != nil {
-		return err
-	}
-	_, err = RunGit(kbRoot, "git commit", args...)
+	args, env := commitArgs(identity, commitMsg, recorded)
+	_, err = runGitEnv(kbRoot, "git commit", env, args...)
 	return err
 }
 
@@ -498,7 +517,7 @@ func (g *GitProvider) gitAdd(relPath string) error {
 	return err
 }
 
-func (g *GitProvider) gitCommit(msg string, relPath string) error {
+func (g *GitProvider) gitCommit(msg string, relPath string, identity *Identity) error {
 	paths, err := g.commitPaths(relPath)
 	if err != nil {
 		return err
@@ -509,39 +528,18 @@ func (g *GitProvider) gitCommit(msg string, relPath string) error {
 		return fmt.Errorf("git commit: nothing to commit for %s", filepath.ToSlash(relPath))
 	}
 
-	args, err := commitArgs(g.kbRoot, msg, paths)
-	if err != nil {
-		return err
-	}
-
-	_, err = RunGit(g.kbRoot, "git commit", args...)
+	args, env := commitArgs(identity, msg, paths)
+	_, err = runGitEnv(g.kbRoot, "git commit", env, args...)
 	return err
 }
 
-// CommitIdentityArgs returns the git arguments that give an akb commit its
-// author. A repository whose merged config carries a user.name commits under
-// that configured identity, so no override is passed; a repository without one
-// falls back to the akb identity. The identity is never written to repository
-// config.
-func CommitIdentityArgs(kbRoot string) ([]string, error) {
-	out, err := RunGit(kbRoot, "git config user.name", "config", "user.name")
-	if err != nil || strings.TrimSpace(out) == "" {
-		return akbCommitIdentity, nil
-	}
-	return nil, nil
-}
-
-// commitArgs builds the arguments of a commit that records exactly paths with
-// msg under the identity resolved for the repository.
-func commitArgs(kbRoot, msg string, paths []string) ([]string, error) {
-	identity, err := CommitIdentityArgs(kbRoot)
-	if err != nil {
-		return nil, err
-	}
-
-	args := append([]string{}, identity...)
+// commitArgs builds the arguments and the environment of a commit that records
+// exactly paths with msg. The identity akb supplies reaches git as
+// GIT_AUTHOR_* and GIT_COMMITTER_* overrides; when akb supplies none, git
+// resolves the identity from its own configuration.
+func commitArgs(identity *Identity, msg string, paths []string) (args []string, env []string) {
 	args = append(args, "commit", "-m", msg, "--only", "--")
-	return append(args, paths...), nil
+	return append(args, paths...), commitEnv(identity)
 }
 
 // RunGit runs a git subcommand in kbRoot and returns its combined output. A
@@ -552,9 +550,17 @@ func commitArgs(kbRoot, msg string, paths []string) ([]string, error) {
 // command outside this package uses for the git steps that package does not
 // wrap (the bootstrap staging and commit of `akb init`).
 func RunGit(kbRoot, op string, args ...string) (string, error) {
+	return runGitEnv(kbRoot, op, nil, args...)
+}
+
+// runGitEnv is RunGit with the environment of the git process spelled out: nil
+// inherits akb's environment, which is what a commit that akb supplies no
+// identity for needs — git resolves the identity from it.
+func runGitEnv(kbRoot, op string, env []string, args ...string) (string, error) {
 	for attempt := 0; ; attempt++ {
 		cmd := exec.Command("git", args...) //nolint:gosec // launching trusted git binary with controlled args
 		cmd.Dir = kbRoot
+		cmd.Env = env
 		out, err := cmd.CombinedOutput()
 		if err == nil {
 			return string(out), nil

@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sync"
 
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/path"
@@ -61,15 +62,21 @@ type committing interface {
 }
 
 // Store is the storage of one knowledge base: the provider its versioning mode
-// selects, plus the lock, merge preflight and commit steps its commands go
-// through. Commands work through a Store rather than a provider directly, so a
-// base that is not versioned in git runs the same command code as a
-// git-versioned one and simply writes its files without committing them.
+// selects, plus the lock, preflight and commit steps its commands go through.
+// Commands work through a Store rather than a provider directly, so a base that
+// is not versioned in git runs the same command code as a git-versioned one and
+// simply writes its files without committing them.
 type Store struct {
 	kbRoot   string
 	mode     Mode
 	noCommit bool
 	provider Provider
+
+	// The commit identity akb supplies is resolved once, by Preflight.
+	identityMu       sync.Mutex
+	identityResolved bool
+	identity         *Identity
+	identityErr      error
 }
 
 // OpenStore returns the storage of the base rooted at kbRoot, with the
@@ -101,14 +108,37 @@ func (s *Store) Mode() Mode {
 
 // Preflight checks what a mutation of the base needs before anything is
 // written: a repository without a merge in progress, which would refuse the
-// commit the mutation ends in. A base that is not versioned in git has nothing
-// to check and no commit to protect. Commands call it before their first
-// mutation; the commit steps themselves check again under the lock.
+// commit the mutation ends in, and a commit identity to record. A base that is
+// not versioned in git has neither to check, and an invocation that leaves the
+// commit to its caller (--no-commit) records no identity either. Commands call
+// it before their first mutation; the commit steps themselves check again under
+// the lock.
 func (s *Store) Preflight() error {
 	if s.mode == ModeNone {
 		return nil
 	}
-	return checkMergeState(s.kbRoot)
+	if err := checkMergeState(s.kbRoot); err != nil {
+		return err
+	}
+	if s.noCommit {
+		return nil
+	}
+	return s.resolveIdentity()
+}
+
+// resolveIdentity resolves the commit identity akb supplies to the base's
+// commits once, so that an identity no source can name is reported before a
+// command writes anything, not by the first commit it attempts.
+func (s *Store) resolveIdentity() error {
+	s.identityMu.Lock()
+	defer s.identityMu.Unlock()
+
+	if s.identityResolved {
+		return s.identityErr
+	}
+	s.identity, s.identityErr = ResolveIdentity(s.kbRoot)
+	s.identityResolved = true
+	return s.identityErr
 }
 
 // Lock acquires the exclusive lock of the base's mutation sequence and returns

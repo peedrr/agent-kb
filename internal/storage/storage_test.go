@@ -775,66 +775,6 @@ func assertRepoIdentityUnset(t *testing.T, repo string) {
 	}
 }
 
-func TestCommitIdentityArgs(t *testing.T) {
-	isolateGitConfig(t)
-
-	t.Run("falls back to the akb identity without a configured user", func(t *testing.T) {
-		forceUnsetUser(t)
-		repo := initRepoWithoutIdentity(t)
-
-		identity, err := CommitIdentityArgs(repo)
-		if err != nil {
-			t.Fatalf("CommitIdentityArgs: %v", err)
-		}
-		if want := []string{"-c", "user.name=akb", "-c", "user.email=akb@local"}; !reflect.DeepEqual(identity, want) {
-			t.Errorf("identity = %v, want %v", identity, want)
-		}
-	})
-
-	t.Run("keeps the configured identity", func(t *testing.T) {
-		repo := initRepoWithoutIdentity(t)
-		mustGitIn(t, repo, "config", "user.name", "ada")
-		mustGitIn(t, repo, "config", "user.email", "ada@example.com")
-
-		identity, err := CommitIdentityArgs(repo)
-		if err != nil {
-			t.Fatalf("CommitIdentityArgs: %v", err)
-		}
-		if len(identity) != 0 {
-			t.Errorf("identity = %v, want no overrides", identity)
-		}
-	})
-}
-
-func TestGitProvider_CommitWithoutRepoIdentity(t *testing.T) {
-	isolateGitConfig(t)
-	forceUnsetUser(t)
-	repo := initRepoWithoutIdentity(t)
-
-	provider := NewGitProvider(repo, false)
-	ctx := context.Background()
-
-	t.Run("commits as the fallback identity", func(t *testing.T) {
-		path := filepath.Join(repo, "kb", "auto-config.md")
-		if err := provider.Write(ctx, path, []byte("auto config test")); err != nil {
-			t.Fatalf("write without repository identity: %v", err)
-		}
-
-		data, err := os.ReadFile(path) //nolint:gosec // test reading a file in its temp repository
-		if err != nil {
-			t.Fatalf("ReadFile: %v", err)
-		}
-		if string(data) != "auto config test" {
-			t.Errorf("content = %q, want %q", string(data), "auto config test")
-		}
-
-		if author := commitAuthor(t, repo); author != "akb <akb@local>" {
-			t.Errorf("author = %q, want %q", author, "akb <akb@local>")
-		}
-		assertRepoIdentityUnset(t, repo)
-	})
-}
-
 func TestGitProvider_CommitWithConfiguredIdentity(t *testing.T) {
 	isolateGitConfig(t)
 	repo := initRepoWithoutIdentity(t)
