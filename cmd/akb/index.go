@@ -127,14 +127,25 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve path: %w", err)
 	}
 
-	// Hold the repository lock across the read-modify-write of kb/index.md and
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
+
+	// Hold the lock of the base across the read-modify-write of kb/index.md and
 	// the commit that records it, so a command running concurrently against the
 	// same index cannot overwrite this entry.
-	repoLock, err := storage.LockRepo(kbRoot)
+	repoLock, err := store.Lock()
 	if err != nil {
 		return fmt.Errorf("lock repository: %w", err)
 	}
 	defer repoLock.Release()
+
+	// The commit identity and the merge state the entry's commit needs are
+	// checked before kb/index.md is touched, so a refusal leaves it as it was.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
+	}
 
 	// Resolve the full file path
 	cleanPath := strings.TrimPrefix(entryPath, "kb/")
@@ -211,7 +222,6 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("read updated index: %w", err)
 	}
 
-	store := storage.NewGitProvider(kbRoot, noCommit)
 	ctx := context.Background()
 	commitMsg := fmt.Sprintf("akb: index add %s", relPath)
 	if err := store.WriteWithCommitMsg(ctx, idxPath, newContent, commitMsg); err != nil {
@@ -241,14 +251,25 @@ func runIndexRemove(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve path: %w", err)
 	}
 
-	// Hold the repository lock across the read-modify-write of kb/index.md and
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
+
+	// Hold the lock of the base across the read-modify-write of kb/index.md and
 	// the commit that records it, so a command running concurrently against the
 	// same index cannot overwrite this removal.
-	repoLock, err := storage.LockRepo(kbRoot)
+	repoLock, err := store.Lock()
 	if err != nil {
 		return fmt.Errorf("lock repository: %w", err)
 	}
 	defer repoLock.Release()
+
+	// The commit identity and the merge state the removal's commit needs are
+	// checked before kb/index.md is touched, so a refusal leaves it as it was.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
+	}
 
 	indexPath := filepath.Join(kbRoot, "kb", "index.md")
 	oldContent, _ := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
@@ -272,7 +293,6 @@ func runIndexRemove(_ *cobra.Command, args []string) error {
 		return nil
 	}
 
-	store := storage.NewGitProvider(kbRoot, noCommit)
 	ctx := context.Background()
 	commitMsg := fmt.Sprintf("akb: index remove %s", relPath)
 	if err := store.WriteWithCommitMsg(ctx, indexPath, newContent, commitMsg); err != nil {
@@ -291,14 +311,26 @@ func runIndexRebuild(_ *cobra.Command, _ []string) error {
 
 	indexPath := filepath.Join(kbRoot, "kb", "index.md")
 
-	// Hold the repository lock across the rebuild of kb/index.md and the commit
-	// that records it, so a command running concurrently against the same index
-	// cannot overwrite the rebuilt entries.
-	repoLock, err := storage.LockRepo(kbRoot)
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
+
+	// Hold the lock of the base across the rebuild of kb/index.md and the
+	// commit that records it, so a command running concurrently against the
+	// same index cannot overwrite the rebuilt entries.
+	repoLock, err := store.Lock()
 	if err != nil {
 		return fmt.Errorf("lock repository: %w", err)
 	}
 	defer repoLock.Release()
+
+	// The commit identity and the merge state the rebuild's commit needs are
+	// checked before kb/index.md and the search index are rebuilt, so a refusal
+	// leaves both as they were.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
+	}
 
 	oldContent, _ := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
 
@@ -331,7 +363,6 @@ func runIndexRebuild(_ *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	store := storage.NewGitProvider(kbRoot, noCommit)
 	if err := store.WriteWithCommitMsg(ctx, indexPath, newContent, "akb: index rebuild"); err != nil {
 		return fmt.Errorf("commit index: %w", err)
 	}

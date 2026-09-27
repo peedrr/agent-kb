@@ -124,8 +124,13 @@ func runWrite(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("load templates: %w", err)
 	}
 
-	// Create storage provider (needed for old_page and write)
-	store := storage.NewGitProvider(kbRoot, noCommit)
+	// Open the storage of the base: the provider its versioning mode selects,
+	// plus the lock, preflight and commit steps its commands go through. It is
+	// needed for old_page and the write.
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
 
 	// Create CEL environment
 	celEnv, err := cel.NewEnv()
@@ -167,11 +172,11 @@ func runWrite(_ *cobra.Command, args []string) error {
 			return &usageError{msg: "cannot write log.md; it is a managed file"}
 		}
 
-		// Hold the repository lock from the read of the existing page through the
-		// commit and the search and link-graph updates that follow it: the update
-		// is assembled from the page as it is at commit time, so concurrent
-		// updates of the same page cannot overwrite each other.
-		pageLock, err := storage.LockRepo(kbRoot)
+		// Hold the lock of the base from the read of the existing page through
+		// the commit and the search and link-graph updates that follow it: the
+		// update is assembled from the page as it is at commit time, so
+		// concurrent updates of the same page cannot overwrite each other.
+		pageLock, err := store.Lock()
 		if err != nil {
 			return fmt.Errorf("lock repository: %w", err)
 		}
@@ -291,10 +296,10 @@ func runWrite(_ *cobra.Command, args []string) error {
 				return &usageError{msg: "cannot write log.md; it is a managed file"}
 			}
 
-			// Hold the repository lock from the read of the existing page through
+			// Hold the lock of the base from the read of the existing page through
 			// the commit and the search and link-graph updates that follow it, so
 			// concurrent appends cannot overwrite each other's content.
-			pageLock, err := storage.LockRepo(kbRoot)
+			pageLock, err := store.Lock()
 			if err != nil {
 				return fmt.Errorf("lock repository: %w", err)
 			}
@@ -447,11 +452,11 @@ func runWrite(_ *cobra.Command, args []string) error {
 			}
 			relPath = filepath.ToSlash(relPath)
 
-			// Hold the repository lock from the on-disk read of the page being
+			// Hold the lock of the base from the on-disk read of the page being
 			// overwritten (os.Stat and BuildOldPage) through the CEL validation
 			// that follows it: old_page reflects the page as it is at commit time,
 			// so a concurrent write of the same page cannot slip in between.
-			pageLock, err := storage.LockRepo(kbRoot)
+			pageLock, err := store.Lock()
 			if err != nil {
 				return fmt.Errorf("lock repository: %w", err)
 			}
@@ -526,9 +531,9 @@ func runWrite(_ *cobra.Command, args []string) error {
 	tags := search.ExtractTags(fm.Fields)
 	summary := search.ExtractSummary(fm.Fields)
 
-	// Hold the repository lock from the page write through its commit and the
+	// Hold the lock of the base from the page write through its commit and the
 	// search and link-graph updates that follow it.
-	repoLock, err := storage.LockRepo(kbRoot)
+	repoLock, err := store.Lock()
 	if err != nil {
 		return fmt.Errorf("lock repository: %w", err)
 	}

@@ -130,6 +130,17 @@ func runLogAppend(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve knowledge base: %w", err)
 	}
 
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
+
+	// The commit identity and the merge state the appended entry's commit needs
+	// are checked before log.md is touched, so a refusal leaves it as it was.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
+	}
+
 	if err := kblog.AppendLog(kbRoot, operation, description, logAppendTitle); err != nil {
 		return fmt.Errorf("append log: %w", err)
 	}
@@ -140,7 +151,6 @@ func runLogAppend(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("read log after append: %w", err)
 	}
 
-	store := storage.NewGitProvider(kbRoot, noCommit)
 	ctx := context.Background()
 	commitMsg := "akb: log append " + operation
 	if err := store.WriteWithCommitMsg(ctx, logPath, data, commitMsg); err != nil {

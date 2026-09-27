@@ -117,16 +117,19 @@ func approveTemplates(kbRoot string) (map[string]template.Template, error) {
 }
 
 func approvePage(ctx context.Context, dbConn *sql.DB, kbRoot string, templates map[string]template.Template, fullPath, inputPath string) (bool, error) {
-	// Hold the repository lock from the read of the page through its commit and
-	// the search and link-graph updates, so the approved body is the body that
-	// gets committed.
-	repoLock, err := storage.LockRepo(kbRoot)
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return false, fmt.Errorf("open storage: %w", err)
+	}
+
+	// Hold the lock of the base from the read of the page through its commit
+	// and the search and link-graph updates, so the approved body is the body
+	// that gets committed.
+	repoLock, err := store.Lock()
 	if err != nil {
 		return false, fmt.Errorf("lock repository: %w", err)
 	}
 	defer repoLock.Release()
-
-	store := storage.NewGitProvider(kbRoot, noCommit)
 
 	content, err := store.Read(ctx, fullPath)
 	if err != nil {
@@ -288,11 +291,14 @@ func approveAllDraftPages(ctx context.Context, dbConn *sql.DB, kbRoot string, te
 // already approved is not a candidate and is skipped.
 func collectDraftCandidates(ctx context.Context, kbRoot string) ([]draftCandidate, error) {
 	kbDir := filepath.Join(kbRoot, "kb")
-	store := storage.NewGitProvider(kbRoot, noCommit)
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return nil, fmt.Errorf("open storage: %w", err)
+	}
 
 	var candidates []draftCandidate
 
-	err := filepath.WalkDir(kbDir, func(fullPath string, d os.DirEntry, err error) error {
+	err = filepath.WalkDir(kbDir, func(fullPath string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}

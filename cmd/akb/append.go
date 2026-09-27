@@ -115,13 +115,16 @@ func runAppend(_ *cobra.Command, args []string) error {
 		return &usageError{msg: "cannot append to log.md; it is a managed file"}
 	}
 
-	store := storage.NewGitProvider(kbRoot, noCommit)
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
 	ctx := context.Background()
 
-	// Hold the repository lock across the read-modify-write of the page body and
-	// the search and link-graph updates that follow it, so concurrent appends
-	// cannot overwrite each other's content.
-	repoLock, err := storage.LockRepo(kbRoot)
+	// Hold the lock of the base across the read-modify-write of the page body
+	// and the search and link-graph updates that follow it, so concurrent
+	// appends cannot overwrite each other's content.
+	repoLock, err := store.Lock()
 	if err != nil {
 		return fmt.Errorf("lock repository: %w", err)
 	}

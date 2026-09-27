@@ -190,13 +190,24 @@ func runDeleteCmd(_ *cobra.Command, args []string) error {
 }
 
 func deletePage(ctx context.Context, kbRoot string, dbConn *sql.DB, relPath, fullPath, cleanPath, title string) error {
-	// Hold the repository lock across the whole deletion: the index and log
+	store, err := storage.OpenStore(kbRoot, noCommit)
+	if err != nil {
+		return fmt.Errorf("open storage: %w", err)
+	}
+
+	// Hold the lock of the base across the whole deletion: the index and log
 	// updates, the commit, and the search and link-graph removals.
-	repoLock, err := storage.LockRepo(kbRoot)
+	repoLock, err := store.Lock()
 	if err != nil {
 		return fmt.Errorf("lock repository: %w", err)
 	}
 	defer repoLock.Release()
+
+	// The commit identity and the merge state the deletion's commit needs are
+	// checked before the first mutation, so a refusal leaves the base as it was.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
+	}
 
 	// The search index and the link graph describe the same deleted page, so
 	// both removals share one transaction: a failure in either leaves both
@@ -236,11 +247,10 @@ func deletePage(ctx context.Context, kbRoot string, dbConn *sql.DB, relPath, ful
 		fmt.Fprintf(os.Stderr, "warning: failed to log deletion: %v — check that kb/log.md exists\n", err)
 	}
 
-	if err := storage.StageFiles(kbRoot, "kb/index.md", "kb/log.md"); err != nil {
+	if err := store.StageFiles("kb/index.md", "kb/log.md"); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to stage index.md/log.md for commit: %v\n", err)
 	}
 
-	store := storage.NewGitProvider(kbRoot, noCommit)
 	if err := store.Delete(ctx, fullPath); err != nil {
 		return fmt.Errorf("delete page: %w — the page was already removed from the search index and link graph but its file removal or its commit did not complete; if the page file still exists, run `akb index rebuild` to rebuild the search index and link graph; if the file is gone, run `git status` and commit the staged deletion manually", err)
 	}
