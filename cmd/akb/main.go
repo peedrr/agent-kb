@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/storage"
 )
 
 var version = "dev"
@@ -67,7 +68,8 @@ func (e commandFailure) Unwrap() error { return e.err }
 
 // classifyExit maps a command error to its process exit code and the text to
 // report on stderr. An empty report means the command already reported the
-// reason itself.
+// reason itself. A commit identity no source can name is a configuration fault
+// the caller fixes, so its refusal reports as a usage mistake.
 func classifyExit(err error) (code int, report string) {
 	var validationErr validationFailure
 	var driftErr driftDetected
@@ -80,7 +82,8 @@ func classifyExit(err error) (code int, report string) {
 		return exitSuccess, ""
 	case errors.As(err, &validationErr), errors.As(err, &driftErr):
 		return exitFailure, ""
-	case errors.As(err, &usageErr), errors.As(err, &pathGuardErr):
+	case errors.As(err, &usageErr), errors.As(err, &pathGuardErr),
+		errors.Is(err, storage.ErrNoCommitIdentity):
 		return exitFault, "usage: " + commandMessage(err)
 	case errors.As(err, &internalErr):
 		return exitFault, "internal: " + internalErr.Error()

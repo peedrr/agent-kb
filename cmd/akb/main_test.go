@@ -278,6 +278,84 @@ func TestPathGuardViolationClassifiesAsUsage(t *testing.T) {
 	assertUsageReport(t, report, "resolve path: path must not contain '..'")
 }
 
+// unsetCommitIdentityVars removes the environment variables that name a commit
+// identity — AKB_AUTHOR_*, GIT_AUTHOR_*, GIT_COMMITTER_* — from the test
+// process and restores them afterwards, so an in-process command resolves no
+// identity from the environment.
+func unsetCommitIdentityVars(t *testing.T) {
+	t.Helper()
+
+	for _, variable := range os.Environ() {
+		key, value, _ := strings.Cut(variable, "=")
+		if !strings.HasPrefix(key, "AKB_AUTHOR_") && !strings.HasPrefix(key, "GIT_AUTHOR_") && !strings.HasPrefix(key, "GIT_COMMITTER_") {
+			continue
+		}
+		os.Unsetenv(key)                            //nolint:errcheck,gosec // test setup — failure is non-fatal
+		t.Cleanup(func() { os.Setenv(key, value) }) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
+	}
+}
+
+// useNoCommitIdentityEnv makes git resolve no commit identity in the test
+// process: the environment names none, and git's own configuration names none.
+// It applies in process the conditions the raw write tests give their child
+// processes through fallbackIdentityEnv, so the command under test reaches the
+// identity refusal for real.
+func useNoCommitIdentityEnv(t *testing.T) {
+	t.Helper()
+
+	unsetCommitIdentityVars(t)
+
+	overrides := map[string]string{
+		"GIT_CONFIG_NOSYSTEM": "1",
+		"GIT_CONFIG_GLOBAL":   filepath.Join(t.TempDir(), "gitconfig"),
+		"GIT_CONFIG_COUNT":    "1",
+		"GIT_CONFIG_KEY_0":    "user.name",
+		"GIT_CONFIG_VALUE_0":  "",
+	}
+	for key, value := range overrides {
+		orig, had := os.LookupEnv(key)
+		os.Setenv(key, value) //nolint:errcheck,gosec // test setup — failure is non-fatal
+		t.Cleanup(func() {
+			if had {
+				os.Setenv(key, orig) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
+				return
+			}
+			os.Unsetenv(key) //nolint:errcheck,gosec // test cleanup — failure is non-fatal
+		})
+	}
+}
+
+// TestCommitIdentityRefusalClassifiesAsUsage drives `akb raw write` into the
+// commit-identity refusal in process — neither the environment nor git's own
+// configuration names an identity — and pins how Execute's error classifies:
+// the refusal is a configuration fault the caller fixes, so it exits 2 with the
+// usage: prefix and the sentinel's remedies. A layer between the refusal and
+// classifyExit that drops the sentinel fails the test.
+func TestCommitIdentityRefusalClassifiesAsUsage(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	// The harness configures a repository identity; the refusal needs none.
+	mustGitInDir(t, kbRoot, "config", "--unset", "user.name")
+	mustGitInDir(t, kbRoot, "config", "--unset", "user.email")
+	useNoCommitIdentityEnv(t)
+	pointStdinAtTempFile(t, "hello\n")
+
+	code, report := classifiesInvocation(t, "raw", "write", "data.csv")
+
+	if code != exitFault {
+		t.Errorf("exit code = %d, want %d", code, exitFault)
+	}
+	if !strings.HasPrefix(report, "usage: ") {
+		t.Errorf("report = %q, want a usage: prefix", report)
+	}
+	for _, want := range []string{"AKB_AUTHOR_NAME", "git-author"} {
+		if !strings.Contains(report, want) {
+			t.Errorf("report = %q does not name %q", report, want)
+		}
+	}
+}
+
 // TestWriteInvocationMistakesClassifyAsUsage drives each input branch of
 // `akb write` into its invocation mistakes: every one of them reports the same
 // message as before and now exits with the usage fault code.
