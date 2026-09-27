@@ -296,7 +296,7 @@ func TestStoreUnversionedBaseLockLocksItsOwnLockFile(t *testing.T) {
 		t.Fatalf("OpenStore: %v", err)
 	}
 
-	lockPath := filepath.Join(path.StateDir(kbRoot), kbLockFileName)
+	lockPath := path.LockPath(kbRoot)
 	lock, err := store.Lock()
 	if err != nil {
 		t.Fatalf("Lock: %v", err)
@@ -342,7 +342,7 @@ func TestStoreGitModeLockLocksTheRepository(t *testing.T) {
 	if lockFree(t, repoLock) {
 		t.Fatalf("the repository lock %s is not held after Lock", repoLock)
 	}
-	baseLock := filepath.Join(path.StateDir(repo), kbLockFileName)
+	baseLock := path.LockPath(repo)
 	if _, err := os.Stat(baseLock); !os.IsNotExist(err) {
 		t.Errorf("a git-versioned base wrote a base lock file (stat error: %v)", err)
 	}

@@ -33,6 +33,10 @@ const StateDirName = ".agent-kb"
 // directory a knowledge base: discovery lists by it and ResolveKB requires it.
 const ConfigFileName = "akb.yaml"
 
+// LockFileName names the lock file of a knowledge base that is not versioned in
+// git: the flock that serializes the mutations of the base.
+const LockFileName = "akb.lock"
+
 // StateDir returns the state directory of the knowledge base rooted at
 // kbRoot.
 func StateDir(kbRoot string) string {
@@ -54,6 +58,12 @@ func TemplatesDir(kbRoot string) string {
 // at kbRoot.
 func SearchDBPath(kbRoot string) string {
 	return filepath.Join(kbRoot, StateDirName, "search.db")
+}
+
+// LockPath returns the lock file of the knowledge base rooted at kbRoot: the
+// file a base that is not versioned in git locks to serialize its mutations.
+func LockPath(kbRoot string) string {
+	return filepath.Join(kbRoot, StateDirName, LockFileName)
 }
 
 // Common error messages

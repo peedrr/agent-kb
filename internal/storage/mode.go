@@ -7,16 +7,11 @@ package storage
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"sync"
 
 	"github.com/peedrr/agent-kb/internal/config"
 	"github.com/peedrr/agent-kb/internal/path"
 )
-
-// kbLockFileName names the lock file of a base that is not versioned in git. It
-// sits in the base's state directory, next to the config it belongs to.
-const kbLockFileName = "akb.lock"
 
 // Mode is the versioning mode of a knowledge base: the value of its akb.yaml
 // `versioning` key.
@@ -150,7 +145,7 @@ func (s *Store) resolveIdentity() error {
 // steps inside it lock again.
 func (s *Store) Lock() (*RepoLock, error) {
 	if s.mode == ModeNone {
-		return lockFile(filepath.Join(path.StateDir(s.kbRoot), kbLockFileName))
+		return lockFile(path.LockPath(s.kbRoot))
 	}
 	return LockRepo(s.kbRoot)
 }
