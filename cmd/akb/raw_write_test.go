@@ -115,16 +115,34 @@ func TestRunRawWrite_RepeatedWriteKeepsSingleManifestEntry(t *testing.T) {
 }
 
 // rawWriteRun drives the akb binary for one raw write and returns its combined
-// output.
+// output. The child environment carries no inherited commit-identity variables,
+// so the identity a test supplies in extraEnv is the one that resolves.
 func rawWriteRun(t *testing.T, kbRoot, inputPath, content string, extraEnv ...string) (string, error) {
 	t.Helper()
 
 	cmd := exec.Command(akbBinPath, "raw", "write", inputPath) //nolint:gosec // test helper launching akb binary
 	cmd.Dir = kbRoot
 	cmd.Stdin = strings.NewReader(content)
-	cmd.Env = append(os.Environ(), extraEnv...)
+	cmd.Env = append(withoutIdentityVars(os.Environ()), extraEnv...)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
+}
+
+// withoutIdentityVars returns the test runner's environment without the
+// variables that name a commit identity: GIT_AUTHOR_*, GIT_COMMITTER_*, and
+// AKB_AUTHOR_*. The child process must not inherit them: exec passes duplicate
+// variables through and git reads the first match, so an inherited value would
+// outrank the identity a test supplies in extraEnv.
+func withoutIdentityVars(environ []string) []string {
+	env := make([]string, 0, len(environ))
+	for _, variable := range environ {
+		key, _, _ := strings.Cut(variable, "=")
+		if strings.HasPrefix(key, "GIT_AUTHOR_") || strings.HasPrefix(key, "GIT_COMMITTER_") || strings.HasPrefix(key, "AKB_AUTHOR_") {
+			continue
+		}
+		env = append(env, variable)
+	}
+	return env
 }
 
 // gitInDir runs one git command in kbRoot and returns its trimmed output.
@@ -163,10 +181,10 @@ func commitFilesIn(t *testing.T, kbRoot string) []string {
 }
 
 // fallbackIdentityEnv keeps an ambient global git identity out of the akb
-// process under test, so the raw write path resolves the akb fallback identity.
-// Some git builds (nix) ignore GIT_CONFIG_GLOBAL and read a compiled-in global
-// config; an empty user.name reaches the same branch, because the identity
-// resolution treats an empty value as unset.
+// process under test, so the raw write path sees the identity the test names —
+// or none at all. Some git builds (nix) ignore GIT_CONFIG_GLOBAL and read a
+// compiled-in global config; an empty user.name reaches the same branch,
+// because the identity resolution treats an empty value as unset.
 func fallbackIdentityEnv(t *testing.T) []string {
 	t.Helper()
 
@@ -226,20 +244,56 @@ func TestRawWriteCommitUsesConfiguredIdentity(t *testing.T) {
 	}
 }
 
-func TestRawWriteCommitFallsBackToAKBIdentityWithoutConfiguredUser(t *testing.T) {
+func TestRawWriteCommitRefusesWithoutCommitIdentity(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)
 
 	mustGitInDir(t, kbRoot, "config", "--unset", "user.name")
 	mustGitInDir(t, kbRoot, "config", "--unset", "user.email")
 
+	headBefore := mustGitInDir(t, kbRoot, "log", "-1", "--format=%s")
+
 	out, err := rawWriteRun(t, kbRoot, "data.csv", "hello\n", fallbackIdentityEnv(t)...)
+	if err == nil {
+		t.Fatalf("akb raw write succeeded without a commit identity: %s", out)
+	}
+
+	for _, want := range []string{"no commit identity", "AKB_AUTHOR_NAME", "git-author"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("refusal output %q does not name %q", out, want)
+		}
+	}
+
+	if headAfter := mustGitInDir(t, kbRoot, "log", "-1", "--format=%s"); headAfter != headBefore {
+		t.Errorf("HEAD message = %q, want it unchanged at %q", headAfter, headBefore)
+	}
+
+	for _, key := range []string{"user.name", "user.email"} {
+		if value, err := gitInDir(t, kbRoot, "config", "--local", key); err == nil {
+			t.Errorf("repository config %s = %q, want it unset", key, value)
+		}
+	}
+}
+
+func TestRawWriteCommitUsesAKBIdentityFromEnvironment(t *testing.T) {
+	kbRoot := writeSetupTestKB(t)
+	defer writeCleanup(kbRoot)
+
+	mustGitInDir(t, kbRoot, "config", "--unset", "user.name")
+	mustGitInDir(t, kbRoot, "config", "--unset", "user.email")
+
+	env := append(fallbackIdentityEnv(t),
+		"AKB_AUTHOR_NAME=env-author",
+		"AKB_AUTHOR_EMAIL=env-author@example.com",
+	)
+
+	out, err := rawWriteRun(t, kbRoot, "data.csv", "hello\n", env...)
 	if err != nil {
 		t.Fatalf("akb raw write failed: %s: %v", out, err)
 	}
 
-	if author := mustGitInDir(t, kbRoot, "log", "-1", "--format=%an <%ae>"); author != "akb <akb@local>" {
-		t.Errorf("author = %q, want %q", author, "akb <akb@local>")
+	if author := mustGitInDir(t, kbRoot, "log", "-1", "--format=%an <%ae>"); author != "env-author <env-author@example.com>" {
+		t.Errorf("author = %q, want %q", author, "env-author <env-author@example.com>")
 	}
 
 	for _, key := range []string{"user.name", "user.email"} {
