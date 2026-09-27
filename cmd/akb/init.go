@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -119,6 +120,21 @@ func runInit(_ *cobra.Command, args []string) error {
 		return &usageError{msg: fmt.Sprintf("--embed: %s is not inside a git repository — omit --embed to create a standalone repository", name)}
 	}
 
+	// The versioning mode the invocation chose, and the identity the base
+	// records for its commits. A base that is not versioned in git never commits,
+	// so it resolves and records no identity.
+	versioning := config.VersioningGit
+	if initNoGit {
+		versioning = config.VersioningNone
+	}
+
+	var identity *storage.Identity
+	var identityNotice string
+	if !initNoGit {
+		resolved, source := storage.ResolveInitIdentity(nearestExistingDir(absTarget), "", "")
+		identity, identityNotice = initIdentity(resolved, source)
+	}
+
 	if err := createDirectoryStructure(target); err != nil {
 		return err
 	}
@@ -128,7 +144,7 @@ func runInit(_ *cobra.Command, args []string) error {
 	}
 
 	now := time.Now().Format(time.RFC3339)
-	if err := writeAkbConfig(target, name, now, initDescription); err != nil {
+	if err := writeAkbConfig(target, name, now, initDescription, versioning, identity); err != nil {
 		return err
 	}
 
@@ -140,11 +156,82 @@ func runInit(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := gitInitAndCommit(target, name); err != nil {
+	var modeNotice string
+	if initNoGit {
+		if hostRoot != "" {
+			excluded, err := excludeFromHostRepo(absTarget, hostRoot)
+			if err != nil {
+				return err
+			}
+			modeNotice = fmt.Sprintf("kb: excluded %s from host git tracking via .git/info/exclude (local to this clone; remove that line to undo)", excluded)
+		}
+	} else if err := commitBase(target, name, initEmbed); err != nil {
 		return err
 	}
 
 	fmt.Printf("Initialized KB %q at %s\n", name, absTarget)
+	if initEmbed {
+		fmt.Printf("kb: %s is embedded inside repository %s; akb commits only kb/, raw/, .agent-kb/\n", name, hostRoot)
+	}
+	if modeNotice != "" {
+		fmt.Println(modeNotice)
+	}
+	if identityNotice != "" {
+		fmt.Println(identityNotice)
+	}
+	return nil
+}
+
+// initIdentity decides what the new base records for its commits and what the
+// invocation reports. An identity the invocation's environment or the machine's
+// git configuration named belongs to that environment or machine and is never
+// written into a file that travels with the base: the file would mis-attribute
+// every commit made from another machine after a clone. Only the akb default is
+// recorded, so that a base cloned to a machine without a git identity still
+// commits.
+func initIdentity(identity storage.Identity, source storage.IdentitySource) (*storage.Identity, string) {
+	switch source {
+	case storage.IdentityFromDefault:
+		return &identity, fmt.Sprintf("commit identity: %s <%s> (default — no git identity found; recorded in akb.yaml, edit git-author/git-email to change)", identity.Name, identity.Email)
+	case storage.IdentityFromGitConfig:
+		return nil, fmt.Sprintf("commit identity: from git config (%s <%s>) — not recorded; each machine's git identity applies", identity.Name, identity.Email)
+	default:
+		return nil, fmt.Sprintf("commit identity: from AKB_AUTHOR_NAME/AKB_AUTHOR_EMAIL (%s <%s>) — not recorded; the environment of each invocation applies", identity.Name, identity.Email)
+	}
+}
+
+// commitBase records the new base in the versioning mode it was created in: a
+// standalone base gets a repository of its own, while an embedded one is
+// committed into the repository that hosts it. The commit records exactly the
+// base's own paths, so changes another tool staged in the host worktree stay
+// staged and uncommitted. An invocation that leaves the commit to its caller
+// stages those paths instead.
+func commitBase(target, name string, embed bool) error {
+	if !embed {
+		// `git init` runs directly: it neither creates nor contends on the
+		// repository index lock, which is the lock the staging and commit steps
+		// behind it wait out.
+		gitInit := exec.Command("git", "init", target) //nolint:gosec // launching trusted git binary with controlled args
+		if out, err := gitInit.CombinedOutput(); err != nil {
+			return fmt.Errorf("git init: %s: %w", strings.TrimSpace(string(out)), err)
+		}
+	}
+
+	store, err := storage.OpenStore(target, noCommit)
+	if err != nil {
+		return fmt.Errorf("open base storage: %w", err)
+	}
+
+	basePaths := []string{"kb", "raw", path.StateDirName, ".gitignore"}
+	if noCommit {
+		if err := store.StageFiles(basePaths...); err != nil {
+			return fmt.Errorf("stage the base's files: %w", err)
+		}
+		return nil
+	}
+	if err := store.Commit(fmt.Sprintf("akb: init %s", name), basePaths...); err != nil {
+		return fmt.Errorf("commit the base: %w", err)
+	}
 	return nil
 }
 
@@ -221,11 +308,18 @@ func writeSeedFiles(target string) error {
 	return nil
 }
 
-func writeAkbConfig(target, name, created, description string) error {
+func writeAkbConfig(target, name, created, description, versioning string, identity *storage.Identity) error {
 	cfg := &config.Config{
 		Name:        name,
 		Created:     created,
 		Description: strings.TrimSpace(description),
+		Versioning:  versioning,
+	}
+	// Only an identity the base itself owns is recorded: one from the machine or
+	// the invocation stays out of a file that travels with the base.
+	if identity != nil {
+		cfg.GitAuthor = identity.Name
+		cfg.GitEmail = identity.Email
 	}
 	if err := config.Save(path.ConfigPath(target), cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
@@ -252,77 +346,65 @@ func initSearchDB(target string) error {
 	return nil
 }
 
+// writeGitignoreFiles writes the ignore rules init owns. Both files merge: a
+// target that already carries a .gitignore keeps every line of it and gains the
+// missing ones, so writing them twice changes nothing.
 func writeGitignoreFiles(target string) error {
-	akbGitignore := filepath.Join(path.StateDir(target), ".gitignore")
-	if err := os.WriteFile(akbGitignore, []byte("search.db*\n"), 0600); err != nil {
+	if err := appendMissingLines(filepath.Join(path.StateDir(target), ".gitignore"), "search.db*"); err != nil {
 		return fmt.Errorf("write .agent-kb/.gitignore: %w", err)
 	}
 
-	rootGitignore := filepath.Join(target, ".gitignore")
-	if err := os.WriteFile(rootGitignore, []byte("*.akb.bak\n.agent-kb/search.db*\n"), 0600); err != nil {
+	if err := appendMissingLines(filepath.Join(target, ".gitignore"), "*.akb.bak", ".agent-kb/search.db*"); err != nil {
 		return fmt.Errorf("write .gitignore: %w", err)
 	}
 	return nil
 }
 
-func gitInitAndCommit(target, name string) error {
-	absTarget, err := filepath.Abs(target)
+// appendMissingLines appends the lines target does not carry yet, creating the
+// file when it is not there. Every line that is already in the file stays as it
+// is: an ignore file that predates the base keeps its own rules.
+func appendMissingLines(target string, lines ...string) error {
+	existing, err := os.ReadFile(target) //nolint:gosec // init writes fixed files under the base it creates
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read %s: %w", target, err)
+	}
+
+	present := make(map[string]bool)
+	for _, line := range strings.Split(string(existing), "\n") {
+		present[strings.TrimSpace(line)] = true
+	}
+
+	var missing []string
+	for _, line := range lines {
+		if !present[strings.TrimSpace(line)] {
+			missing = append(missing, line)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	if err := os.MkdirAll(filepath.Dir(target), 0750); err != nil {
+		return fmt.Errorf("create %s: %w", filepath.Dir(target), err)
+	}
+
+	// A file that does not end in a newline gets one before the appended lines,
+	// so its last line does not run into the first appended one.
+	content := strings.Join(missing, "\n") + "\n"
+	if len(existing) > 0 && !bytes.HasSuffix(existing, []byte("\n")) {
+		content = "\n" + content
+	}
+
+	file, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600) //nolint:gosec // init writes fixed files under the base it creates
 	if err != nil {
-		return fmt.Errorf("resolve path: %w", err)
+		return fmt.Errorf("open %s: %w", target, err)
 	}
-
-	gitInit := exec.Command("git", "init", target) //nolint:gosec // launching trusted git binary with controlled args
-	if out, err := gitInit.CombinedOutput(); err != nil {
-		return fmt.Errorf("git init: %s: %w", strings.TrimSpace(string(out)), err)
+	if _, err := file.WriteString(content); err != nil {
+		_ = file.Close() //nolint:errcheck // the write error is the one to report
+		return fmt.Errorf("append to %s: %w", target, err)
 	}
-
-	if err := ensureGitConfig(absTarget); err != nil {
-		return err
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close %s: %w", target, err)
 	}
-
-	// The staging and commit steps touch the repository index, so they run
-	// through the retry runner every other staging and commit step uses:
-	// another process holding the index lock is waited out instead of failing
-	// the fresh base. The `git init` above and the `git config` invocations in
-	// ensureGitConfig run directly via exec.Command on purpose: neither creates
-	// nor contends on the repository index lock.
-	if _, err := storage.RunGit(absTarget, "git add", "add", "-A"); err != nil {
-		//nolint:wrapcheck // RunGit's error already names the git step and its output
-		return err
-	}
-
-	commitMsg := fmt.Sprintf("akb: init %s", name)
-	if _, err := storage.RunGit(absTarget, "git commit", "commit", "-m", commitMsg); err != nil {
-		//nolint:wrapcheck // RunGit's error already names the git step and its output
-		return err
-	}
-
-	return nil
-}
-
-// ensureGitConfig gives a repository without a git identity the akb identity to
-// commit under. Only `akb init` runs it: every other command commits under the
-// repository's configured identity or the per-invocation akb fallback, and none
-// of them write repository config.
-func ensureGitConfig(repoPath string) error {
-	gitConfig := func(args ...string) (string, error) {
-		cmd := exec.Command("git", args...) //nolint:gosec // launching trusted git binary with controlled args
-		cmd.Dir = repoPath
-		out, err := cmd.Output()
-		return strings.TrimSpace(string(out)), err
-	}
-
-	if _, err := gitConfig("config", "user.name"); err != nil {
-		if _, err := gitConfig("config", "user.name", "akb"); err != nil {
-			return fmt.Errorf("set git user.name: %w", err)
-		}
-	}
-
-	if _, err := gitConfig("config", "user.email"); err != nil {
-		if _, err := gitConfig("config", "user.email", "akb@local"); err != nil {
-			return fmt.Errorf("set git user.email: %w", err)
-		}
-	}
-
 	return nil
 }

@@ -70,7 +70,7 @@ rm -rf raw
 stderr 'raw/ directory not found'
 
 # --- Error: corrupted manifest ---
-exec akb init test-kb2
+exec akb init test-kb2 --embed
 cd test-kb2
 stdin ../../csv-input.txt
 exec akb raw write data.csv
