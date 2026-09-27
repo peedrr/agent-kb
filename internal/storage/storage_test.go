@@ -857,3 +857,9 @@ func TestGitProvider_ImplementsStorageProvider(_ *testing.T) {
 	// Compile-time interface check
 	var _ Provider = (*GitProvider)(nil)
 }
+
+func TestStoreImplementsStorageProvider(_ *testing.T) {
+	// Compile-time interface check: commands read, write and delete through the
+	// store, and hand it to the code that builds a page from what is on disk.
+	var _ Provider = (*Store)(nil)
+}
