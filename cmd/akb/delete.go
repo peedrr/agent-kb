@@ -252,10 +252,23 @@ func deletePage(ctx context.Context, kbRoot string, dbConn *sql.DB, relPath, ful
 	}
 
 	if err := store.Delete(ctx, fullPath); err != nil {
-		return fmt.Errorf("delete page: %w — the page was already removed from the search index and link graph but its file removal or its commit did not complete; if the page file still exists, run `akb index rebuild` to rebuild the search index and link graph; if the file is gone, run `git status` and commit the staged deletion manually", err)
+		return fmt.Errorf("delete page: %w — %s", err, deleteFailureRemediation(store.Mode()))
 	}
 
 	return nil
+}
+
+// deleteFailureRemediation describes how to reconcile a deletion whose file
+// step failed after the search index, the link graph, and index.md were already
+// updated. A base versioned in git has a commit to finish by hand; a base that
+// is not versioned in git has no repository and no commit, so reconciling the
+// derived records is the whole remedy.
+func deleteFailureRemediation(mode storage.Mode) string {
+	const divergence = "the page was already removed from the search index and link graph but "
+	if mode == storage.ModeNone {
+		return divergence + "its file removal did not complete; if the page file still exists, run `akb index rebuild` to rebuild the search index and link graph"
+	}
+	return divergence + "its file removal or its commit did not complete; if the page file still exists, run `akb index rebuild` to rebuild the search index and link graph; if the file is gone, run `git status` and commit the staged deletion manually"
 }
 
 var fileExists = func(path string) (bool, error) {

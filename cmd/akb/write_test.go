@@ -20,6 +20,7 @@ import (
 	"github.com/peedrr/agent-kb/internal/db"
 	"github.com/peedrr/agent-kb/internal/frontmatter"
 	"github.com/peedrr/agent-kb/internal/path"
+	"github.com/peedrr/agent-kb/internal/storage"
 	"github.com/peedrr/agent-kb/internal/template"
 )
 
@@ -191,6 +192,30 @@ func assertRecentTimestamp(t *testing.T, value string) {
 	}
 	if delta := time.Since(parsed); delta < 0 || delta > 2*time.Minute {
 		t.Errorf("timestamp %q is not current (delta %v)", value, delta)
+	}
+}
+
+// TestPageWriteStateIsModeAccurate pins the state a failed index step reports
+// per versioning mode: a git-versioned base names the commit of the page, and
+// the staged state --no-commit leaves, while a base that is not versioned in
+// git names the plain write because there is no commit to describe.
+func TestPageWriteStateIsModeAccurate(t *testing.T) {
+	origNoCommit := noCommit
+	t.Cleanup(func() { noCommit = origNoCommit })
+
+	noCommit = false
+	if got := pageWriteState(storage.ModeGit); got != "page file committed to git" {
+		t.Errorf("pageWriteState(git) = %q, want %q", got, "page file committed to git")
+	}
+
+	noCommit = true
+	if got := pageWriteState(storage.ModeGit); got != "page file written and staged but not committed (--no-commit)" {
+		t.Errorf("pageWriteState(git, --no-commit) = %q, want the staged state", got)
+	}
+	// --no-commit is a no-op in a base that is not versioned in git, so the
+	// mode decides the report there.
+	if got := pageWriteState(storage.ModeNone); got != "page file written (unversioned KB)" {
+		t.Errorf("pageWriteState(none, --no-commit) = %q, want the unversioned state", got)
 	}
 }
 

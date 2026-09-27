@@ -73,10 +73,13 @@ func init() {
 }
 
 // pageWriteState describes what the write step left behind when a database
-// step after it fails: the git provider commits the page before the search and
-// link-graph updates run, so the page is already on its branch, unless
-// --no-commit left it staged.
-func pageWriteState() string {
+// step after it fails: the commit funnel records the page before the search
+// and link-graph updates run, so the page is already on its branch, unless
+// --no-commit left it staged or the base is not versioned in git at all.
+func pageWriteState(mode storage.Mode) string {
+	if mode == storage.ModeNone {
+		return "page file written (unversioned KB)"
+	}
 	if noCommit {
 		return "page file written and staged but not committed (--no-commit)"
 	}
@@ -550,22 +553,22 @@ func runWrite(_ *cobra.Command, args []string) error {
 	// their pre-write state instead of one step behind the other.
 	tx, err := dbConn.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("begin index transaction: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState())
+		return fmt.Errorf("begin index transaction: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState(store.Mode()))
 	}
 	defer tx.Rollback() //nolint:errcheck // deferred rollback is no-op after successful commit
 
 	searcher := search.NewSQLiteFTS5Searcher(dbConn)
 	if err := searcher.IndexPageTx(ctx, tx, relPath, fm.Title, string(body), tags, summary, fm.Type); err != nil {
-		return fmt.Errorf("index page: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState())
+		return fmt.Errorf("index page: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState(store.Mode()))
 	}
 
 	updater := linkgraph.NewSQLiteLinkGraph(dbConn)
 	if err := updater.UpdatePageLinksTx(ctx, tx, relPath, string(writeContent)); err != nil {
-		return fmt.Errorf("update links: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState())
+		return fmt.Errorf("update links: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState(store.Mode()))
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit index transaction: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState())
+		return fmt.Errorf("commit index transaction: %w — %s; run `akb index rebuild` to rebuild the search index and link graph", err, pageWriteState(store.Mode()))
 	}
 
 	// Output

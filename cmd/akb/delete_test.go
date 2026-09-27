@@ -13,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/peedrr/agent-kb/internal/storage"
 )
 
 func TestDelete(t *testing.T) {
@@ -440,6 +442,67 @@ func TestDeleteFileStepFailureAfterIndexRemovalReportsRemediation(t *testing.T) 
 	}
 	if !strings.Contains(err.Error(), "akb index rebuild") {
 		t.Errorf("expected the delete error to carry the rebuild remediation, got: %v", err)
+	}
+	if _, statErr := os.Stat(failedFull); statErr != nil {
+		t.Errorf("the page path should still exist after the failed file step, stat error: %v", statErr)
+	}
+}
+
+// TestDeleteFailureRemediationIsModeAccurate pins the remediation a failed file
+// step reports per versioning mode: a git-versioned base points at the staged
+// deletion to finish by hand, while a base that is not versioned in git has no
+// repository, so no git step is named.
+func TestDeleteFailureRemediationIsModeAccurate(t *testing.T) {
+	const gitRemediation = "the page was already removed from the search index and link graph but its file removal or its commit did not complete; if the page file still exists, run `akb index rebuild` to rebuild the search index and link graph; if the file is gone, run `git status` and commit the staged deletion manually"
+	if got := deleteFailureRemediation(storage.ModeGit); got != gitRemediation {
+		t.Errorf("git-mode remediation = %q, want %q", got, gitRemediation)
+	}
+
+	const noneRemediation = "the page was already removed from the search index and link graph but its file removal did not complete; if the page file still exists, run `akb index rebuild` to rebuild the search index and link graph"
+	if got := deleteFailureRemediation(storage.ModeNone); got != noneRemediation {
+		t.Errorf("non-git remediation = %q, want %q", got, noneRemediation)
+	}
+}
+
+// TestNonGitDeleteFileStepFailureNamesNoGitStep drives the failed file step of
+// a delete in a base that is not versioned in git, with the git binary
+// unreachable: the command reports the divergent derived records and the
+// rebuild remedy without naming a repository step.
+func TestNonGitDeleteFileStepFailureNamesNoGitStep(t *testing.T) {
+	kbRoot := nonGitTestKB(t)
+	withoutGitOnPath(t)
+
+	origNoCommit := noCommit
+	noCommit = false
+	t.Cleanup(func() { noCommit = origNoCommit })
+
+	// The page path is a non-empty directory, so os.Remove fails in the file
+	// step of the delete after the search index, link graph, and index.md steps
+	// ran.
+	failedFull := filepath.Join(kbRoot, "kb", "notes", "delete-failure.md")
+	if err := os.MkdirAll(failedFull, 0750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(failedFull, "blocker"), []byte("blocker"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := runDeleteCmd(&cobra.Command{}, []string{"notes/delete-failure.md"})
+	if err == nil {
+		t.Fatal("expected the delete to fail at the file step")
+	}
+
+	message := err.Error()
+	if !strings.Contains(message, "already removed from the search index and link graph") {
+		t.Errorf("expected the delete error to surface the removed derived records, got: %v", err)
+	}
+	if !strings.Contains(message, "akb index rebuild") {
+		t.Errorf("expected the delete error to carry the rebuild remediation, got: %v", err)
+	}
+	for _, unwanted := range []string{"git", "commit", "staged"} {
+		if strings.Contains(message, unwanted) {
+			t.Errorf("non-git delete error names %q, which does not exist in that mode: %v", unwanted, err)
+		}
 	}
 	if _, statErr := os.Stat(failedFull); statErr != nil {
 		t.Errorf("the page path should still exist after the failed file step, stat error: %v", statErr)
