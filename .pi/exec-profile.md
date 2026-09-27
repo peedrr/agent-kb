@@ -5,9 +5,9 @@ four `##` section headers EXACT — the coordinator HALTs if any is missing. Eve
 GATES command must be exit-code meaningful (non-zero = gate failure).
 
 ## GATES
-build: make build
+build: just build
 vet: go vet ./...
-lint: make lint
+lint: just lint
 fmt: test -z "$(gofmt -l .)"
 test: go test ./...
 test-integration: go test ./test/ -test.v
@@ -22,7 +22,7 @@ linter: golangci-lint (+ go vet)
 dormant-test: "build-tagged / t.Skip()ped"
 
 ## CONVENTIONS
-- Build output ALWAYS `-o bin/akb` (never project root); `make build` handles this.
+- Build output ALWAYS `-o bin/akb` (never project root); `just build` handles this.
 - YAML: `github.com/goccy/go-yaml` ONLY — never `gopkg.in/yaml.v3`.
 - Integration tests use the testscript framework (`.txt` files in testdata/).
 - Managed files: never write `index.md` or `log.md` directly (use `akb index add` /
@@ -32,3 +32,7 @@ dormant-test: "build-tagged / t.Skip()ped"
 - Reuse existing module deps before adding; any dep beyond the plan's enumeration
   needs supervisor approval (canonical module, minimal, approval in commit body).
 - Code comments describe non-obvious behaviour only.
+
+## AUTHORITY
+ADR: none
+SPEC: /home/pete/code/projects/tools/llm-wiki/agent-kb/agent-kb/.pi/subagents/specs/init-versioning-spec.md
