@@ -30,7 +30,7 @@ stdout 'akb: init git-kb'
 ! exec git config --local user.name
 ! exec git config --local user.email
 
-# === NO USABLE GIT IDENTITY — WRITE STILL WORKS ===
+# === NO USABLE GIT IDENTITY — WRITE REFUSES ===
 
 # Emptying the ambient values leaves the merged git config without a usable
 # identity, whatever the machine sets in its system or global config (the
@@ -39,18 +39,28 @@ env GIT_CONFIG_VALUE_0=
 env GIT_CONFIG_VALUE_1=
 
 stdin ../note-input.md
+! exec akb write no-user-note.md
+stderr 'no commit identity'
+stderr 'AKB_AUTHOR_NAME'
+stderr 'git-author'
+
+# The refusal created no commit: HEAD is still the seeded template commit.
+exec git log --oneline -1
+stdout 'seed note template'
+
+# Naming the identity in the environment lets the write commit under it, and
+# the repository identity stays untouched. The environment persists for the
+# rest of the script, so the operations below commit under it too.
+env AKB_AUTHOR_NAME=env-writer
+env AKB_AUTHOR_EMAIL=env-writer@example.com
+
+stdin ../note-input.md
 exec akb write no-user-note.md
 stdout 'Written to kb/notes/no-user-note.md'
 
-# Verify write created a commit
-exec git log --oneline -1
-stdout 'akb: write kb/notes/no-user-note.md'
-
-# Verify the commit used the per-invocation akb fallback identity
 exec git log -1 --format='%an <%ae>'
-stdout 'akb <akb@local>'
+stdout 'env-writer <env-writer@example.com>'
 
-# and that the repository identity was left untouched
 ! exec git config --local user.name
 ! exec git config --local user.email
 
