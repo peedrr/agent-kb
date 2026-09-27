@@ -87,11 +87,19 @@ func excludeFromHostRepo(target, hostRoot string) (string, error) {
 }
 
 // hostExcludeEntries returns the patterns that keep the new base out of the host
-// repository's status. A base in a subdirectory is excluded as that directory. A
-// base at the repository root is excluded by the directories it owns, because
-// excluding the directory the host's own files live in would hide them too.
+// repository's status. The target is resolved through symlinks first, because
+// the repository root git reports is resolved too: a target reached through a
+// symlink would otherwise render an entry relative to the repository and
+// outside it at once, which git reads as a pattern that matches nothing. A base
+// in a subdirectory is excluded as that directory. A base at the repository
+// root is excluded by the directories it owns, because excluding the directory
+// the host's own files live in would hide them too.
 func hostExcludeEntries(target, hostRoot string) ([]string, error) {
-	rel, err := filepath.Rel(hostRoot, target)
+	resolved, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		return nil, fmt.Errorf("resolve %s: %w", target, err)
+	}
+	rel, err := filepath.Rel(hostRoot, resolved)
 	if err != nil {
 		return nil, fmt.Errorf("locate %s in %s: %w", target, hostRoot, err)
 	}

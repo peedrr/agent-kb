@@ -505,6 +505,69 @@ func TestInitNoGitExcludesTheBaseFromTheHost(t *testing.T) {
 	}
 }
 
+// TestHostExcludeEntriesResolvesASymlinkedTarget covers an init invocation whose
+// target is reached through a symlink: git reports the resolved repository root,
+// so the exclude entry has to name the resolved directory — the lexical
+// '../<link>/docs/' pattern would match nothing — while a target at the
+// repository root still yields the directories the base owns.
+func TestHostExcludeEntriesResolvesASymlinkedTarget(t *testing.T) {
+	repo := initTestRepo(t)
+	hostRoot, err := detectHostRepo(repo)
+	if err != nil {
+		t.Fatalf("detectHostRepo(%s): %v", repo, err)
+	}
+
+	if err := os.MkdirAll(filepath.Join(repo, "docs"), 0750); err != nil {
+		t.Fatal(err)
+	}
+
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(repo, link); err != nil {
+		t.Fatal(err)
+	}
+	lexicalTarget := filepath.Join(link, "docs")
+
+	entries, err := hostExcludeEntries(lexicalTarget, hostRoot)
+	if err != nil {
+		t.Fatalf("hostExcludeEntries(%s): %v", lexicalTarget, err)
+	}
+	if got := strings.Join(entries, ", "); got != "docs/" {
+		t.Errorf("hostExcludeEntries(%s) = %q, want %q", lexicalTarget, got, "docs/")
+	}
+
+	excluded, err := excludeFromHostRepo(lexicalTarget, hostRoot)
+	if err != nil {
+		t.Fatalf("excludeFromHostRepo(%s): %v", lexicalTarget, err)
+	}
+	if excluded != "docs/" {
+		t.Errorf("excludeFromHostRepo(%s) = %q, want %q", lexicalTarget, excluded, "docs/")
+	}
+
+	excludeData, err := os.ReadFile(filepath.Join(repo, ".git", "info", "exclude")) //nolint:gosec // test temp file
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(excludeData), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if line != "docs/" {
+			t.Errorf("host exclude file carries pattern %q, want only the resolved base directory", line)
+		}
+	}
+
+	// A target at the repository root keeps yielding the directories the base
+	// owns instead of the root itself.
+	entries, err = hostExcludeEntries(repo, hostRoot)
+	if err != nil {
+		t.Fatalf("hostExcludeEntries(%s): %v", repo, err)
+	}
+	if got, want := strings.Join(entries, ", "), ".agent-kb/, kb/, raw/"; got != want {
+		t.Errorf("hostExcludeEntries at the repository root = %q, want %q", got, want)
+	}
+}
+
 // TestInitNoGitOutsideARepository covers non-git mode with no host repository:
 // the base is unversioned and nothing is created around it.
 func TestInitNoGitOutsideARepository(t *testing.T) {
