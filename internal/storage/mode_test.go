@@ -7,6 +7,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -426,5 +427,58 @@ func TestStoreCommitRejectsConflictedMerge(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "merge conflict") {
 		t.Errorf("error = %q, want a merge conflict report", err)
+	}
+}
+
+// mergeInProgressReport returns the report of a merge that is in progress in
+// repo and changed file, as the merge preflight words it.
+func mergeInProgressReport(t *testing.T, repo, file string) string {
+	t.Helper()
+
+	return fmt.Sprintf("merge in progress in repository %s (outside the knowledge base, in: %s): "+
+		"akb commits are blocked until it is completed or aborted. This merge belongs to the host project "+
+		"— do not resolve it from the KB; retry later or surface to the user.",
+		mustGitIn(t, repo, "rev-parse", "--show-toplevel"), file)
+}
+
+// TestGitProviderWriteRejectsCleanInProgressMerge asserts the merge preflight of
+// the provider refuses a clean merge that is still in progress: git would refuse
+// the partial commit that follows, so the report of the merge replaces the raw
+// git failure.
+func TestGitProviderWriteRejectsCleanInProgressMerge(t *testing.T) {
+	repo, changed := repoWithInProgressMerge(t, false)
+
+	provider := NewGitProvider(repo, false)
+	page := filepath.Join(repo, "kb", "notes", "page.md")
+	err := provider.Write(context.Background(), page, []byte("page body\n"))
+	if err == nil {
+		t.Fatal("Write succeeded while the repository carried a merge in progress")
+	}
+	if want := mergeInProgressReport(t, repo, changed); err.Error() != want {
+		t.Errorf("error = %q, want %q", err, want)
+	}
+	if _, err := os.Stat(page); !os.IsNotExist(err) {
+		t.Errorf("the page was written while the merge report was due (stat error: %v)", err)
+	}
+}
+
+// TestStoreCommitRejectsCleanInProgressMerge asserts the commit funnel refuses a
+// clean merge in progress and names the merge's path, so the agent sees the host
+// project's merge instead of a git failure it cannot place.
+func TestStoreCommitRejectsCleanInProgressMerge(t *testing.T) {
+	repo, changed := repoWithInProgressMerge(t, false)
+	writeKBConfig(t, repo, config.VersioningGit)
+
+	store, err := OpenStore(repo, false)
+	if err != nil {
+		t.Fatalf("OpenStore: %v", err)
+	}
+
+	err = store.Commit("akb: write kb/notes/page.md", "kb/notes/page.md")
+	if err == nil {
+		t.Fatal("Commit succeeded while the repository carried a merge in progress")
+	}
+	if want := mergeInProgressReport(t, repo, changed); err.Error() != want {
+		t.Errorf("error = %q, want %q", err, want)
 	}
 }

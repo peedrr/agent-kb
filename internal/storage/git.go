@@ -207,16 +207,75 @@ func checkMergeState(kbRoot string) error {
 	if err != nil {
 		return err
 	}
+
+	changed := ""
 	for _, line := range strings.Split(out, "\n") {
-		if len(line) >= 3 {
-			x := line[0]
-			y := line[1]
-			if x == 'U' || y == 'U' || (x == 'A' && y == 'A') || (x == 'D' && y == 'D') {
-				return fmt.Errorf("merge conflict detected: resolve conflicts before proceeding (file: %s)", strings.TrimSpace(line[2:]))
-			}
+		if len(line) < 3 {
+			continue
+		}
+		x := line[0]
+		y := line[1]
+		if x == 'U' || y == 'U' || (x == 'A' && y == 'A') || (x == 'D' && y == 'D') {
+			return fmt.Errorf("merge conflict detected: resolve conflicts before proceeding (file: %s)", strings.TrimSpace(line[2:]))
+		}
+		// A clean merge leaves no conflict to report; the first path it changed
+		// locates it instead. An untracked path is the worktree's own, not the
+		// merge's.
+		if changed == "" && x != '?' {
+			changed = strings.TrimSpace(line[2:])
 		}
 	}
-	return nil
+
+	inProgress, err := mergeInProgress(kbRoot)
+	if err != nil {
+		return err
+	}
+	if !inProgress {
+		return nil
+	}
+
+	// A merge can touch files of the KB, but it belongs to the repository that
+	// hosts the KB: akb never starts one, and resolving it is the host
+	// project's work.
+	const report = ": akb commits are blocked until it is completed or aborted. This merge belongs to the host project — do not resolve it from the KB; retry later or surface to the user."
+	if changed == "" {
+		return fmt.Errorf("merge in progress in repository %s (outside the knowledge base)%s", repoTopLevel(kbRoot), report)
+	}
+	return fmt.Errorf("merge in progress in repository %s (outside the knowledge base, in: %s)%s", repoTopLevel(kbRoot), changed, report)
+}
+
+// mergeInProgress reports whether the repository of kbRoot carries a merge that
+// is not finished. MERGE_HEAD exists from `git merge` until the merge is
+// committed or aborted, whether or not it left conflicts, and git refuses every
+// partial commit while it does.
+func mergeInProgress(kbRoot string) (bool, error) {
+	cmd := exec.Command("git", "rev-parse", "-q", "--verify", "MERGE_HEAD") //nolint:gosec // launching trusted git binary with controlled args
+	cmd.Dir = kbRoot
+	err := cmd.Run()
+	if err == nil {
+		return true, nil
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		// Without a MERGE_HEAD to verify, rev-parse reports no ref and exits 1.
+		return false, nil
+	}
+	return false, fmt.Errorf("inspect merge state: %w", err)
+}
+
+// repoTopLevel returns the root of the repository that hosts the KB, which the
+// merge report names. A repository git cannot resolve falls back to the KB root.
+func repoTopLevel(kbRoot string) string {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel") //nolint:gosec // launching trusted git binary with controlled args
+	cmd.Dir = kbRoot
+	out, err := cmd.Output()
+	if err != nil {
+		return kbRoot
+	}
+	if topLevel := strings.TrimSpace(string(out)); topLevel != "" {
+		return topLevel
+	}
+	return kbRoot
 }
 
 // withRepoLock runs fn while holding an exclusive lock on the git repository
