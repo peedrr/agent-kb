@@ -152,7 +152,13 @@ func runInit(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := writeGitignoreFiles(target); err != nil {
+	// The base's own ignore file is written in every layout. The root .gitignore
+	// is skipped for an unversioned base at its host repository's root: nothing
+	// versions that base, so the rules would have no consumer, and appending them
+	// would mutate a file the host repository tracks, leaving the host's status
+	// dirty.
+	unversionedAtRepoRoot := initNoGit && targetIsRepoRoot
+	if err := writeGitignoreFiles(target, !unversionedAtRepoRoot); err != nil {
 		return err
 	}
 
@@ -348,10 +354,15 @@ func initSearchDB(target string) error {
 
 // writeGitignoreFiles writes the ignore rules init owns. Both files merge: a
 // target that already carries a .gitignore keeps every line of it and gains the
-// missing ones, so writing them twice changes nothing.
-func writeGitignoreFiles(target string) error {
+// missing ones, so writing them twice changes nothing. rootGitignore is false
+// for an unversioned base at its host repository's root, where the root file
+// belongs to the host repository and carries no rules for the base.
+func writeGitignoreFiles(target string, rootGitignore bool) error {
 	if err := appendMissingLines(filepath.Join(path.StateDir(target), ".gitignore"), "search.db*"); err != nil {
 		return fmt.Errorf("write .agent-kb/.gitignore: %w", err)
+	}
+	if !rootGitignore {
+		return nil
 	}
 
 	if err := appendMissingLines(filepath.Join(target, ".gitignore"), "*.akb.bak", ".agent-kb/search.db*"); err != nil {

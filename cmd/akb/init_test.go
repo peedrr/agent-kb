@@ -619,6 +619,85 @@ func TestInitForceBypassesTheLayoutOnly(t *testing.T) {
 	}
 }
 
+// TestInitNoGitAtRepositoryRootKeepsTheHostGitignore covers the unversioned base
+// at its host repository's root: the base is never versioned, so the root
+// .gitignore has no consumer, and init leaves the host's committed file
+// byte-identical and the host's status clean while still writing the base's own
+// .agent-kb/.gitignore and the exclude entries that keep the base invisible.
+func TestInitNoGitAtRepositoryRootKeepsTheHostGitignore(t *testing.T) {
+	repo := initTestRepo(t)
+	setRepoIdentity(t, repo, "ada", "ada@example.com")
+
+	hostGitignore := filepath.Join(repo, ".gitignore")
+	hostContent := "host-rules\n"
+	if err := os.WriteFile(hostGitignore, []byte(hostContent), 0600); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", ".gitignore")
+	gitRun(t, repo, "commit", "-m", "host ignore rules")
+
+	out, code := initRun(t, repo, ".", "--no-git", "--force")
+	if code != exitSuccess {
+		t.Fatalf("exit code = %d, want %d (output: %s)", code, exitSuccess, out)
+	}
+
+	data, err := os.ReadFile(hostGitignore) //nolint:gosec // test temp file
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != hostContent {
+		t.Errorf(".gitignore = %q, want the host's committed content %q untouched", data, hostContent)
+	}
+	if status := gitOutput(t, repo, "status", "--porcelain"); status != "" {
+		t.Errorf("host status = %q, want a clean status", status)
+	}
+
+	baseGitignore, err := os.ReadFile(filepath.Join(path.StateDir(repo), ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(baseGitignore) != "search.db*\n" {
+		t.Errorf(".agent-kb/.gitignore = %q, want the base's own rules", baseGitignore)
+	}
+
+	exclude, err := os.ReadFile(filepath.Join(repo, ".git", "info", "exclude")) //nolint:gosec // test temp file
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range []string{".agent-kb/", "kb/", "raw/"} {
+		if !strings.Contains(string(exclude), entry) {
+			t.Errorf("host exclude file = %q, want it to carry %q", exclude, entry)
+		}
+	}
+}
+
+// TestInitEmbedAtRepositoryRootMergesTheHostGitignore covers the layout the
+// unversioned root case sits beside: an embedded base at the repository root is
+// versioned, so the host's tracked .gitignore still gains the base's rules.
+func TestInitEmbedAtRepositoryRootMergesTheHostGitignore(t *testing.T) {
+	repo := initTestRepo(t)
+	setRepoIdentity(t, repo, "ada", "ada@example.com")
+
+	if err := os.WriteFile(filepath.Join(repo, ".gitignore"), []byte("host-rules\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, repo, "add", ".gitignore")
+	gitRun(t, repo, "commit", "-m", "host ignore rules")
+
+	out, code := initRun(t, repo, ".", "--embed", "--force")
+	if code != exitSuccess {
+		t.Fatalf("exit code = %d, want %d (output: %s)", code, exitSuccess, out)
+	}
+
+	data, err := os.ReadFile(filepath.Join(repo, ".gitignore")) //nolint:gosec // test temp file
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "host-rules\n*.akb.bak\n.agent-kb/search.db*\n"; string(data) != want {
+		t.Errorf(".gitignore = %q, want %q", data, want)
+	}
+}
+
 // TestInitRecordsTheDefaultIdentity covers the identity an environment without
 // any git identity leaves behind: the base records the akb default in akb.yaml,
 // and the init commit is attributed to it.
