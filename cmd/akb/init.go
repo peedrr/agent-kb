@@ -165,11 +165,18 @@ func runInit(_ *cobra.Command, args []string) error {
 	var modeNotice string
 	if initNoGit {
 		if hostRoot != "" {
-			excluded, err := excludeFromHostRepo(absTarget, hostRoot)
+			excluded, count, err := excludeFromHostRepo(absTarget, hostRoot)
 			if err != nil {
 				return err
 			}
-			modeNotice = fmt.Sprintf("kb: excluded %s from host git tracking via .git/info/exclude (local to this clone; remove that line to undo)", excluded)
+			// A base at the repository root is excluded by the directories it
+			// owns — three entries — so the notice's undo guidance refers to them
+			// in the plural there.
+			undo := "remove that line to undo"
+			if count > 1 {
+				undo = "remove those lines to undo"
+			}
+			modeNotice = fmt.Sprintf("kb: excluded %s from host git tracking via .git/info/exclude (local to this clone; %s)", excluded, undo)
 		}
 	} else if err := commitBase(target, name, initEmbed); err != nil {
 		return err

@@ -65,25 +65,26 @@ func sameDirectory(a, b string) bool {
 
 // excludeFromHostRepo appends the new base to the exclude file of the host
 // repository — the file git reads for this clone alone — and returns the
-// patterns it appended, in the form the invocation reports them. It is the
-// single write an init invocation makes to a repository the base does not own:
-// the base stays out of the host's git status without the host tracking an
-// ignore rule for it.
-func excludeFromHostRepo(target, hostRoot string) (string, error) {
+// patterns it appended, in the form the invocation reports them, along with how
+// many there are, so the invocation's undo guidance can refer to them in the
+// singular or the plural. It is the single write an init invocation makes to a
+// repository the base does not own: the base stays out of the host's git status
+// without the host tracking an ignore rule for it.
+func excludeFromHostRepo(target, hostRoot string) (string, int, error) {
 	entries, err := hostExcludeEntries(target, hostRoot)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	excludePath, err := hostExcludePath(target)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	if err := appendMissingLines(excludePath, entries...); err != nil {
-		return "", fmt.Errorf("append to %s: %w", excludePath, err)
+		return "", 0, fmt.Errorf("append to %s: %w", excludePath, err)
 	}
 
-	return strings.Join(entries, ", "), nil
+	return strings.Join(entries, ", "), len(entries), nil
 }
 
 // hostExcludeEntries returns the patterns that keep the new base out of the host

@@ -535,12 +535,15 @@ func TestHostExcludeEntriesResolvesASymlinkedTarget(t *testing.T) {
 		t.Errorf("hostExcludeEntries(%s) = %q, want %q", lexicalTarget, got, "docs/")
 	}
 
-	excluded, err := excludeFromHostRepo(lexicalTarget, hostRoot)
+	excluded, count, err := excludeFromHostRepo(lexicalTarget, hostRoot)
 	if err != nil {
 		t.Fatalf("excludeFromHostRepo(%s): %v", lexicalTarget, err)
 	}
 	if excluded != "docs/" {
 		t.Errorf("excludeFromHostRepo(%s) = %q, want %q", lexicalTarget, excluded, "docs/")
+	}
+	if count != 1 {
+		t.Errorf("excludeFromHostRepo(%s) appended %d entries, want 1", lexicalTarget, count)
 	}
 
 	excludeData, err := os.ReadFile(filepath.Join(repo, ".git", "info", "exclude")) //nolint:gosec // test temp file
@@ -623,7 +626,8 @@ func TestInitForceBypassesTheLayoutOnly(t *testing.T) {
 // at its host repository's root: the base is never versioned, so the root
 // .gitignore has no consumer, and init leaves the host's committed file
 // byte-identical and the host's status clean while still writing the base's own
-// .agent-kb/.gitignore and the exclude entries that keep the base invisible.
+// .agent-kb/.gitignore and the exclude entries that keep the base invisible,
+// whose notice tells the caller to remove all three of them.
 func TestInitNoGitAtRepositoryRootKeepsTheHostGitignore(t *testing.T) {
 	repo := initTestRepo(t)
 	setRepoIdentity(t, repo, "ada", "ada@example.com")
@@ -639,6 +643,12 @@ func TestInitNoGitAtRepositoryRootKeepsTheHostGitignore(t *testing.T) {
 	out, code := initRun(t, repo, ".", "--no-git", "--force")
 	if code != exitSuccess {
 		t.Fatalf("exit code = %d, want %d (output: %s)", code, exitSuccess, out)
+	}
+
+	// The root layout appends three entries, so the notice's undo guidance has
+	// to refer to them in the plural.
+	if want := "kb: excluded .agent-kb/, kb/, raw/ from host git tracking via .git/info/exclude (local to this clone; remove those lines to undo)"; !strings.Contains(out, want) {
+		t.Errorf("output = %q, want it to contain %q", out, want)
 	}
 
 	data, err := os.ReadFile(hostGitignore) //nolint:gosec // test temp file
