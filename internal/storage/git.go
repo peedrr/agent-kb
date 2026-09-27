@@ -175,8 +175,19 @@ func (g *GitProvider) List(_ context.Context, dir string, ext string) ([]string,
 	return files, nil
 }
 
+// checkMergeConflicts rejects a mutation while the repository that hosts the KB
+// carries a merge that is not finished. It is the provider's side of the
+// package-level merge preflight, which every commit path runs.
 func (g *GitProvider) checkMergeConflicts() error {
-	out, err := RunGit(g.kbRoot, "check git status", "status", "--porcelain")
+	return checkMergeState(g.kbRoot)
+}
+
+// checkMergeState rejects a mutation while the repository of kbRoot carries a
+// merge that is not finished: a conflicted merge, or a clean one that is still
+// in progress. Git refuses a partial commit — the only kind akb makes — until
+// the merge is committed or aborted, so a mutation must not start.
+func checkMergeState(kbRoot string) error {
+	out, err := RunGit(kbRoot, "check git status", "status", "--porcelain")
 	if err != nil {
 		return err
 	}
@@ -207,30 +218,31 @@ func (g *GitProvider) withRepoLock(fn func() error) error {
 	return fn()
 }
 
-// RepoLock is a handle on the repository lock the process holds. Releasing the
-// handle drops the one acquisition it represents and is idempotent, so a
-// release run twice on the same handle cannot drop an acquisition another
-// holder of the process holds. The process keeps the flock until the outermost
-// acquisition is released.
+// RepoLock is a handle on the exclusive lock the process holds on one lock
+// file: the repository lock of a git-versioned base, or the lock file of a base
+// that is not versioned in git. Releasing the handle drops the one acquisition
+// it represents and is idempotent, so a release run twice on the same handle
+// cannot drop an acquisition another holder of the process holds. The process
+// keeps the flock until the outermost acquisition is released.
 type RepoLock struct {
 	path     string
 	released bool
 }
 
-// repoLockEntry is the lock the process holds on one repository: the open file
+// lockEntry is the lock the process holds on one lock file: the open file
 // carrying the flock and the number of acquisitions sharing it.
-type repoLockEntry struct {
+type lockEntry struct {
 	file *os.File
 	refs int
 }
 
-// heldRepoLocks tracks the repository locks the process holds. A flock is keyed
-// by the open file description, so a second flock on a fresh handle of the same
-// file would block against the process's own lock; nested acquisitions reuse the
+// heldLocks tracks the lock files the process holds. A flock is keyed by the
+// open file description, so a second flock on a fresh handle of the same file
+// would block against the process's own lock; nested acquisitions reuse the
 // held lock instead.
 var (
-	heldRepoLocksMu sync.Mutex
-	heldRepoLocks   = make(map[string]*repoLockEntry)
+	heldLocksMu sync.Mutex
+	heldLocks   = make(map[string]*lockEntry)
 )
 
 // LockRepo acquires the exclusive lock on the git repository that hosts the KB
@@ -245,11 +257,18 @@ func LockRepo(kbRoot string) (*RepoLock, error) {
 	if err != nil {
 		return nil, err
 	}
+	return lockFile(lockPath)
+}
 
-	heldRepoLocksMu.Lock()
-	defer heldRepoLocksMu.Unlock()
+// lockFile acquires the exclusive lock carried by lockPath and returns its
+// handle. Every lock of the process goes through it, so acquisitions of the same
+// lock file nested inside each other share the lock instead of blocking on the
+// process's own flock.
+func lockFile(lockPath string) (*RepoLock, error) {
+	heldLocksMu.Lock()
+	defer heldLocksMu.Unlock()
 
-	if entry, held := heldRepoLocks[lockPath]; held {
+	if entry, held := heldLocks[lockPath]; held {
 		entry.refs++
 		return &RepoLock{path: lockPath}, nil
 	}
@@ -263,7 +282,7 @@ func LockRepo(kbRoot string) (*RepoLock, error) {
 		return nil, fmt.Errorf("lock repo %s: %w", lockPath, err)
 	}
 
-	heldRepoLocks[lockPath] = &repoLockEntry{file: f, refs: 1}
+	heldLocks[lockPath] = &lockEntry{file: f, refs: 1}
 	return &RepoLock{path: lockPath}, nil
 }
 
@@ -277,15 +296,15 @@ func (l *RepoLock) Release() {
 		return
 	}
 
-	heldRepoLocksMu.Lock()
-	defer heldRepoLocksMu.Unlock()
+	heldLocksMu.Lock()
+	defer heldLocksMu.Unlock()
 
 	if l.released {
 		return
 	}
 	l.released = true
 
-	entry, held := heldRepoLocks[l.path]
+	entry, held := heldLocks[l.path]
 	if !held {
 		return
 	}
@@ -294,7 +313,7 @@ func (l *RepoLock) Release() {
 		return
 	}
 
-	delete(heldRepoLocks, l.path)
+	delete(heldLocks, l.path)
 	_ = unix.Flock(int(entry.file.Fd()), unix.LOCK_UN) //nolint:errcheck,gosec // released with the handle as well; file descriptors fit in an int
 	_ = entry.file.Close()                             //nolint:errcheck // releasing the handle drops the lock too
 }
@@ -329,6 +348,10 @@ func CommitFiles(kbRoot, commitMsg string, paths ...string) error {
 		return err
 	}
 	defer lock.Release()
+
+	if err := checkMergeState(kbRoot); err != nil {
+		return err
+	}
 
 	recorded, err := recordablePaths(kbRoot, paths)
 	if err != nil {
