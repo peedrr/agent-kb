@@ -1,0 +1,75 @@
+# A non-git base at a repository root excludes only its own directories there,
+# so a second, embedded base in a subdirectory keeps committing — in either
+# creation order.
+
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ambient
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ambient@local
+
+# Root first: the unversioned base at the repository root is excluded by its
+# own directories, and the embedded base created afterwards still initializes
+# and commits through the host repository.
+mkdir host
+cd host
+exec git init -q
+
+exec akb init . --no-git --force
+stdout '^Initialized KB "host" at .*/host$'
+stdout '^kb: excluded /\.agent-kb/, /kb/, /raw/ from host git tracking via \.git/info/exclude \(local to this clone; remove those lines to undo\)$'
+! stdout 'commit identity'
+
+exec akb init sub --embed
+stdout '^Initialized KB "sub" at .*/host/sub$'
+stdout '^kb: sub is embedded inside repository .*; akb commits only kb/, raw/, \.agent-kb/$'
+stdout '^commit identity: from git config \(ambient <ambient@local>\) — not recorded; each machine''s git identity applies$'
+
+cd sub
+exec akb template get note --full --examples
+cp stdout .agent-kb/templates/note.yaml
+stdin ../../note-input.md
+exec akb write notes/root-first.md
+stdout '^Written to kb/notes/root-first\.md$'
+! stderr 'ignored by one of your'
+cd ..
+exec git log -1 --format=%s
+stdout '^akb: write kb/notes/root-first\.md$'
+
+# Embedded first: the non-git base created at the root afterwards must not
+# take over the embedded base's directories, which keep committing.
+cd $WORK
+mkdir host2
+cd host2
+exec git init -q
+
+exec akb init sub --embed
+stdout '^Initialized KB "sub" at .*/host2/sub$'
+stdout '^commit identity: from git config \(ambient <ambient@local>\) — not recorded; each machine''s git identity applies$'
+
+cd sub
+exec akb template get note --full --examples
+cp stdout .agent-kb/templates/note.yaml
+cd ..
+
+exec akb init . --no-git --force
+stdout '^Initialized KB "host2" at .*/host2$'
+stdout '^kb: excluded /\.agent-kb/, /kb/, /raw/ from host git tracking via \.git/info/exclude \(local to this clone; remove those lines to undo\)$'
+
+cd sub
+stdin ../../note-input.md
+exec akb write notes/embed-first.md
+stdout '^Written to kb/notes/embed-first\.md$'
+! stderr 'ignored by one of your'
+cd ..
+exec git log -1 --format=%s
+stdout '^akb: write kb/notes/embed-first\.md$'
+
+-- note-input.md --
+---
+type: note
+title: Coexisting note
+summary: Note in a base that sits beside a non-git base
+tags: versioning
+---
+A page written in an embedded base beside a non-git base at the repository root.

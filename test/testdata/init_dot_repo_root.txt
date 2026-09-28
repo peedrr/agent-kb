@@ -52,12 +52,12 @@ exec git init -q
 
 exec akb init . --no-git --force
 stdout '^Initialized KB "host2" at .*/host2$'
-stdout '^kb: excluded \.agent-kb/, kb/, raw/ from host git tracking via \.git/info/exclude \(local to this clone; remove those lines to undo\)$'
+stdout '^kb: excluded /\.agent-kb/, /kb/, /raw/ from host git tracking via \.git/info/exclude \(local to this clone; remove those lines to undo\)$'
 ! stdout 'commit identity'
 grep '^versioning: none$' .agent-kb/akb.yaml
-grep '^\.agent-kb/$' .git/info/exclude
-grep '^kb/$' .git/info/exclude
-grep '^raw/$' .git/info/exclude
+grep '^/\.agent-kb/$' .git/info/exclude
+grep '^/kb/$' .git/info/exclude
+grep '^/raw/$' .git/info/exclude
 ! exists .gitignore
 # The base's own paths stay out of the repository's status.
 exec git status --porcelain
