@@ -103,8 +103,10 @@ That line names the repository the KB now shares. The init commit records the
 KB's own paths only, so changes another author staged in the host worktree stay
 staged and uncommitted.
 
-The invocation also reports the commit identity it resolved, in one of three
-forms:
+### Commit identity
+
+Every init that versions the KB in git — standalone as well as embedded —
+also reports the commit identity it resolved, in one of three forms:
 
 ```
 commit identity: from git config (Ada Lovelace <ada@example.com>) — not recorded; each machine's git identity applies
@@ -115,7 +117,7 @@ commit identity: agent-kb <agent@agent-kb> (default — no git identity found; r
 An identity from the environment or from git config belongs to that invocation
 or to that machine, so it is not written into `.agent-kb/akb.yaml`. Only the akb
 default is recorded there, so a KB cloned to a machine without a git identity
-still commits.
+still commits. A `--no-git` init commits nothing and reports no identity.
 
 ### Unversioned
 
