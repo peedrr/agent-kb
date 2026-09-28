@@ -106,18 +106,25 @@ staged and uncommitted.
 ### Commit identity
 
 Every init that versions the KB in git — standalone as well as embedded —
-also reports the commit identity it resolved, in one of three forms:
+also reports the commit identity it resolved. `--author-name` and
+`--author-email` name that identity for the init alone: it attributes the init
+commit, it is never recorded in `.agent-kb/akb.yaml`, and every later commit
+resolves the identity of the machine it runs on.
 
 ```
+commit identity: from --author-name/--author-email (Ada Lovelace <ada@example.com>) — not recorded; this init commit uses it; later commits use each machine's identity
+commit identity: from --author-name/--author-email (Ada Lovelace <ada@example.com>) — not recorded; the commit stays with the caller and its own identity; later commits use each machine's identity
 commit identity: from git config (Ada Lovelace <ada@example.com>) — not recorded; each machine's git identity applies
 commit identity: from AKB_AUTHOR_NAME/AKB_AUTHOR_EMAIL (Ada Lovelace <ada@example.com>) — not recorded; the environment of each invocation applies
 commit identity: agent-kb <agent@agent-kb> (default — no git identity found; recorded in akb.yaml, edit git-author/git-email to change)
 ```
 
-An identity from the environment or from git config belongs to that invocation
-or to that machine, so it is not written into `.agent-kb/akb.yaml`. Only the akb
-default is recorded there, so a KB cloned to a machine without a git identity
-still commits. A `--no-git` init commits nothing and reports no identity.
+An identity the init flags, the environment, or git config named belongs to that
+invocation or to that machine, so it is not written into `.agent-kb/akb.yaml`.
+Only the akb default is recorded there, so a KB cloned to a machine without a
+git identity still commits. A `--no-git` init commits nothing and reports no
+identity; an init with `--no-commit` leaves its commit to the caller, which
+attributes it with its own identity.
 
 ### Unversioned
 

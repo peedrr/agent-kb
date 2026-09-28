@@ -754,6 +754,120 @@ func TestInitRecordsTheDefaultIdentity(t *testing.T) {
 	}
 }
 
+// TestInitRegistersAuthorFlags covers the two identity flags `akb init` carries:
+// both are registered with an empty default, so an init that names neither
+// resolves its identity from the environment or git config as before.
+func TestInitRegistersAuthorFlags(t *testing.T) {
+	for _, name := range []string{"author-name", "author-email"} {
+		flag := initCmd.Flags().Lookup(name)
+		if flag == nil {
+			t.Fatalf("initCmd registers no --%s flag", name)
+		}
+		if flag.DefValue != "" {
+			t.Errorf("--%s default = %q, want the empty default an unnamed identity has", name, flag.DefValue)
+		}
+	}
+}
+
+// TestInitAuthorFlagsOutrankEnvironmentAndGitConfig covers an init whose
+// identity comes from its flags: the report names the flags, the base records no
+// identity, and the init commit is attributed to them — whether git config, the
+// environment, or no other source names one.
+func TestInitAuthorFlagsOutrankEnvironmentAndGitConfig(t *testing.T) {
+	cases := map[string][]string{
+		"flags outrank git config": envWithGitIdentity("machine-user", "machine@example.com"),
+		"flags outrank the environment": append(envWithGitIdentity("machine-user", "machine@example.com"),
+			"AKB_AUTHOR_NAME=env-user", "AKB_AUTHOR_EMAIL=env@example.com"),
+		"flags resolve on their own": envWithoutIdentity(),
+	}
+	for name, env := range cases {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+
+			out, code := initRunEnv(t, dir, env, "flagged-kb", "--author-name", "Grace Hopper", "--author-email", "grace@example.com")
+			if code != exitSuccess {
+				t.Fatalf("exit code = %d, want %d (output: %s)", code, exitSuccess, out)
+			}
+			assertIdentityReport(t, out, "commit identity: from --author-name/--author-email (Grace Hopper <grace@example.com>) — not recorded; this init commit uses it; later commits use each machine's identity")
+
+			kbDir := filepath.Join(dir, "flagged-kb")
+			assertNoRecordedIdentity(t, kbDir)
+			if author := gitOutput(t, kbDir, "log", "-1", "--format=%an <%ae>"); author != "Grace Hopper <grace@example.com>" {
+				t.Errorf("init commit author = %q, want the flag identity", author)
+			}
+		})
+	}
+}
+
+// TestInitAuthorNameFlagFillsTheEmailFromGit covers a partial flag pair: the
+// name the flag named attributes the init commit, and the email the flag left
+// empty comes from the next source down the chain, the machine's git identity.
+func TestInitAuthorNameFlagFillsTheEmailFromGit(t *testing.T) {
+	dir := t.TempDir()
+
+	out, code := initRunEnv(t, dir, envWithGitIdentity("machine-user", "machine@example.com"), "named-kb", "--author-name", "Grace Hopper")
+	if code != exitSuccess {
+		t.Fatalf("exit code = %d, want %d (output: %s)", code, exitSuccess, out)
+	}
+	assertIdentityReport(t, out, "commit identity: from --author-name/--author-email (Grace Hopper <machine@example.com>) — not recorded; this init commit uses it; later commits use each machine's identity")
+
+	kbDir := filepath.Join(dir, "named-kb")
+	assertNoRecordedIdentity(t, kbDir)
+	if author := gitOutput(t, kbDir, "log", "-1", "--format=%an <%ae>"); author != "Grace Hopper <machine@example.com>" {
+		t.Errorf("init commit author = %q, want the flag name and the git config email", author)
+	}
+}
+
+// TestInitAuthorFlagsWithNoCommitLeaveTheCommitToTheCaller covers the flags of
+// an init that records no commit: the scaffold succeeds without an exit-2
+// identity refusal, nothing is committed, and the report attributes the commit
+// to the caller rather than to the flags.
+func TestInitAuthorFlagsWithNoCommitLeaveTheCommitToTheCaller(t *testing.T) {
+	dir := t.TempDir()
+	kbDir := filepath.Join(dir, "staged-kb")
+
+	out, code := initRunEnv(t, dir, envWithoutIdentity(), "staged-kb", "--no-commit", "--author-name", "Grace Hopper", "--author-email", "grace@example.com")
+	if code != exitSuccess {
+		t.Fatalf("exit code = %d, want %d (output: %s)", code, exitSuccess, out)
+	}
+	assertIdentityReport(t, out, "commit identity: from --author-name/--author-email (Grace Hopper <grace@example.com>) — not recorded; the commit stays with the caller and its own identity; later commits use each machine's identity")
+
+	logCmd := exec.Command("git", "log", "-1", "--format=%s") //nolint:gosec // test helper launching trusted git binary
+	logCmd.Dir = kbDir
+	if err := logCmd.Run(); err == nil {
+		t.Error("--no-commit recorded a commit")
+	}
+
+	assertNoRecordedIdentity(t, kbDir)
+}
+
+// assertIdentityReport fails the test unless out carries the identity report the
+// scenario resolved.
+func assertIdentityReport(t *testing.T, out, want string) {
+	t.Helper()
+
+	if !strings.Contains(out, want) {
+		t.Errorf("output = %q, want it to contain %q", out, want)
+	}
+}
+
+// assertNoRecordedIdentity fails the test unless the base's akb.yaml carries no
+// commit identity: an identity a flag, the environment, or git config named is
+// never written into a file that travels with the base.
+func assertNoRecordedIdentity(t *testing.T, kbDir string) {
+	t.Helper()
+
+	data, err := os.ReadFile(path.ConfigPath(kbDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"git-author", "git-email"} {
+		if strings.Contains(string(data), key) {
+			t.Errorf("akb.yaml = %q, want no %s key", data, key)
+		}
+	}
+}
+
 // TestInitNoCommitLeavesTheCommitToTheCaller covers `akb init --no-commit`: the
 // base is scaffolded and staged, and its commit is the caller's to make.
 func TestInitNoCommitLeavesTheCommitToTheCaller(t *testing.T) {
@@ -825,11 +939,11 @@ func TestAppendMissingLinesKeepsExistingLines(t *testing.T) {
 	}
 }
 
-// envWithoutIdentity returns the process environment with every source of a
-// git identity removed: the akb and git identity variables, and the machine's
-// configuration, which the empty user.name and user.email values override. Git
-// reads an empty value as no identity at all.
-func envWithoutIdentity() []string {
+// envWithGitIdentity returns the process environment with the machine's git
+// identity replaced by name and email: the akb and git identity variables are
+// removed and git's merged configuration names exactly the given identity, so a
+// scenario resolving one does not depend on the host's configuration.
+func envWithGitIdentity(name, email string) []string {
 	env := make([]string, 0, len(os.Environ())+4)
 	for _, variable := range os.Environ() {
 		key, _, _ := strings.Cut(variable, "=")
@@ -841,8 +955,16 @@ func envWithoutIdentity() []string {
 	return append(env,
 		"GIT_CONFIG_COUNT=2",
 		"GIT_CONFIG_KEY_0=user.name",
-		"GIT_CONFIG_VALUE_0=",
+		"GIT_CONFIG_VALUE_0="+name,
 		"GIT_CONFIG_KEY_1=user.email",
-		"GIT_CONFIG_VALUE_1=",
+		"GIT_CONFIG_VALUE_1="+email,
 	)
+}
+
+// envWithoutIdentity returns the process environment with every source of a
+// git identity removed: the akb and git identity variables, and the machine's
+// configuration, which the empty user.name and user.email values override. Git
+// reads an empty value as no identity at all.
+func envWithoutIdentity() []string {
+	return envWithGitIdentity("", "")
 }

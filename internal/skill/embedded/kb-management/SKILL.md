@@ -119,7 +119,7 @@ Every command below is shown without its selection: pass `--kb <path>` or set
 
 | Operation | Command |
 |-----------|---------|
-| Initialize KB | `akb init <name> [--embed] [--no-git] [--force] [--no-commit]` |
+| Initialize KB | `akb init <name> [--embed] [--no-git] [--force] [--no-commit] [--author-name <name>] [--author-email <email>]` |
 | Read page | `akb read <path>` |
 | Write page | `akb write <path> [--frontmatter key=val] [--append] <<'EOF' ... EOF` |
 | Delete page | `akb delete <path> [--orphans] [--force]` |
