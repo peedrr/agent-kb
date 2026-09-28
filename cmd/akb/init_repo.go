@@ -94,7 +94,9 @@ func excludeFromHostRepo(target, hostRoot string) (string, int, error) {
 // outside it at once, which git reads as a pattern that matches nothing. A base
 // in a subdirectory is excluded as that directory. A base at the repository
 // root is excluded by the directories it owns, because excluding the directory
-// the host's own files live in would hide them too.
+// the host's own files live in would hide them too. Each of those patterns is
+// anchored with a leading slash, so it matches the directory at the repository
+// root alone and not a same-named directory anywhere below it.
 func hostExcludeEntries(target, hostRoot string) ([]string, error) {
 	resolved, err := filepath.EvalSymlinks(target)
 	if err != nil {
@@ -105,7 +107,7 @@ func hostExcludeEntries(target, hostRoot string) ([]string, error) {
 		return nil, fmt.Errorf("locate %s in %s: %w", target, hostRoot, err)
 	}
 	if rel == "." {
-		return []string{path.StateDirName + "/", "kb/", "raw/"}, nil
+		return []string{"/" + path.StateDirName + "/", "/kb/", "/raw/"}, nil
 	}
 	return []string{filepath.ToSlash(rel) + "/"}, nil
 }

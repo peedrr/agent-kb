@@ -561,13 +561,19 @@ func TestHostExcludeEntriesResolvesASymlinkedTarget(t *testing.T) {
 	}
 
 	// A target at the repository root keeps yielding the directories the base
-	// owns instead of the root itself.
+	// owns instead of the root itself, each anchored to the root so the pattern
+	// matches those directories there alone.
 	entries, err = hostExcludeEntries(repo, hostRoot)
 	if err != nil {
 		t.Fatalf("hostExcludeEntries(%s): %v", repo, err)
 	}
-	if got, want := strings.Join(entries, ", "), ".agent-kb/, kb/, raw/"; got != want {
+	if got, want := strings.Join(entries, ", "), "/.agent-kb/, /kb/, /raw/"; got != want {
 		t.Errorf("hostExcludeEntries at the repository root = %q, want %q", got, want)
+	}
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry, "/") {
+			t.Errorf("hostExcludeEntries at the repository root yielded %q, want a pattern anchored to the root", entry)
+		}
 	}
 }
 
@@ -646,8 +652,9 @@ func TestInitNoGitAtRepositoryRootKeepsTheHostGitignore(t *testing.T) {
 	}
 
 	// The root layout appends three entries, so the notice's undo guidance has
-	// to refer to them in the plural.
-	if want := "kb: excluded .agent-kb/, kb/, raw/ from host git tracking via .git/info/exclude (local to this clone; remove those lines to undo)"; !strings.Contains(out, want) {
+	// to refer to them in the plural, and each entry is anchored to the
+	// repository root.
+	if want := "kb: excluded /.agent-kb/, /kb/, /raw/ from host git tracking via .git/info/exclude (local to this clone; remove those lines to undo)"; !strings.Contains(out, want) {
 		t.Errorf("output = %q, want it to contain %q", out, want)
 	}
 
@@ -674,10 +681,20 @@ func TestInitNoGitAtRepositoryRootKeepsTheHostGitignore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, entry := range []string{".agent-kb/", "kb/", "raw/"} {
-		if !strings.Contains(string(exclude), entry) {
-			t.Errorf("host exclude file = %q, want it to carry %q", exclude, entry)
+	anchored := map[string]bool{"/.agent-kb/": true, "/kb/": true, "/raw/": true}
+	patterns := 0
+	for _, line := range strings.Split(string(exclude), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
 		}
+		if !anchored[line] {
+			t.Errorf("host exclude file carries pattern %q, want only the anchored directories of the base", line)
+		}
+		patterns++
+	}
+	if patterns != len(anchored) {
+		t.Errorf("host exclude file carries %d patterns, want the base's three anchored directories", patterns)
 	}
 }
 
