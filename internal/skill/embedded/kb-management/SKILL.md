@@ -85,6 +85,13 @@ akb discover --json   # one object per base: name, path, and optional descriptio
 which creates the base at `<working directory>/<name>` and leaves the selection
 to you.
 
+A base may live inside a git repository and be versioned with it (`akb init <name>
+--embed`), in a repository of its own (`akb init <name>`), or not be versioned at
+all (`--no-git`). The layout decides what `akb` commits, never how a base is
+selected: every mode is addressed by the same `--kb`/`AKB_KB` rules above. Inside
+a repository, `akb init` refuses to guess the mode — it exits 2 and states what
+each choice does. See `references/INIT.md` for the decision and the refusals.
+
 There is no registry and no "current KB": `akb use` and `akb registry` were
 removed. Pass `--kb` on every invocation, or export `AKB_KB` for a session or
 directory (for example through direnv). Mutating commands echo the base they
@@ -112,7 +119,7 @@ Every command below is shown without its selection: pass `--kb <path>` or set
 
 | Operation | Command |
 |-----------|---------|
-| Initialize KB | `akb init <name>` |
+| Initialize KB | `akb init <name> [--embed] [--no-git] [--force] [--no-commit]` |
 | Read page | `akb read <path>` |
 | Write page | `akb write <path> [--frontmatter key=val] [--append] <<'EOF' ... EOF` |
 | Delete page | `akb delete <path> [--orphans] [--force]` |
