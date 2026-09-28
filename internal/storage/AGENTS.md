@@ -37,9 +37,15 @@ Storage abstraction with two implementations: git-backed (`GitProvider`) and fil
 ## TYPICAL USAGE
 
 ```go
-kbRoot, _ := path.ResolveKB(kbFlag)   // --kb or AKB_KB selection
-store := storage.NewGitProvider(kbRoot, noCommit)
-store.Write(ctx, path, data)
+kbRoot, _ := path.ResolveKB(kbFlag)                 // --kb or AKB_KB selection
+store, err := storage.OpenStore(kbRoot, noCommit)   // the versioning mode selects the provider
+if err != nil {
+    return err
+}
+store.Write(ctx, filepath.Join(kbRoot, "kb", "notes", "page.md"), data)   // in git mode commits `akb: write <path>`
+store.Delete(ctx, filepath.Join(kbRoot, "kb", "notes", "page.md"))        // in git mode commits `akb: delete <path>`
+store.Commit("akb: index add kb/notes/page.md", "kb/index.md")            // stages and commits base-relative paths as one unit
+store.NothingToCommit("kb/index.md")                                      // would a commit of these paths record anything?
 ```
 
 ## NOTES

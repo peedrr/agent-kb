@@ -25,7 +25,7 @@ agent-kb/
 │   ├── path/       # KB path resolution & guards
 │   ├── search/     # SQLite FTS5 full-text search
 │   ├── skill/      # Embedded skill management (//go:embed)
-│   ├── storage/    # GitProvider (auto-commit)
+│   ├── storage/    # Store/OpenStore (versioning modes) + GitProvider (auto-commit)
 │   └── template/   # Typed page templates (TemplateV2 with CEL rules)
 ├── test/           # Integration tests (testscript)
 ├── flake.nix       # Nix flake (dev shell + build package)
@@ -51,7 +51,8 @@ agent-kb/
 | Template loader | `internal/template/template.go` | TemplateV2 with schema, validations, lint_rules |
 | Template commands | `cmd/akb/template.go`, `templates_write.go`, `template_delete.go` | `template get/list/write/delete` |
 | Template delete | `cmd/akb/template_delete.go` | Impact analysis (page count), `--force`, path traversal prevention |
-| Git integration | `internal/storage/git.go` | Auto-commit, merge conflict detection |
+| Git integration | `internal/storage/mode.go`, `internal/storage/git.go` | `OpenStore`/`Store`: the versioning mode selects the provider; auto-commit, merge conflict detection |
+| Commit identity | `internal/storage/identity.go` | `ResolveIdentity`: env → `akb.yaml` → git config for a mutation; `ResolveInitIdentity`: flags → env → git config → akb default for a new base |
 | DB schema | `internal/db/db.go` | documents, pages, links tables + FTS5 |
 | Config format | `internal/config/config.go` | YAML akb.yaml |
 | Lint engine | `internal/lint/engine.go` | LintEngine, LintChecker interface |
@@ -73,8 +74,13 @@ agent-kb/
 |--------|------|----------|------|
 | RootCmd | Cobra.Command | cmd/akb/root.go:43 | Base CLI command |
 | version | string | cmd/akb/main.go:11 | CLI version (injected at build via LDFLAGS) |
-| Provider | interface | internal/storage/provider.go:6 | Write/Read/Delete/Exists/List |
-| GitProvider | struct | internal/storage/git.go:41 | Git-tracked file operations |
+| Provider | interface | internal/storage/provider.go:10 | Write/Read/Delete/Exists/List |
+| GitProvider | struct | internal/storage/git.go:40 | Git-tracked file operations |
+| Store | struct | internal/storage/mode.go:64 | Storage of one base: provider, lock, preflight, commit |
+| OpenStore | func | internal/storage/mode.go:82 | Opens a base's storage in the versioning mode its akb.yaml records |
+| Mode | type | internal/storage/mode.go:18 | Versioning mode of a base: `git` or `none` |
+| ResolveIdentity | func | internal/storage/identity.go:73 | Commit identity of a mutation: env → `akb.yaml` → git config |
+| ResolveInitIdentity | func | internal/storage/identity.go:119 | Identity a new base records: flags → env → git config → akb default |
 | Searcher | interface | internal/search/searcher.go:33 | IndexPage/RemovePage/Search/RebuildIndex |
 | SQLiteFTS5Searcher | struct | internal/search/sqlite.go:18 | FTS5 implementation |
 | Updater | interface | internal/linkgraph/updater.go:13 | UpdatePageLinks/RemovePage |

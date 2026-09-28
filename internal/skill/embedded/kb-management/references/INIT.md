@@ -136,7 +136,7 @@ A KB initialized at the repository root is excluded by the three directories it
 owns, and the undo guidance refers to them in the plural:
 
 ```
-kb: excluded .agent-kb/, kb/, raw/ from host git tracking via .git/info/exclude (local to this clone; remove those lines to undo)
+kb: excluded /.agent-kb/, /kb/, /raw/ from host git tracking via .git/info/exclude (local to this clone; remove those lines to undo)
 ```
 
 ## Refusals
