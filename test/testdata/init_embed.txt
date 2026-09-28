@@ -1,0 +1,63 @@
+# --embed: the base joins the enclosing repository's history, and the init
+# commit records exactly the base's own paths, leaving the host worktree's
+# staged changes as they were.
+
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ambient
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ambient@local
+
+mkdir host
+cd host
+exec git init -q
+
+# Unrelated host work, staged before the base is created.
+cp ../host-wip.txt host.txt
+exec git add host.txt
+exec git diff --cached --name-only
+stdout '^host\.txt$'
+
+exec akb init docs --embed
+stdout '^Initialized KB "docs" at .*/host/docs$'
+stdout '^kb: docs is embedded inside repository .*; akb commits only kb/, raw/, \.agent-kb/$'
+stdout '^commit identity: from git config \(ambient <ambient@local>\) — not recorded; each machine''s git identity applies$'
+
+# No nested repository: the base is versioned by the host repository.
+! exists docs/.git
+exists docs/kb/index.md
+exists docs/raw/files.log
+exists docs/.agent-kb/akb.yaml
+exists docs/.agent-kb/.gitignore
+exists docs/.gitignore
+grep '^name: docs$' docs/.agent-kb/akb.yaml
+grep '^versioning: git$' docs/.agent-kb/akb.yaml
+
+# The init commit records exactly the base's paths.
+exec bash -c 'git ls-tree -r --name-only HEAD | sort > "$WORK/init-commit-paths.txt"'
+cmp ../init-commit-paths.txt ../init-commit-paths-expected.txt
+
+# The host's staged work is untouched: still staged, still uncommitted.
+exec git status --porcelain
+stdout '^A  host\.txt$'
+! stdout 'docs/'
+! exec git config --local user.name
+! exec git config --local user.email
+
+cd docs
+exec akb status
+stdout '^Name: docs$'
+# The hosting repository carries the host's staged work, so it is not clean:
+# the status line reports the repository the base lives in.
+stdout '^Git: dirty$'
+
+-- host-wip.txt --
+Unrelated host work, staged before the base is created.
+
+-- init-commit-paths-expected.txt --
+docs/.agent-kb/.gitignore
+docs/.agent-kb/akb.yaml
+docs/.gitignore
+docs/kb/index.md
+docs/kb/log.md
+docs/raw/files.log

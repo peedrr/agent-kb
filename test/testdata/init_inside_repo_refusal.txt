@@ -1,0 +1,27 @@
+# init inside a git repository with no versioning mode: an exit-2 refusal that
+# is self-sufficient — it names the membership of the target and explains what
+# each mode does with the repository.
+
+mkdir host
+cd host
+exec git init -q
+
+exec bash -c 'akb init sub-kb; echo "akb-exit=$?"'
+stdout '^akb-exit=2$'
+stderr '^usage: sub-kb is inside git repository .* — choose how the KB is versioned:$'
+stderr '^  --embed    the KB joins this repository''s history; akb commits only its own paths \(kb/, raw/, \.agent-kb/\), never other worktree changes$'
+stderr '^  --no-git   the KB is not versioned; akb excludes it from the host''s git status via \.git/info/exclude \(local to this clone\)$'
+# The repo-root layout warning belongs to a target that IS the repository root.
+! stderr 'This will write'
+! stderr 'internal:'
+# The refusal is a preflight: nothing was scaffolded.
+! exists sub-kb
+
+# A target nested at any depth gets the same membership wording: it is inside
+# the repository, not a repository of its own.
+mkdir nested/deeper
+cd nested/deeper
+exec bash -c 'akb init deep-kb; echo "akb-exit=$?"'
+stdout '^akb-exit=2$'
+stderr '^usage: deep-kb is inside git repository .* — choose how the KB is versioned:$'
+! exists deep-kb

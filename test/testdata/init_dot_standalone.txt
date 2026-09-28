@@ -1,0 +1,29 @@
+# `akb init .` outside a repository: a standalone repository at the current
+# directory, with the KB name derived from the directory's basename and
+# reported back at exit 0.
+
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ambient
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ambient@local
+
+mkdir project
+cd project
+
+exec akb init .
+stdout '^Initialized KB "project" at .*/project$'
+
+exists .git
+exists kb/index.md
+exists .agent-kb/akb.yaml
+grep '^name: project$' .agent-kb/akb.yaml
+grep '^versioning: git$' .agent-kb/akb.yaml
+
+# The adopted name reaches the init commit as well.
+exec git log -1 --format=%s
+stdout '^akb: init project$'
+
+exec akb status
+stdout '^Name: project$'
+stdout '^Git: clean$'

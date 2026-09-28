@@ -1,0 +1,82 @@
+# --no-git: an unversioned base. Inside a repository the base is excluded from
+# the host's git status; committing commands are file operations with no git
+# invocation at all.
+
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ambient
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ambient@local
+
+mkdir host
+cd host
+exec git init -q
+
+exec akb init scratch --no-git
+stdout '^Initialized KB "scratch" at .*/host/scratch$'
+stdout '^kb: excluded scratch/ from host git tracking via \.git/info/exclude \(local to this clone; remove that line to undo\)$'
+# An unversioned base resolves and records no commit identity.
+! stdout 'commit identity'
+
+# No nested repository, and the mode is written explicitly.
+! exists scratch/.git
+exists scratch/.agent-kb/.gitignore
+grep '^name: scratch$' scratch/.agent-kb/akb.yaml
+grep '^versioning: none$' scratch/.agent-kb/akb.yaml
+
+# The host's exclude file carries the base, and the host's own ignore file is
+# left to the host: it tracks nothing of an unversioned base.
+grep '^scratch/$' .git/info/exclude
+! exists .gitignore
+exec git status --porcelain
+! stdout .
+
+cd scratch
+
+exec akb status
+stdout '^Name: scratch$'
+stdout '^Versioning: none$'
+! stdout '^Git:'
+
+# A page round-trip: every committing command writes files only, so the
+# commands work with no git binary on PATH and inside no repository.
+exec akb template get note --full --examples
+cp stdout .agent-kb/templates/note.yaml
+
+stdin ../../note-input.md
+exec bash -c 'p=$(command -v akb); PATH=${p%/*}; export PATH; akb write notes/plain.md; echo "akb-exit=$?"'
+stdout '^akb-exit=0$'
+stdout '^Written to kb/notes/plain\.md$'
+exists kb/notes/plain.md
+
+stdin ../../append-input.md
+exec bash -c 'p=$(command -v akb); PATH=${p%/*}; export PATH; akb append notes/plain.md; echo "akb-exit=$?"'
+stdout '^akb-exit=0$'
+stdout '^Appended to kb/notes/plain\.md$'
+grep '^Appended in a base that is not versioned\.$' kb/notes/plain.md
+
+# --no-commit is a no-op in a base that never commits.
+stdin ../../note-input.md
+exec bash -c 'p=$(command -v akb); PATH=${p%/*}; export PATH; akb --no-commit write notes/no-commit.md; echo "akb-exit=$?"'
+stdout '^akb-exit=0$'
+exists kb/notes/no-commit.md
+
+exec bash -c 'p=$(command -v akb); PATH=${p%/*}; export PATH; akb delete notes/plain.md; echo "akb-exit=$?"'
+stdout '^akb-exit=0$'
+stdout '^Deleted kb/notes/plain\.md$'
+! exists kb/notes/plain.md
+
+# The base stayed outside every repository.
+! exists .git
+
+-- note-input.md --
+---
+type: note
+title: Unversioned note
+summary: Note in a base that is not versioned
+tags: versioning
+---
+A page written in a base that has no repository.
+
+-- append-input.md --
+Appended in a base that is not versioned.

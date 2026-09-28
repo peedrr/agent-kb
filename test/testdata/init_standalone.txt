@@ -1,0 +1,49 @@
+# Standalone init outside a repository: the base becomes a git repository of
+# its own, with the standard tree and the mode written explicitly.
+#
+# The identity reaches git through GIT_CONFIG_* environment entries, which
+# outrank the machine's system and global configuration, so the scenario reads
+# no identity from the host it runs on.
+
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ambient
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ambient@local
+
+exec akb init stand-kb
+stdout '^Initialized KB "stand-kb" at .*/stand-kb$'
+stdout '^commit identity: from git config \(ambient <ambient@local>\) — not recorded; each machine''s git identity applies$'
+
+# The standard tree, plus the base's own ignore file.
+exists stand-kb/.git
+exists stand-kb/kb/index.md
+exists stand-kb/kb/log.md
+exists stand-kb/raw/files.log
+exists stand-kb/.agent-kb/akb.yaml
+exists stand-kb/.agent-kb/.gitignore
+exists stand-kb/.gitignore
+
+# The config names the mode explicitly and records no identity: the ambient
+# identity belongs to the machine, not to the base.
+grep '^name: stand-kb$' stand-kb/.agent-kb/akb.yaml
+grep '^versioning: git$' stand-kb/.agent-kb/akb.yaml
+! grep 'git-author' stand-kb/.agent-kb/akb.yaml
+! grep 'git-email' stand-kb/.agent-kb/akb.yaml
+
+cd stand-kb
+
+# The init commit is the repository's root commit and commits under the
+# machine's identity.
+exec git log -1 --format=%s
+stdout '^akb: init stand-kb$'
+exec git log -1 --format='%an <%ae>'
+stdout '^ambient <ambient@local>$'
+
+# init writes no repository configuration of its own.
+! exec git config --local user.name
+! exec git config --local user.email
+
+exec akb status
+stdout '^Name: stand-kb$'
+stdout '^Git: clean$'

@@ -1,0 +1,62 @@
+# --no-commit on init: the base is scaffolded and its paths are staged; the
+# commit is left to the caller. The flag leaves the tree without a commit both
+# standalone and embedded.
+
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ambient
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ambient@local
+
+exec akb init staged-kb --no-commit
+stdout '^Initialized KB "staged-kb" at .*/staged-kb$'
+exists staged-kb/.git
+exists staged-kb/.agent-kb/akb.yaml
+
+cd staged-kb
+
+# The repository has no commit, and the base's paths wait in the index.
+! exec git log --oneline
+exec git diff --cached --name-only
+stdout '^\.agent-kb/\.gitignore$'
+stdout '^\.agent-kb/akb\.yaml$'
+stdout '^\.gitignore$'
+stdout '^kb/index\.md$'
+stdout '^kb/log\.md$'
+stdout '^raw/files\.log$'
+# The search database is ignored, so it is not staged.
+! stdout 'search\.db'
+exec git status --porcelain
+stdout '^A  kb/index\.md$'
+
+# The embedded layout stages the base's paths in the host index and leaves the
+# host history untouched.
+cd $WORK
+mkdir host
+cd host
+exec git init -q
+cp ../host-wip.txt host.txt
+exec git add host.txt
+exec git commit -m 'host work'
+# Unrelated host work, staged before the base is created.
+cp ../host-wip.txt wip.txt
+exec git add wip.txt
+exec git rev-parse HEAD
+cp stdout head-before.txt
+
+exec akb init docs --embed --no-commit
+stdout '^Initialized KB "docs" at .*/host/docs$'
+stdout '^kb: docs is embedded inside repository .*; akb commits only kb/, raw/, \.agent-kb/$'
+
+exec git rev-parse HEAD
+cmp stdout head-before.txt
+exec git diff --cached --name-only
+stdout '^docs/\.agent-kb/\.gitignore$'
+stdout '^docs/\.agent-kb/akb\.yaml$'
+stdout '^docs/\.gitignore$'
+stdout '^docs/kb/index\.md$'
+stdout '^docs/kb/log\.md$'
+stdout '^docs/raw/files\.log$'
+stdout '^wip\.txt$'
+-- host-wip.txt --
+Unrelated host work, staged before the base is created.

@@ -1,0 +1,64 @@
+# `akb init .` at a repository root: the target IS the repository, so the
+# refusal reports that membership and carries the repo-root layout warning.
+# --force addresses the layout only; a versioning mode is still required.
+
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ambient
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ambient@local
+
+mkdir host
+cd host
+exec git init -q
+
+exec bash -c 'akb init .; echo "akb-exit=$?"'
+stdout '^akb-exit=2$'
+stderr '^usage: host is a git repository — choose how the KB is versioned:$'
+stderr '^  --embed    the KB joins this repository''s history; akb commits only its own paths \(kb/, raw/, \.agent-kb/\), never other worktree changes$'
+stderr '^  --no-git   the KB is not versioned; akb excludes it from the host''s git status via \.git/info/exclude \(local to this clone\)$'
+stderr '^This will write \.agent-kb/, kb/ and raw/ directly to the repo root\. --force if desired, otherwise prefer a subdirectory: akb init <name> --embed\.$'
+! stderr 'internal:'
+! exists .agent-kb
+
+# --force addresses the layout warning only: it chooses no versioning mode,
+# so the refusal stands unchanged.
+exec bash -c 'akb init . --force; echo "akb-exit=$?"'
+stdout '^akb-exit=2$'
+stderr '^usage: host is a git repository — choose how the KB is versioned:$'
+! exists .agent-kb
+
+# A mode plus --force initializes the base at the repository root and records
+# it in the repository's history.
+exec akb init . --embed --force
+stdout '^Initialized KB "host" at .*/host$'
+stdout '^kb: host is embedded inside repository .*; akb commits only kb/, raw/, \.agent-kb/$'
+stdout '^commit identity: from git config \(ambient <ambient@local>\) — not recorded; each machine''s git identity applies$'
+exists .agent-kb/akb.yaml
+grep '^name: host$' .agent-kb/akb.yaml
+grep '^versioning: git$' .agent-kb/akb.yaml
+# This layout writes the ignore file of the base into the repository root.
+exists .gitignore
+grep '^\.agent-kb/search\.db\*$' .gitignore
+exec git log -1 --format=%s
+stdout '^akb: init host$'
+
+# An unversioned base at the repository root excludes the directories it owns
+# instead, and leaves the root ignore file to the repository.
+cd $WORK
+mkdir host2
+cd host2
+exec git init -q
+
+exec akb init . --no-git --force
+stdout '^Initialized KB "host2" at .*/host2$'
+stdout '^kb: excluded \.agent-kb/, kb/, raw/ from host git tracking via \.git/info/exclude \(local to this clone; remove those lines to undo\)$'
+! stdout 'commit identity'
+grep '^versioning: none$' .agent-kb/akb.yaml
+grep '^\.agent-kb/$' .git/info/exclude
+grep '^kb/$' .git/info/exclude
+grep '^raw/$' .git/info/exclude
+! exists .gitignore
+# The base's own paths stay out of the repository's status.
+exec git status --porcelain
+! stdout .
