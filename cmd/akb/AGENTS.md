@@ -62,10 +62,10 @@ CLI commands using Cobra framework. Each subcommand is a separate file. 25+ comm
 
 ```go
 // Typical command structure
-kbRoot, err := path.ResolveKB(kbFlag)   // --kb or AKB_KB selection
-dbConn, err := db.OpenKB(kbRoot)        // Open search DB
-store := storage.NewGitProvider(...)    // Git-backed storage
+kbRoot, err := path.ResolveKB(kbFlag)              // --kb or AKB_KB selection
+dbConn, err := db.OpenKB(kbRoot)                   // Open search DB
+store, err := storage.OpenStore(kbRoot, noCommit)  // Mode-aware store, selected by the `versioning` key
 searcher := search.NewSQLiteFTS5Searcher(dbConn)
 updater := linkgraph.NewSQLiteLinkGraph(dbConn)
-engine := lint.NewLintEngine()          // Add checkers, then Run()
+engine := lint.NewLintEngine()                     // Add checkers, then Run()
 ```

@@ -115,9 +115,10 @@ agent-kb/
 - **Paths**: Always relative to KB root; `kb/` prefix stripped
 - **Managed files**: `index.md`, `log.md` cannot be written directly
 - **Raw access**: `raw/` prefix → separate storage; use `akb raw` commands
+- **Versioning**: `.agent-kb/akb.yaml` carries `versioning: git|none` — the mode the base records its history in. A config without the key means `git`, the mode bases predating the key were created in; any other value is rejected instead of read as git. In `git` mode a mutation is committed in the repository that hosts the base; in `none` mode the files are written with no git invocation at all, and the base locks its own `.agent-kb/akb.lock`. `akb init` picks the mode: a repository of the base's own (`akb init <name>`), the enclosing repository's history (`--embed`), or no versioning (`--no-git`, excluded from the host's git status through `.git/info/exclude`). Inside a repository the mode is required: an invocation that names none refuses with exit 2.
 - **Commits**: Git commits auto-created with `akb: write/delete <path>` messages
 - **Merge conflicts**: Blocked; must resolve before any write/delete
-- **Git identity**: A commit is authored by the repository's configured `user.name`; a repository without one gets the per-invocation fallback `-c user.name=akb -c user.email=akb@local`. Repository config is never written, except by `akb init` (`ensureGitConfig`)
+- **Git identity**: The identity of a commit resolves in precedence order: `AKB_AUTHOR_NAME`/`AKB_AUTHOR_EMAIL` in the environment, then `git-author`/`git-email` in the base's `akb.yaml`, then git's own resolution (`GIT_AUTHOR_*` in the environment, then repository and global configuration). An identity akb supplies is exported as `GIT_AUTHOR_*`/`GIT_COMMITTER_*`; when it supplies none, git resolves the identity itself. An identity no source names is a configuration fault: a committing command refuses with exit 2 before writing anything. `akb init` records the akb default (`agent-kb <agent@agent-kb>`) in a new base's `akb.yaml` only when neither the environment nor git names one — an identity from the environment or from git config belongs to that invocation or machine and is never written into the file. Repository config is never written.
 - **DB path**: `.agent-kb/search.db` with WAL mode, single connection
 - **is_draft**: Auto-managed frontmatter field; new pages are implicit drafts; `akb approve` sets `is_draft: false`
 - **Type enforcement**: All pages MUST declare `type` in frontmatter matching a template in `.agent-kb/templates/`. `akb write` and `akb append` also refuse a page that leaves out a field the template marks `required: true` (exit 1, every missing field listed) before the CEL rules run; `akb template write` requires its PASS mockup to carry every required field
@@ -127,7 +128,7 @@ agent-kb/
 - **CEL rule evaluation**: write-time CEL eval errors fail closed (exit 1, write blocked, author-directed message); lint-time eval errors degrade to per-page issues and the sweep continues. The divergence is deliberate.
 - **Date fields**: any frontmatter string value that parses as RFC3339 or date-only `2006-01-02` is converted to `time.Time` for CEL `timestamp()` and duration math
 - **Template name validation**: Names must match `^[a-zA-Z0-9_-]+$` (regex-enforced, prevents path traversal)
-- **`--force` semantics**: On template commands, bypasses existence warning only; never bypasses mockup validation
+- **`--force` semantics**: A warning bypass only, never a validation or mode bypass. On template commands it bypasses the existence warning but never mockup validation; on `akb init` it bypasses the repository-root layout warning but never selects a versioning mode.
 
 ## ANTI-PATTERNS (THIS PROJECT)
 
@@ -176,4 +177,5 @@ nix develop                     # Dev shell (Go, gopls, delve, golangci-lint, ju
 - `akb template write` validates CEL syntax and test-driven mockups; overwrite: shows diff + page count, reuses existing mockups, `--force` bypasses existence warning only
 - All-errors aggregation on write: ALL failed rules reported, file NOT written if any fail
 - Exit codes: 0=success; 1=the command ran but produced a result to act on (failed page validation, raw drift); 2=the command could not do its work — bad invocations print a `usage:` prefix, akb faults an `internal:` prefix. Command failures that are neither — a git error, for example — exit 1 with an `Error: ` prefix (`classifyExit` in `cmd/akb/main.go`)
+- Exit-2 refusals are self-sufficient: a refusal states what was found, what each choice does, and the implication of each choice, so the decision can be made from the message alone. `akb init` inside a repository names the repository and spells out `--embed` and `--no-git` with what each does to the host; a blocked commit names the host repository, the merge in progress and the path it changed, and states that the merge belongs to the host project
 - `akb template delete <name>` impact analysis: counts pages using the type before deletion; auto-runs lint after

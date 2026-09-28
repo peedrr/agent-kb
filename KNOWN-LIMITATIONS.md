@@ -449,3 +449,27 @@ git's slash-separated pathspec format; the no-op check would misbehave on Window
 **Why deferred:** a pre-existing convention across the storage layer; the project's toolchain
 (Makefile, Nix flake) targets unix and Windows is not a supported platform.
 **Reported, deliberately deferred: 2026-09-24.**
+
+### A KB cannot be a git submodule of the host project
+
+**What happens.** `akb init` offers three layouts and none of them is a submodule: a standalone KB
+with a repository of its own, a KB embedded in the repository that hosts it (`--embed`), and an
+unversioned KB (`--no-git`). A submodule needs a repository a clone of the host can fetch from.
+The KB's repository is local to the machine that initialized it and akb has no remote or push
+machinery, so registering it would need the KB to be hosted first; git refuses the local-path form
+by default since CVE-2022-39253 — on git 2.55.0, `git submodule add ../kb sub` fails with
+`fatal: transport 'file' not allowed`, and only `git -c protocol.file.allow=always submodule add
+../kb sub` proceeds. A registered submodule would still be fragile: a fresh clone of the host
+leaves its directory empty until `git submodule update --init`. A nested repository that no host
+registered is not offered as a submodule either: inside one, `akb init` expects a versioning mode
+like anywhere else and offers `--embed` (that repository's history) or `--no-git` — standalone,
+which would nest a third repository, is not on offer — and the outer repository records the nested
+one as a gitlink when it stages it (`warning: adding embedded git repository: <dir>`).
+
+**Manual escape hatch:** initialize the KB standalone (`akb init <name>`), host its repository at
+a URL the host project can read, and run `git submodule add <url> <name>` by hand.
+
+**Why deferred:** akb would have to manage remotes, pushes and submodule registration for a layout
+most KBs do not need; `--embed` covers "the KB belongs to this project" without a second
+repository, and `--no-git` covers "not versioned".
+**Reported, deliberately deferred: 2026-09-28.**
