@@ -1,0 +1,43 @@
+# init merges its ignore lines into a .gitignore that already exists — every
+# line of the existing file survives, and the second run appends nothing again.
+
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ambient
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ambient@local
+
+mkdir kb-dir
+cp pre-gitignore kb-dir/.gitignore
+
+exec akb init kb-dir
+stdout '^Initialized KB "kb-dir" at .*/kb-dir$'
+
+# The unrelated lines are kept and init's lines are appended after them.
+cmp kb-dir/.gitignore gitignore-expected.txt
+grep '^# host rules$' kb-dir/.gitignore
+grep '^build/$' kb-dir/.gitignore
+grep '^\*\.akb\.bak$' kb-dir/.gitignore
+grep '^\.agent-kb/search\.db\*$' kb-dir/.gitignore
+
+# A second run leaves the merged file byte-identical: no appended line is
+# written twice. The initialized marker and the repository of the first run are
+# cleared, so the second run starts where the first one did.
+cp kb-dir/.gitignore gitignore-after-first.txt
+rm kb-dir/.agent-kb kb-dir/.git
+
+exec akb init kb-dir
+stdout '^Initialized KB "kb-dir" at .*/kb-dir$'
+cmp kb-dir/.gitignore gitignore-after-first.txt
+cmp kb-dir/.gitignore gitignore-expected.txt
+
+-- pre-gitignore --
+# host rules
+build/
+tmp.cache
+-- gitignore-expected.txt --
+# host rules
+build/
+tmp.cache
+*.akb.bak
+.agent-kb/search.db*

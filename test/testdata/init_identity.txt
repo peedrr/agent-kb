@@ -1,0 +1,64 @@
+# Commit identity: what init reports and records, and which identity the
+# committing commands apply. The scenario names the identity through GIT_CONFIG_*
+# environment entries, which outrank the machine's system and global
+# configuration, so no host configuration takes part.
+
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ada
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ada@example.com
+
+# An identity git config names belongs to the machine: init reports it, applies
+# it to the init commit, and writes nothing into akb.yaml.
+exec akb init cfg-kb
+stdout '^commit identity: from git config \(ada <ada@example\.com>\) — not recorded; each machine''s git identity applies$'
+! grep 'git-author' cfg-kb/.agent-kb/akb.yaml
+! grep 'git-email' cfg-kb/.agent-kb/akb.yaml
+exec git -C cfg-kb log -1 --format='%an <%ae>'
+stdout '^ada <ada@example\.com>$'
+
+# An identity no source names falls back to the akb default, which init records
+# so that a clone to a machine without an identity can still commit.
+env GIT_CONFIG_VALUE_0=
+env GIT_CONFIG_VALUE_1=
+exec akb init default-kb
+stdout '^commit identity: agent-kb <agent@agent-kb> \(default — no git identity found; recorded in akb\.yaml, edit git-author/git-email to change\)$'
+grep '^git-author: agent-kb$' default-kb/.agent-kb/akb.yaml
+grep '^git-email: agent@agent-kb$' default-kb/.agent-kb/akb.yaml
+exec git -C default-kb log -1 --format='%an <%ae>'
+stdout '^agent-kb <agent@agent-kb>$'
+
+cd default-kb
+exec akb template get note --full --examples
+cp stdout .agent-kb/templates/note.yaml
+
+# The environment outranks what the base records.
+env AKB_AUTHOR_NAME=env-ada
+env AKB_AUTHOR_EMAIL=env-ada@example.com
+stdin ../note-input.md
+exec akb write notes/env-note.md
+stdout '^Written to kb/notes/env-note\.md$'
+exec git log -1 --format='%an <%ae>'
+stdout '^env-ada <env-ada@example\.com>$'
+
+# What the base records outranks git-native resolution: the ambient
+# configuration still names ada, and the commit is attributed to the base.
+env AKB_AUTHOR_NAME=
+env AKB_AUTHOR_EMAIL=
+env GIT_CONFIG_VALUE_0=ada
+env GIT_CONFIG_VALUE_1=ada@example.com
+stdin ../note-input.md
+exec akb write notes/cfg-note.md
+stdout '^Written to kb/notes/cfg-note\.md$'
+exec git log -1 --format='%an <%ae>'
+stdout '^agent-kb <agent@agent-kb>$'
+
+-- note-input.md --
+---
+type: note
+title: Identity note
+summary: Note written to check the commit identity
+tags: identity
+---
+A page whose commit records the identity the invocation resolved.

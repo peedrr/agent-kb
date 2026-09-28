@@ -1,0 +1,61 @@
+# A clean merge in progress in the host repository blocks akb's commits with a
+# self-sufficient exit-2 refusal, reported before anything is written. The raw
+# git fatal for a partial commit never surfaces.
+
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ambient
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ambient@local
+
+mkdir host
+cd host
+exec git init -q
+cp ../base-file.txt base.txt
+exec git add base.txt
+exec git commit -m 'host base'
+
+exec akb init docs --embed
+stdout '^Initialized KB "docs" at .*/host/docs$'
+
+# Both branches advance, so the merge is a real one; --no-commit stops it
+# cleanly, with no conflict to resolve.
+exec git checkout -b feature
+cp ../feature-file.txt feature.txt
+exec git add feature.txt
+exec git commit -m 'feature work'
+exec git checkout -
+cp ../base-advance.txt base.txt
+exec git add base.txt
+exec git commit -m 'advance the base branch'
+exec git merge --no-commit feature
+
+cd docs
+
+# A committing command refuses: this merge belongs to the host project, not to
+# the base.
+stdin ../../raw-data.csv
+exec bash -c 'akb raw write data.csv; echo "akb-exit=$?"'
+stdout '^akb-exit=2$'
+stderr '^usage: commit preflight: merge in progress in repository .* akb commits are blocked until it is completed or aborted\. This merge belongs to the host project — do not resolve it from the KB; retry later or surface to the user\.$'
+! stderr 'cannot do a partial commit during a merge'
+! stderr 'internal:'
+# The refusal is a preflight: the raw file was not written.
+! exists raw/data.csv
+
+# Completing the host merge unblocks the same command.
+cd $WORK/host
+exec git merge --abort
+cd docs
+stdin ../../raw-data.csv
+exec akb raw write data.csv
+stdout '^Written to raw/data\.csv$'
+exists raw/data.csv
+-- base-file.txt --
+The host project's base revision.
+-- base-advance.txt --
+The host project advanced its base branch.
+-- feature-file.txt --
+The host project's feature work.
+-- raw-data.csv --
+raw content
