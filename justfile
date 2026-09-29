@@ -10,7 +10,7 @@ commit := `git rev-parse --short HEAD 2>/dev/null || echo "unknown"`
 # Untracked files count as dirty here too, so the marker means the same thing
 # as the clean-tree guard in scripts/check-release-preconditions.sh.
 dirty := `test -z "$(git status --porcelain 2>/dev/null)" || echo "-dirty"`
-ldflags := "-X main.version=" + version + "-" + commit + dirty
+ldflags := "-X main.version=" + version + " -X main.commit=" + commit + dirty
 
 # List available recipes
 default:
@@ -37,10 +37,13 @@ clean:
     rm -rf bin/
 
 # Every guard runs first, so a failed check aborts before any tag is created.
-# Release: clean-tree + branch guard, version lockstep check, then tag HEAD as v<VERSION>
+# Release: clean-tree + branch guard, version lockstep check, then tag HEAD as
+# v<VERSION> and move the `release` branch to it.
 release:
     scripts/check-release-preconditions.sh
     scripts/check-version-lockstep.sh
     git tag -a v{{version}} -m "akb v{{version}}"
-    @echo "tag v{{version}} created. Publish with: git push --follow-tags"
+    git branch -f release v{{version}}
+    @echo "tag v{{version}} created; local 'release' branch moved to it."
+    @echo "Publish with: git push --follow-tags && git push -f origin release"
     @echo "(the tag push triggers .github/workflows/release.yml: test, build, GitHub Release)"

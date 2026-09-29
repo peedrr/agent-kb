@@ -64,7 +64,8 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           out="dist/akb_${version}_${GOOS}_${GOARCH}"
           mkdir -p "$out"
-          go build -ldflags "-X main.version=${version}" \
+          ldflags="-X main.version=${version} -X main.commit=${GITHUB_SHA:0:7}"
+          go build -ldflags "$ldflags" \
             -o "$out/akb" ./cmd/akb/
           cp LICENSE README.md "$out/"
           tar -czf "dist/akb_${version}_${GOOS}_${GOARCH}.tar.gz" \

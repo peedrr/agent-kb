@@ -73,7 +73,8 @@ agent-kb/
 | Symbol | Type | Location | Role |
 |--------|------|----------|------|
 | RootCmd | Cobra.Command | cmd/akb/root.go:43 | Base CLI command |
-| version | string | cmd/akb/main.go:11 | CLI version (injected at build via LDFLAGS) |
+| version | string | cmd/akb/main.go:16 | CLI version (injected at build via LDFLAGS) |
+| commit | string | cmd/akb/main.go:20 | Source revision (injected at build via LDFLAGS; empty for plain `go build`) |
 | Provider | interface | internal/storage/provider.go:10 | Write/Read/Delete/Exists/List |
 | GitProvider | struct | internal/storage/git.go:40 | Git-tracked file operations |
 | Store | struct | internal/storage/mode.go:64 | Storage of one base: provider, lock, preflight, commit |
@@ -157,12 +158,13 @@ just build                      # Build with version injected (NEVER output to p
 just test                       # Unit tests
 go test ./test/ -test.v         # Integration tests (testscript)
 just lint                       # Lint (golangci-lint)
-just release                    # Preconditions + lockstep + tag v$(cat VERSION)
+just release                    # Preconditions + lockstep + tag v$(cat VERSION) + move release branch
 nix develop                     # Dev shell (Go, gopls, delve, golangci-lint, just)
 
-# Plain `go build -o bin/akb ./cmd/akb/` works but produces version "dev" —
-# the version reaches the binary only through -ldflags, which `just build`
-# and `nix build` inject from VERSION.
+# Plain `go build -o bin/akb ./cmd/akb/` works but reports version "dev" —
+# version and commit reach the binary only through -ldflags, injected by
+# `just build` (git), `nix build` (flake sourceInfo), and the release
+# workflow (GITHUB_SHA).
 ```
 
 ## NOTES

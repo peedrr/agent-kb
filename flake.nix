@@ -15,6 +15,10 @@
       # before `nix build` will pick up a bump.
       akbVersion = inputs.nixpkgs.lib.removeSuffix "\n" (builtins.readFile ./VERSION);
 
+      # The commit for clean trees and remote fetches, "<rev>-dirty" for a
+      # dirty worktree.
+      akbRev = self.shortRev or self.dirtyShortRev or "unknown";
+
       goVersion = 26; # Change this to update the whole stack
 
       supportedSystems = [
@@ -98,6 +102,7 @@
 
             ldflags = [
               "-X main.version=${akbVersion}"
+              "-X main.commit=${akbRev}"
             ];
 
             # Ensure we use the Go version specified in the flake

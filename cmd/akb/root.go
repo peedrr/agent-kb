@@ -43,11 +43,20 @@ var mutatingCommands = map[string]bool{
 // were installed, so Execute installs them once per process.
 var usageClassificationInstalled bool
 
+// versionString composes the --version output: version plus the source commit
+// when the build injected one.
+func versionString() string {
+	if commit == "" {
+		return version
+	}
+	return version + " (" + commit + ")"
+}
+
 var RootCmd = &cobra.Command{
 	Use:     "akb",
 	Short:   "Agent Knowledge Base CLI",
 	Long:    `A CLI tool for managing the Agent Knowledge Base.`,
-	Version: version,
+	Version: versionString(),
 	Run: func(cmd *cobra.Command, _ []string) {
 		_ = cmd.Help() //nolint:errcheck // help display failure is non-fatal
 	},

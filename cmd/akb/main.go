@@ -15,6 +15,10 @@ import (
 
 var version = "dev"
 
+// commit is the short source revision, injected alongside version via
+// -ldflags. A plain `go build` leaves it empty.
+var commit = ""
+
 // Process exit codes: 0 = success, 1 = the command ran but produced a result
 // the caller can act on and retry (failed page validation, raw drift detected),
 // 2 = the command could not do its work (bad invocation or an akb fault).
