@@ -7,16 +7,37 @@ append-only log, and raw-source drift tracking.
 `akb` never calls an LLM. The agent using it supplies the knowledge; `akb`
 reads, writes, searches, links, and lints it.
 
+## Install
+
+With Nix (flakes enabled), choose the ref that matches what you want:
+
+```bash
+nix profile add github:peedrr/agent-kb           # HEAD of the default branch
+nix profile add github:peedrr/agent-kb/release   # latest tagged release
+nix profile add github:peedrr/agent-kb/v0.22.0   # a specific release
+```
+
+All three build from source. The tag ref never moves; the other two re-resolve
+on `nix profile upgrade`. To try akb without installing:
+`nix shell github:peedrr/agent-kb/release`.
+
+Prebuilt binaries for Linux and macOS are attached to each
+[GitHub Release](https://github.com/peedrr/agent-kb/releases).
+
+`akb --version` reports the version and the source commit the binary was built
+from.
+
 ## Build
 
 ```bash
-make build     # → bin/akb
-make test      # go test ./...
-nix develop    # dev shell: Go, gopls, delve, golangci-lint
+just build     # → bin/akb
+just test      # go test ./...
+nix develop    # dev shell: Go, gopls, delve, golangci-lint, just
 ```
 
-`git` must be on `PATH`: every knowledge base is a git repository, and every
-write is committed.
+`git` must be on `PATH`: a knowledge base is git-tracked by default and every
+write is committed (`akb init` offers `--embed` and `--no-git` for the other
+versioning modes).
 
 ## Quick start
 
