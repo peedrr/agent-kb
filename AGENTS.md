@@ -1,6 +1,6 @@
 # PROJECT KNOWLEDGE BASE
 
-**Status:** v0.21.0 — `akb init --description` records what a KB holds in `akb.yaml`, shown by `akb discover` (previous release, v0.20.0, BREAKING: the KB state directory is renamed `.akb/` → `.agent-kb/` and its config is now `akb.yaml` (no leading dot), with the layout centralized behind `internal/path` helpers; no compatibility shim). The version lives in `VERSION`, is derived into `flake.nix` and the `justfile`, and the human-facing copies — this line, the CHANGELOG section, the git tag — are checked by `scripts/check-version-lockstep.sh`
+**Status:** v0.22.0 — `akb init` makes the KB's versioning a decision: `--embed` versions it in the enclosing repository, `--no-git` leaves it unversioned, neither creates a repository of its own (BREAKING: inside a repository an invocation that names no mode is refused, exit 2), the choice is recorded as `versioning: git|none` in `akb.yaml`, and the commit identity resolves from `AKB_AUTHOR_*`, then `git-author`/`git-email`, then git (previous release, v0.21.0: `akb init --description` records what a KB holds in `akb.yaml`, shown by `akb discover`). The version lives in `VERSION`, is derived into `flake.nix` and the `justfile`, and the human-facing copies — this line, the CHANGELOG section, the git tag — are checked by `scripts/check-version-lockstep.sh`
 
 ## OVERVIEW
 
