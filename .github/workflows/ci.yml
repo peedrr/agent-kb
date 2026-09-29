@@ -21,8 +21,8 @@ jobs:
       - name: Version lockstep
         run: scripts/check-version-lockstep.sh
 
-      # The test suite is identity-hermetic: test repos get repo-local
-      # identity from their setup helpers, so no ambient git config is needed.
+      # The test suite is identity-hermetic: the testscript Setup injects an
+      # ambient GIT_CONFIG_* identity, so no host git configuration is needed.
       - name: Unit and integration tests
         env:
           CGO_ENABLED: "0"

@@ -60,6 +60,22 @@ func Test(t *testing.T) {
 			// directory inside the scenario is bounded there instead of
 			// climbing past it to the filesystem root.
 			env.Vars = append(env.Vars, "HOME="+env.WorkDir)
+			// Ambient git identity, injected through GIT_CONFIG_* entries that
+			// outrank system and global configuration: scenarios that shell out
+			// to raw `git commit` (template seeding, merge setup) must not
+			// depend on the machine's own identity. NixOS hosts resolve one
+			// from system-level config even with HOME moved; CI runners have
+			// none, which is how machine-dependent scenarios pass locally and
+			// fail in CI. Scenarios that exercise identity resolution itself
+			// override these same slots with `env` (which runs after Setup) or
+			// empty GIT_CONFIG_VALUE_0/1 to simulate a host without identity.
+			env.Vars = append(env.Vars,
+				"GIT_CONFIG_COUNT=2",
+				"GIT_CONFIG_KEY_0=user.name",
+				"GIT_CONFIG_VALUE_0=akb-test",
+				"GIT_CONFIG_KEY_1=user.email",
+				"GIT_CONFIG_VALUE_1=akb-test@localhost",
+			)
 			// Every scenario runs its commands from the root of the KB it
 			// created, so a relative selection resolves against that working
 			// directory. Scenarios that need no KB clear the variable.

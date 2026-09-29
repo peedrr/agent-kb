@@ -78,6 +78,17 @@ Behavior changes and fixes worth acting on. Versions before 0.18.0 predate this 
   (`/.agent-kb/`, `/kb/`, `/raw/`). Unanchored, they also matched a same-named directory
   anywhere below the root, hiding unrelated host files from `git status`.
 
+- **The integration suite no longer takes its git identity from the machine it runs on.**
+  Once `akb init` stopped writing repo-local `user.name` (identity moved to `akb.yaml`),
+  the testscripts that shell out to raw `git commit` had no git-visible identity of their
+  own: they passed on hosts whose system-level git config supplies one (NixOS does, even
+  with `HOME` moved) and failed on CI runners, which have none. The testscript `Setup`
+  now injects an ambient `GIT_CONFIG_*` identity every scenario inherits; scenarios that
+  exercise identity resolution itself override or empty those same slots. The release
+  preconditions gained a test gate that runs the suite under a CI-simulated git
+  environment (no system or global config, no identity environment), so a
+  machine-dependent scenario blocks the tag instead of the published release workflow.
+
 - **A `--no-git` base at a repository root no longer writes a root `.gitignore`** for
   exclusions the host's exclude file already carries.
 
