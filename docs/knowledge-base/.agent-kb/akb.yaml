@@ -1,0 +1,4 @@
+name: knowledge-base
+created: "2026-09-30T15:20:21+01:00"
+description: agent-kb's own knowledge base, dogfooding the development of akb
+versioning: git
