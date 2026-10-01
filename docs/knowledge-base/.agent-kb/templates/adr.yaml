@@ -1,5 +1,5 @@
-# ADR template for this knowledge base, encoding the docs-writer ADR contract
-# (pi-meta-config global-harness skills/docs-writer/references/adr.md).
+# ADR template for this knowledge base: machine-checkable guardrails,
+# EARS-2119 constraint statements, and a lifecycle state machine.
 # Guard doctrine (per the showcase this derives from):
 #   schema-required keys — read UNGUARDED: akb write refuses a page missing one
 #     before any rule runs.
@@ -7,7 +7,7 @@
 #   old_page.* — ALWAYS guarded: nil on create.
 #   lint_rules — guard EVERYTHING except type and title.
 name: adr
-description: Architecture Decision Record per the docs-writer contract — machine-checkable guardrails, EARS-2119 constraints, lifecycle state machine
+description: Architecture Decision Record — machine-checkable guardrails, EARS-2119 constraint statements, lifecycle state machine
 dir: decisions
 schema:
   frontmatter:

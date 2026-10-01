@@ -3,25 +3,25 @@ grammar: 1
 type: adr
 id: ADR-000
 title: Decision Records Carry Machine-Checkable Guardrails in This Knowledge Base
-summary: ADRs in this base follow the docs-writer contract — EARS-2119 constraint statements, a lifecycle state machine, and per-rule verification — enforced by this template at write time.
+summary: ADRs in this base carry EARS-2119 constraint statements, a lifecycle state machine, and per-rule verification — enforced by this template at write time.
 tags: [adr, governance, templates]
 status: proposed
 created: 2026-09-30
 updated: 2026-09-30
 provenance: agent-drafted
 scope: ["docs/knowledge-base/**"]
-revisit: ["the docs-writer ADR contract changes", "a second grammar version is introduced"]
+revisit: ["a second grammar version is introduced", "the CEL rules in this template change"]
 ---
 
 # ADR-000: Decision Records Carry Machine-Checkable Guardrails in This Knowledge Base
 
-> In the context of a knowledge base whose decisions future agents must not silently reverse, facing decision records that drift into unverifiable prose, we decided that every ADR follows the docs-writer contract and is gated by this template's CEL rules at write time and neglected free-form decision notes, to achieve verbatim-quotable, mechanically checkable guardrails, accepting a heavier authoring bar for each record, because a constraint an agent cannot check is a constraint an agent will eventually violate.
+> In the context of a knowledge base whose decisions future agents must not silently reverse, facing decision records that drift into unverifiable prose, we decided that every ADR carries machine-checkable guardrails and is gated by this template's CEL rules at write time and neglected free-form decision notes, to achieve verbatim-quotable, mechanically checkable guardrails, accepting a heavier authoring bar for each record, because a constraint an agent cannot check is a constraint an agent will eventually violate.
 
 > **For agents:** if your task conflicts with this ADR, stop and name the conflict. Do not silently work around it; propose supersession instead.
 
 ## Decision
 
-Every architecture decision record in this base MUST follow the docs-writer ADR contract: frontmatter as the retrieval API, EARS-2119 constraint statements, and a verification entry per rule, because a decision that cannot be mechanically checked cannot be mechanically defended.
+Every architecture decision record in this base MUST follow this template's contract: frontmatter as the retrieval API, EARS-2119 constraint statements, and a verification entry per rule, because a decision that cannot be mechanically checked cannot be mechanically defended.
 
 ## Invariants
 
