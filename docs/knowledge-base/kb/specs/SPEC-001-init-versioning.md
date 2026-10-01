@@ -1,6 +1,6 @@
 ---
 anchors:
-- checked_at: "2026-10-01T16:13:38Z"
+- checked_at: "2026-10-01T16:22:52Z"
   claim: REQ-005
   evidence: resolves at git.go:430; commits exactly the named paths, unrelated staged changes stay staged; named test PASS
   kind: flow
@@ -10,7 +10,7 @@ anchors:
   verify:
     check: go test ./internal/storage/ -run TestGitProviderCommitLeavesUnrelatedStagedChanges
     method: check
-- checked_at: "2026-10-01T16:13:38Z"
+- checked_at: "2026-10-01T16:22:52Z"
   claim: REQ-006
   evidence: resolves at mode.go:82; ParseMode(cfg.Versioning) selects the provider — mode comes from the akb.yaml key
   kind: flow
@@ -20,9 +20,9 @@ anchors:
   verify:
     check: go test ./internal/storage/...
     method: check
-- checked_at: "2026-10-01T16:13:38Z"
+- checked_at: "2026-10-01T16:22:52Z"
   claim: REQ-011
-  evidence: resolves at identity.go:119; precedence flags -> env -> git config -> default confirmed in the body, source decides recording
+  evidence: resolves at identity.go:121; precedence flags -> env -> git config -> default confirmed in the body, source decides recording
   kind: local
   path: internal/storage/identity.go
   state: live
@@ -30,17 +30,17 @@ anchors:
   verify:
     check: go test ./internal/storage/...
     method: check
-- checked_at: "2026-10-01T16:13:38Z"
+- checked_at: "2026-10-01T16:22:52Z"
   claim: REQ-012
-  evidence: resolves at init.go:227; the IdentityFromFlag branch returns a nil identity, so a flag-named identity attributes the init commit and is never recorded; flag tests PASS
+  evidence: resolves at init.go:229; the IdentityFromFlag branch returns the pair for a complete flag set, which init records in akb.yaml, and nil for a partial pair, which stays invocation-scoped (ADR-002); flag tests PASS
   kind: local
   path: cmd/akb/init.go
   state: live
   symbol: initIdentity
   verify:
-    check: go test ./cmd/akb/ -run 'TestInitAuthor|TestInitRecordsTheDefaultIdentity' -count=1
+    check: go test ./cmd/akb/ -run 'TestInitAuthor|TestInitPartial|TestInitRecordsTheDefaultIdentity' -count=1
     method: check
-- checked_at: "2026-10-01T16:13:38Z"
+- checked_at: "2026-10-01T16:22:52Z"
   claim: REQ-013
   evidence: resolves at identity.go:73; env -> akb.yaml git-author/git-email -> git-native confirmed; unresolvable yields ErrNoCommitIdentity
   kind: flow
@@ -50,7 +50,7 @@ anchors:
   verify:
     check: go test ./internal/storage/...
     method: check
-- checked_at: "2026-10-01T16:13:38Z"
+- checked_at: "2026-10-01T16:22:52Z"
   claim: REQ-016
   evidence: resolves at git.go:197 as a GitProvider method; clean merges detected via MERGE_HEAD rev-parse in mergeInProgress
   kind: local
@@ -73,11 +73,11 @@ scope:
 status: completed
 title: Init Selects the KB Versioning Mode and Resolves Commit Identity
 type: spec
-updated: "2026-10-01T16:14:29Z"
+updated: "2026-10-01T16:23:16Z"
 verified:
-  at: "2026-10-01T16:13:38Z"
+  at: "2026-10-01T16:22:52Z"
   branch: main
-  commit: 04a38b0e5eb91980b382af313451a02f3ee3aa29
+  commit: eeebad88e0bf595af0490683fb4aafb80dd6c0b1
   method: symbol-resolve+blame-trace
   next_review_by: "2027-01-01"
   state: live
@@ -128,7 +128,7 @@ REQ-008: WHILE a base records `versioning: none`, a mutation MUST NOT invoke git
 REQ-009: WHEN `akb init --no-git` runs inside a repository, the system MUST exclude the base from the host's git status through `.git/info/exclude`; the system MUST NOT edit the host's tracked `.gitignore`.
 REQ-010: WHEN init writes a `.gitignore` that already exists, the system MUST append only the missing lines; the system MUST NOT truncate existing content.
 REQ-011: WHEN `akb init` records a commit identity, the system MUST resolve it in precedence order: init flags, then `AKB_AUTHOR_*` environment, then git config, then the akb default.
-REQ-012: WHEN the init flags, the environment, or git config yields an identity at init, the system MUST NOT write that identity to `akb.yaml`; the system MUST record the akb default only when no source names an identity.
+REQ-012: WHEN a complete `--author-name`/`--author-email` pair names an identity at init, the system MUST write it to `akb.yaml` as `git-author`/`git-email` — a typed flag pair is declared by the invoker for the base itself (ADR-002); WHEN the environment or git config yields an identity at init, or exactly one of the flags is passed, the system MUST NOT write that identity to `akb.yaml`; the system MUST record the akb default only when no source names an identity.
 REQ-013: WHILE a committing command runs, the system MUST resolve commit identity in precedence order: `AKB_AUTHOR_*` environment, then `git-author`/`git-email` in `akb.yaml`, then git-native resolution.
 REQ-014: WHEN a committing command takes its identity from the environment or `akb.yaml`, the system MUST export both `GIT_AUTHOR_*` and `GIT_COMMITTER_*` to the git subprocess.
 REQ-015: IF a committing command cannot resolve a commit identity, THEN the system MUST refuse with exit 2 before any file mutation, naming the `AKB_AUTHOR_*` environment variables and `akb.yaml` `git-author`/`git-email` as remedies.
@@ -174,8 +174,8 @@ AC-017 (verifies REQ-017): WHEN `akb init .` runs in a directory named `foo`, th
   verify: { method: check, check: "go test ./test/..." }
 AC-018 (verifies REQ-018): WHEN `akb init foo --no-commit` runs, the scaffold MUST exist on disk and the repository MUST hold no akb init commit.
   verify: { method: check, check: "go test ./test/..." }
-AC-019 (verifies REQ-012): WHEN `--author-name` and `--author-email` name an identity at init, the new `akb.yaml` MUST NOT contain `git-author`, and the exit-0 output MUST report the identity as not recorded.
-  verify: { method: check, check: "go test ./cmd/akb/ -run 'TestInitAuthor' -count=1" }
+AC-019 (verifies REQ-012): WHEN both `--author-name` and `--author-email` name an identity at init, the new `akb.yaml` MUST contain it as `git-author`/`git-email` and the exit-0 output MUST report it as recorded; WHEN exactly one flag is passed, the new `akb.yaml` MUST NOT contain `git-author`.
+  verify: { method: check, check: "go test ./cmd/akb/ -run 'TestInitAuthor|TestInitPartial' -count=1" }
 
 ## Contract and Invariants
 
@@ -197,7 +197,7 @@ AC-019 (verifies REQ-012): WHEN `--author-name` and `--author-email` name an ide
 
 ## Decisions and Rejected Alternatives
 
-The versioning mode is recorded explicitly in `akb.yaml` in both modes, so the mode is visible and correctable in the file. An identity named by the init flags or resolved from the environment or git config is never written into `akb.yaml`: the file travels with the KB, and a baked-in identity belonging to the invocation or the machine would mis-attribute on every other machine after push and clone. akb exports `GIT_AUTHOR_*`/`GIT_COMMITTER_*` to the git subprocess, replacing the `-c user.name=…` mechanism.
+The versioning mode is recorded explicitly in `akb.yaml` in both modes, so the mode is visible and correctable in the file. An identity resolved from the environment or git config, or named by a partial flag pair whose missing field git config filled, is never written into `akb.yaml`: the file travels with the KB, and a baked-in ambient identity would mis-attribute on every other machine after push and clone. A complete init flag pair is the exception: it is declared by the invoker for the base being created — the deliberate edit the durable channel exists for, expressed at creation time — and is recorded (ADR-002). akb exports `GIT_AUTHOR_*`/`GIT_COMMITTER_*` to the git subprocess, replacing the `-c user.name=…` mechanism.
 
 - **`--standalone` / nested unregistered repos as a mode** — rejected: nested unregistered repos are not a mode akb offers. Do not re-propose unless akb gains a registry or submodule support.
 - **KB as a git submodule of the host** — rejected: requires a hosted remote (git refuses local-path submodule clones by default since CVE-2022-39253), push machinery akb does not have, and a gitlink-bump commit per KB write; fresh clones get an empty directory — the opposite of "travels with the code". Do not re-propose unless akb gains remote/push functionality.
@@ -232,12 +232,13 @@ depends_on: []
 - 2026-10-01 · verified + anchors REQ-005/006/011/013/016 · unverified → live · anchor verification pass · evidence: all five symbols resolve at their claimed paths at 5c0857b (files last changed 2026-09-27), claims confirmed against the bodies, `go test ./internal/storage/...` green including `TestGitProviderCommitLeavesUnrelatedStagedChanges`
 - 2026-10-01 · amendment REQ-012 + AC-019 + Decisions · completed → completed · human-directed correctness amendment: the init-flag case was implemented and tested but unspecified by REQ-012, which named only the environment and git config — a flag-named identity is likewise never recorded; [[ADR-002-init-author-flags]] (proposed) challenges exactly this clause · evidence: `cmd/akb/init.go` `initIdentity` `IdentityFromFlag` branch returns a nil identity; `TestInitAuthorFlagsOutrankEnvironmentAndGitConfig`, `TestInitAuthorNameFlagFillsTheEmailFromGit`, `TestInitAuthorFlagsWithNoCommitLeaveTheCommitToTheCaller`, and `Test/init_identity` green
 - 2026-10-01 · re-verified + anchor REQ-012 · live → live · re-stamp at HEAD 04a38b0 (was 5c0857b): all six anchor symbols resolve at their claimed paths, claims confirmed against the bodies · evidence: `go test ./internal/storage/... ./internal/config/...` green, `go test ./cmd/akb/ -run 'TestInitAuthor|TestInitRecordsTheDefaultIdentity' -count=1` green, `Test/init_identity` PASS
+- 2026-10-01 · amendment REQ-012 + AC-019 + Decisions + anchor REQ-012 · completed → completed · [[ADR-002-init-author-flags]] ratified (deciders: Pete Hope) and implemented: the flag clause of REQ-012 is reversed — a complete `--author-name`/`--author-email` pair is declared, not ambient, and init records it in `akb.yaml`; partial pairs and the ambient sources stay unrecorded · evidence: code change eeebad8 (`initIdentity` records a complete pair; `TestInitAuthorFlagsOutrankEnvironmentAndGitConfig`, `TestInitPartialAuthorFlagIsNotRecorded`, `TestInitAuthorFlagsWithNoCommitLeaveTheCommitToTheCaller` reworked; `Test/init_identity` extended with complete-pair, partial-pair, and `--no-git` flag cases)
+- 2026-10-01 · re-verified · live → live · re-stamp at HEAD eeebad8 (was 04a38b0): all six anchor symbols resolve at their claimed paths (`initIdentity` now init.go:229, `ResolveInitIdentity` now identity.go:121 — doc-comment growth), claims confirmed against the bodies · evidence: `go test ./cmd/akb/ ./internal/... ./test/ -count=1` green, `golangci-lint run ./...` 0 issues
 
 ## Revisit Triggers
 
 - `internal/storage/mode.go`, `internal/storage/identity.go`, `internal/storage/git.go` — any change to mode selection, identity precedence, or merge preflight
 - `cmd/akb/init.go` — any change to the init behavior matrix
-- `docs/knowledge-base/kb/decisions/ADR-002-init-author-flags.md` — ratification of ADR-002 reverses the flag clause of REQ-012 (amendment here, or absorbed by the capability promotion)
 - Promotion of this record's durable content into a `kind: capability` SPEC (sets `superseded_by` here)
 - 2027-01-01 — `verified.next_review_by`
 
@@ -248,4 +249,5 @@ depends_on: []
 - Source-cited external verifications: git 2.55.0 refuses `file` transport for local-path submodule clones without `protocol.file.allow=always`; git refuses partial commits during any in-progress merge (`fatal: cannot do a partial commit during a merge`).
 - Source-named tests evidencing the embedded-commit pin: `TestGitProviderCommitLeavesUnrelatedStagedChanges`, `TestCommitFilesRecordsDeletionInNestedKB`.
 - Amendment 2026-10-01: REQ-012, AC-019, and the Decisions identity sentence extended to cover init flags; new anchor on `initIdentity`; `verified` re-stamped at 04a38b0 with every anchor re-resolved.
+- Amendment 2026-10-01 (ADR-002 ratified, deciders: Pete Hope): the REQ-012 flag clause reversed — a complete flag pair is recorded as `git-author`/`git-email`; AC-019 inverted to assert recording and extended to the partial-pair case; the Decisions identity sentence amended; anchor REQ-012 evidence updated to the recording behavior; the ADR-002 revisit trigger discharged; `verified` re-stamped at eeebad8 with every anchor re-resolved.
 - Discard log: marking anchors `live` from the release description alone — rejected: release notes are not symbol resolution, so `unverified` is the honest state. Amending REQ-012 without adding AC-019 — rejected: an implemented-but-unspecified behavior needs its observable boundary in Acceptance, not only in the requirement line. `provenance: agent-drafted` — rejected: the substance is a faithful restructure of a human-authored, human-agreed design; only the restructuring is the agent's contribution, disclosed here.
