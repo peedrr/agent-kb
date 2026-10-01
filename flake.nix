@@ -53,6 +53,14 @@
             # also forces CGO_ENABLED=0, so the dev shell matches it.
             env.CGO_ENABLED = "0";
 
+            # Point akb at this repo's own knowledge base (the one
+            # `akb discover` finds under docs/) without needing --kb.
+            # Set in shellHook so $PWD resolves to the worktree the
+            # shell was entered from, not the flake's store copy.
+            shellHook = ''
+              export AKB_KB="$PWD/docs/knowledge-base"
+            '';
+
             packages = with pkgs; [
               # go (version is specified by overlay)
               go
