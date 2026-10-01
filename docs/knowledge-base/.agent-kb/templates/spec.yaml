@@ -1,0 +1,278 @@
+# SPEC template for this knowledge base, encoding the docs-writer SPEC contract
+# (pi-meta-config global-harness skills/docs-writer/references/spec.md).
+# Guard doctrine (per the showcase this derives from):
+#   schema-required keys — read UNGUARDED: akb write refuses a page missing one
+#     before any rule runs.
+#   schema-optional keys — ALWAYS guarded with has().
+#   nested keys of a map field (verified.*, anchors[].*) — ALWAYS guarded with
+#     has(): the required-field gate checks the top-level key only.
+#   old_page.* — ALWAYS guarded: nil on create.
+#   lint_rules — guard EVERYTHING except type and title.
+name: spec
+description: Technical specification per the docs-writer contract — EARS-2119 requirements, acceptance contract, lifecycle state machine, mechanical staleness signal
+dir: specs
+schema:
+  frontmatter:
+    grammar:
+      type: int
+      required: true
+    type:
+      type: string
+      required: true
+    id:
+      type: string
+      required: true
+    title:
+      type: string
+      required: true
+    kind:
+      type: string
+      required: true
+      enum:
+        - change
+        - capability
+    status:
+      type: string
+      required: true
+      enum:
+        - draft
+        - proposed
+        - active
+        - completed
+        - superseded
+        - withdrawn
+    provenance:
+      type: string
+      required: true
+      enum:
+        - human
+        - agent-drafted
+    created:
+      type: string
+      required: true
+    updated:
+      type: string
+      required: true
+    scope:
+      type: list
+      required: true
+    verified:
+      type: map
+      required: true
+    ratified_by:
+      type: list
+      required: false
+    supersedes:
+      type: string
+      required: false
+    superseded_by:
+      type: string
+      required: false
+    anchors:
+      type: list
+      required: false
+validations:
+  - id: grammar_is_one
+    rule: 'page.frontmatter.grammar == 1'
+    requirement: Grammar version must be 1; a validator refuses a document whose grammar is newer than itself
+    expect: grammar must be the integer 1
+
+  - id: id_format
+    rule: 'page.frontmatter.id.matches("^SPEC-[0-9]{3}$")'
+    requirement: ID must be zero-padded SPEC-NNN, matching the filename prefix (filename match itself is human-verified)
+    expect: id must match ^SPEC-[0-9]{3}$
+
+  - id: title_nonempty
+    rule: 'page.frontmatter.title != ""'
+    requirement: Title must not be empty
+    expect: frontmatter title must be non-empty
+
+  - id: title_style
+    rule: 'page.frontmatter.title.matches("^[A-Z]") && !page.frontmatter.title.endsWith(".") && size(page.frontmatter.title) <= 80'
+    requirement: Title must be a capability- or change-carrying statement — capitalised, no trailing period, at most 80 characters
+    expect: title must start with an uppercase letter, not end with ".", and be at most 80 characters
+
+  - id: valid_kind
+    rule: 'page.frontmatter.kind in ["change", "capability"]'
+    requirement: Kind must be change (one unit of work) or capability (living record of current behaviour)
+    expect: kind must be one of change, capability
+
+  - id: valid_status
+    rule: 'page.frontmatter.status in ["draft", "proposed", "active", "completed", "superseded", "withdrawn"]'
+    requirement: Status must be a valid SPEC lifecycle status; only active authorizes adjudication quotes
+    expect: status must be one of draft, proposed, active, completed, superseded, withdrawn
+
+  - id: valid_provenance
+    rule: 'page.frontmatter.provenance in ["human", "agent-drafted"]'
+    requirement: Provenance must record who drafted the document
+    expect: provenance must be one of human, agent-drafted
+
+  - id: scope_nonempty
+    rule: 'size(page.frontmatter.scope) > 0'
+    requirement: Scope must name at least one path glob this SPEC governs (the per-plan routing key)
+    expect: scope must hold at least one entry
+
+  - id: active_requires_ratified_by
+    rule: 'page.frontmatter.status != "active" || (has(page.frontmatter.ratified_by) && size(page.frontmatter.ratified_by) > 0)'
+    requirement: An active SPEC must name its human ratifier(s); an agent-drafted document can never reach active without them — agents must not self-ratify
+    expect: active SPECs must carry a non-empty ratified_by list
+
+  - id: active_requires_live_verified
+    rule: 'page.frontmatter.status != "active" || (has(page.frontmatter.verified) && has(page.frontmatter.verified.state) && page.frontmatter.verified.state == "live")'
+    requirement: An active SPEC must carry a live staleness signal; verified.state other than live makes the document advisory only
+    expect: active SPECs must carry verified.state equal to live
+
+  - id: verified_state_enum
+    rule: '!has(page.frontmatter.verified) || !has(page.frontmatter.verified.state) || page.frontmatter.verified.state in ["live", "drifted", "lost", "unverified"]'
+    requirement: The staleness signal must use the four defined states; unverified is not live
+    expect: verified.state must be one of live, drifted, lost, unverified when present
+
+  - id: supersedes_format
+    rule: '!has(page.frontmatter.supersedes) || page.frontmatter.supersedes.matches("^SPEC-[0-9]{3}$")'
+    requirement: Supersedes must name a single SPEC by ID
+    expect: supersedes must match ^SPEC-[0-9]{3}$ when present
+
+  - id: superseded_requires_superseded_by
+    rule: 'page.frontmatter.status != "superseded" || (has(page.frontmatter.superseded_by) && page.frontmatter.superseded_by.matches("^SPEC-[0-9]{3}$"))'
+    requirement: A superseded SPEC must name the record replacing it, set in the same commit as the superseding SPEC
+    expect: superseded SPECs must set superseded_by to a SPEC-NNN id
+
+  - id: valid_state_transition
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.status) || old_page.frontmatter.status == page.frontmatter.status || (old_page.frontmatter.status == "draft" && page.frontmatter.status == "proposed") || (old_page.frontmatter.status == "proposed" && page.frontmatter.status in ["active", "withdrawn", "superseded"]) || (old_page.frontmatter.status == "active" && page.frontmatter.status in ["completed", "withdrawn", "superseded"])'
+    requirement: Status transitions must follow the lifecycle — draft to proposed, proposed to active or withdrawn or superseded, active to completed or withdrawn or superseded
+    expect: only draft->proposed, proposed->active/withdrawn/superseded, active->completed/withdrawn/superseded transitions are allowed
+
+  - id: created_immutable
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.created) || old_page.frontmatter.created == page.frontmatter.created'
+    requirement: Created date must never change
+    expect: created must equal the on-disk page's created date
+
+  - id: id_immutable
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.id) || old_page.frontmatter.id == page.frontmatter.id'
+    requirement: The SPEC ID is allocated once and never reused or changed
+    expect: id must equal the on-disk page's id
+
+  - id: kind_frozen_at_ratification
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.kind) || !has(old_page.frontmatter.status) || old_page.frontmatter.status != "active" || old_page.frontmatter.kind == page.frontmatter.kind'
+    requirement: An active change SPEC is frozen at ratification; its kind must not change except through supersession
+    expect: an active SPEC's kind must equal the on-disk page's kind
+
+  - id: updated_not_before_created
+    rule: 'timestamp(page.frontmatter.updated) >= timestamp(page.frontmatter.created)'
+    requirement: Updated date must not precede the created date
+    expect: updated must be at or after created
+
+  - id: temporal_created
+    rule: 'timestamp(page.frontmatter.created) <= now'
+    requirement: Created date must not be in the future
+    expect: created timestamp must be less than or equal to current time
+
+  - id: challenge_affordance
+    rule: 'page.content.raw.contains("this SPEC is authority only while")'
+    requirement: Must carry the verbatim challenge affordance stating the authority preconditions and granting agents permission to halt on conflict
+    expect: body must contain the challenge affordance sentence
+
+  - id: require_goals
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Goals and Non-Goals")'
+    requirement: Must include H2 'Goals and Non-Goals' section — an unstated boundary becomes an escalation mid-run
+    expect: page must have a '## Goals and Non-Goals' heading
+
+  - id: require_requirements
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Requirements")'
+    requirement: Must include H2 'Requirements' section with numbered REQ-NNN statements in EARS-2119 grammar
+    expect: page must have a '## Requirements' heading
+
+  - id: require_acceptance
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Acceptance Criteria")'
+    requirement: Must include H2 'Acceptance Criteria' section — at least one criterion per requirement, each with a verify entry
+    expect: page must have an '## Acceptance Criteria' heading
+
+  - id: require_assumptions
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Assumptions and Open Questions")'
+    requirement: Must include H2 'Assumptions and Open Questions' section
+    expect: page must have an '## Assumptions and Open Questions' heading
+
+  - id: require_affected_surface
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Affected Surface and Ordering")'
+    requirement: Must include H2 'Affected Surface and Ordering' section with depends_on declared as data
+    expect: page must have an '## Affected Surface and Ordering' heading
+
+  - id: require_verification_plan
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Verification Plan")'
+    requirement: Must include H2 'Verification Plan' section enumerating hermetic commands and human-only residue
+    expect: page must have a '## Verification Plan' heading
+
+  - id: require_drift_ledger
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Drift Ledger")'
+    requirement: Must include H2 'Drift Ledger' section — append-only; the ledger turns staleness from memory into record
+    expect: page must have a '## Drift Ledger' heading
+
+  - id: require_revisit_triggers
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Revisit Triggers")'
+    requirement: Must include H2 'Revisit Triggers' section in resolvable form (a glob checkable against a diff)
+    expect: page must have a '## Revisit Triggers' heading
+
+  - id: current_behaviour_for_capability
+    rule: 'page.frontmatter.kind != "capability" || page.ast.headings.exists(h, h.level == 2 && h.text == "Current Behaviour")'
+    requirement: A capability SPEC must record what the system does today at verified.commit
+    expect: capability SPECs must have a '## Current Behaviour' heading
+
+  - id: requirements_have_ids
+    rule: 'page.content.raw.matches("REQ-[0-9]{3}")'
+    requirement: Requirements must carry stable REQ-NNN IDs so acceptance criteria and anchors can cite them
+    expect: body must contain at least one REQ-NNN identifier
+
+  - id: acceptance_cites_requirements
+    rule: 'page.content.raw.matches("AC-[0-9]{3} \\(verifies REQ-[0-9]{3}\\)")'
+    requirement: Each acceptance criterion must cite the requirement it verifies
+    expect: body must contain at least one 'AC-NNN (verifies REQ-NNN)' citation
+
+  - id: no_unresolved_clarification
+    rule: '!page.content.raw.contains("[NEEDS CLARIFICATION")'
+    requirement: An unresolved clarification marker blocks ratification — ambiguity in scope is the most damaging defect class for agent execution
+    expect: body must carry no open clarification markers
+
+  - id: rejected_alternatives_carry_clause
+    rule: '!page.ast.headings.exists(h, h.level == 2 && h.text == "Decisions and Rejected Alternatives") || page.content.raw.contains("Do not re-propose unless")'
+    requirement: Each rejected alternative must carry a do-not-re-propose-unless condition — agents re-propose rejections they cannot see
+    expect: a '## Decisions and Rejected Alternatives' section must contain a do-not-re-propose-unless clause
+
+  - id: anchors_role_bearing
+    rule: '!has(page.frontmatter.anchors) || page.frontmatter.anchors.all(a, has(a.claim) && has(a.path) && has(a.symbol) && has(a.kind) && a.kind in ["local", "flow", "invariant"])'
+    requirement: Anchors are role-bearing claims only — symbol-first (line numbers forbidden), each carrying claim, path, symbol, and kind
+    expect: every anchor must carry claim, path, symbol, and a kind of local, flow, or invariant
+
+  - id: min_word_count
+    rule: 'page.content.word_count >= 50'
+    requirement: Body must carry at least 50 words — the threshold catches a stub, not a style
+    expect: body must hold at least 50 words
+
+  - id: code_blocks_have_language
+    rule: 'page.ast.code_blocks.all(c, c.language != "")'
+    requirement: Every fenced code block must declare a language
+    expect: every code block must carry a language tag
+lint_rules:
+  - id: spec_stale
+    rule: '!has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("4320h")'
+    severity: warning
+    expect: SPEC hasn't been updated in 180 days
+
+  - id: proposed_too_long
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "proposed" || !has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("2160h")'
+    severity: warning
+    expect: Proposed SPECs must be revisited within 90 days — a proposed SPEC is advisory and ages into noise
+
+  - id: active_signal_not_live
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "active" || (has(page.frontmatter.verified) && has(page.frontmatter.verified.state) && page.frontmatter.verified.state == "live")'
+    severity: error
+    expect: An active SPEC whose verified.state is not live is advisory only and must not be quoted as binding authority until re-verified
+
+  - id: lost_anchor_blocks
+    rule: '!has(page.frontmatter.anchors) || !page.frontmatter.anchors.exists(a, has(a.state) && a.state == "lost")'
+    severity: error
+    expect: A lost anchor blocks the destroying change — repair the claim or supersede the SPEC
+
+  - id: drifted_anchor_reports
+    rule: '!has(page.frontmatter.anchors) || !page.frontmatter.anchors.exists(a, has(a.state) && a.state == "drifted")'
+    severity: warning
+    expect: A drifted anchor means the span moved but the claim holds — report and re-stamp post-merge
