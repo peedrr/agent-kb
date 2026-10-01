@@ -1,5 +1,6 @@
-# SPEC template for this knowledge base, encoding the docs-writer SPEC contract
-# (pi-meta-config global-harness skills/docs-writer/references/spec.md).
+# SPEC template for this knowledge base: EARS-2119 requirements, an
+# acceptance contract, a lifecycle state machine, and a mechanical staleness
+# signal.
 # Guard doctrine (per the showcase this derives from):
 #   schema-required keys — read UNGUARDED: akb write refuses a page missing one
 #     before any rule runs.
@@ -9,7 +10,7 @@
 #   old_page.* — ALWAYS guarded: nil on create.
 #   lint_rules — guard EVERYTHING except type and title.
 name: spec
-description: Technical specification per the docs-writer contract — EARS-2119 requirements, acceptance contract, lifecycle state machine, mechanical staleness signal
+description: Technical specification — EARS-2119 requirements, acceptance contract, lifecycle state machine, mechanical staleness signal
 dir: specs
 schema:
   frontmatter:

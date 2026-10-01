@@ -2,7 +2,7 @@
 grammar: 1
 type: spec
 id: SPEC-000
-title: Spec Records in This Knowledge Base Follow the Docs-Writer Contract
+title: Spec Records in This Knowledge Base Carry Machine-Checkable Guardrails
 kind: change
 status: proposed
 provenance: agent-drafted
@@ -27,7 +27,7 @@ anchors:
     evidence: "CEL rule compilation gates every typed page write in this repository"
 ---
 
-# SPEC-000: Spec Records in This Knowledge Base Follow the Docs-Writer Contract
+# SPEC-000: Spec Records in This Knowledge Base Carry Machine-Checkable Guardrails
 
 > **For agents:** this SPEC is authority only while `status: active` AND
 > `verified.state: live`. If your task conflicts with it, or any anchor fails
@@ -38,11 +38,11 @@ This page is the pass mockup of the `spec` template: the exemplar `akb template 
 
 ## Why
 
-Decision records in this base are already gated by the docs-writer-conforming `adr` template; specifications had no equivalent, so a planning agent had nothing stable and verbatim-quotable to decompose from. This template closes that gap at write time rather than at review time.
+Decision records in this base are already gated by the `adr` template; specifications had no equivalent, so a planning agent had nothing stable and verbatim-quotable to decompose from. This template closes that gap at write time rather than at review time.
 
 ## Goals and Non-Goals
 
-- Goal: every spec page passes CEL rules encoding the docs-writer SPEC contract before it is stored.
+- Goal: every spec page passes this template's CEL rules before it is stored.
 - Goal: the staleness signal is recorded in the page and re-checkable by anyone.
 - Non-goal: judging whether an acceptance criterion genuinely verifies its requirement — that is human ratification work.
 
@@ -96,4 +96,4 @@ depends_on: []
 ## Revisit Triggers
 
 - `docs/knowledge-base/.agent-kb/templates/spec.yaml` — any edit re-runs mockup validation
-- the docs-writer `references/spec.md` contract changes
+- a second grammar version is introduced
