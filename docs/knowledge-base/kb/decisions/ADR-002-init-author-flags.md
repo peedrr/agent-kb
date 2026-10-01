@@ -1,5 +1,7 @@
 ---
 created: "2026-10-01"
+deciders:
+- Pete Hope
 grammar: 1
 id: ADR-002
 provenance: agent-drafted
@@ -9,7 +11,7 @@ revisit:
 scope:
 - cmd/akb/**
 - internal/storage/**
-status: proposed
+status: accepted
 summary: A complete --author-name/--author-email pair at akb init is recorded in the new base's akb.yaml as git-author/git-email; environment and git-config identities are never recorded.
 tags:
 - init
@@ -18,7 +20,7 @@ tags:
 - attribution
 title: Init Author Flags Record a Durable Commit Identity in akb.yaml
 type: adr
-updated: "2026-10-01T16:14:29Z"
+updated: "2026-10-01T16:19:36Z"
 ---
 
 # ADR-002: Init Author Flags Record a Durable Commit Identity in akb.yaml
