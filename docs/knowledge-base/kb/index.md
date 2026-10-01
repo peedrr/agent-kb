@@ -3,6 +3,7 @@
 ## Adrs
 
 - [KB Diagnosis and Repair Live in a Dedicated akb Doctor Command](kb/decisions/ADR-001-akb-doctor.md) — akb doctor owns diagnosis and repair of nonconformant KBs; remediation names akb commands, never raw git
+- [Init Author Flags Record a Durable Commit Identity in akb.yaml](kb/decisions/ADR-002-init-author-flags.md) — a complete --author-name/--author-email pair at init is recorded in akb.yaml as git-author/git-email; ambient identities never are
 
 ## Specs
 
