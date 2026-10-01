@@ -2,6 +2,29 @@
 
 Behavior changes and fixes worth acting on. Versions before 0.18.0 predate this file.
 
+## [0.23.0] — 2026-10-01
+
+### Changed
+
+- **A complete `akb init --author-name`/`--author-email` pair is recorded as the base's
+  durable commit identity.** A flag pair typed at init is a declaration about the base
+  being created, not an ambient property of the machine, so init now writes it to
+  `.agent-kb/akb.yaml` as `git-author`/`git-email`: it attributes the init commit and
+  every later commit the base makes, until the keys are edited. Passing exactly one flag
+  stays invocation-scoped — the missing field is filled from git config for the init
+  commit and nothing is recorded, because a half-declared pair would bake one
+  machine-local field into a file that travels with the base. Identities from
+  `AKB_AUTHOR_*` and git config are never recorded, as before. **Note for automation:**
+  invocations that passed both flags expecting no persistence now leave
+  `git-author`/`git-email` in the base's config; `AKB_AUTHOR_*` still overrides per
+  invocation, and the keys can be edited or removed by hand. (Decision record: ADR-002
+  in this repository's own knowledge base, `docs/knowledge-base`.)
+
+- **`akb --version` reports the source revision alongside the version.** Plain
+  `go build` binaries report no commit; builds through `just build`, `nix build`, and
+  the release workflow inject it via LDFLAGS. Releases now also move a `release` branch
+  to the tagged commit.
+
 ## [0.22.0] — 2026-09-29
 
 ### Changed
