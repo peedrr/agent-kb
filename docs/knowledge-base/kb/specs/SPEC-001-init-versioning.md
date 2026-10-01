@@ -1,62 +1,76 @@
 ---
-grammar: 1
-type: spec
-id: SPEC-001
-title: Init Selects the KB Versioning Mode and Resolves Commit Identity
-kind: change
-status: completed
-provenance: human
-created: 2026-09-25
-updated: 2026-10-01
-scope: ["cmd/akb/**", "internal/storage/**", "internal/config/**", "internal/skill/embedded/**"]
-verified:
-  commit: 15dfaacdac9a35e425b49e1cdb6758af8dcab3fd
-  branch: main
-  at: "2026-10-01T15:55:21Z"
-  method: manual-review
-  state: unverified
-  next_review_by: "2027-01-01"
 anchors:
-  - claim: REQ-005
-    path: internal/storage/git.go
-    symbol: CommitFiles
-    kind: flow
-    verify: { method: check, check: "go test ./internal/storage/ -run TestGitProviderCommitLeavesUnrelatedStagedChanges" }
-    state: unverified
-    checked_at: "2026-10-01T15:55:21Z"
-    evidence: "pathspec machinery named in the source record (section 3); not re-resolved at migration"
-  - claim: REQ-006
-    path: internal/storage/mode.go
-    symbol: OpenStore
-    kind: flow
-    verify: { method: check, check: "go test ./internal/storage/..." }
-    state: unverified
-    checked_at: "2026-10-01T15:55:21Z"
-    evidence: "opens a base's storage in the mode its akb.yaml records, per the project code map; not re-resolved at migration"
-  - claim: REQ-011
-    path: internal/storage/identity.go
-    symbol: ResolveInitIdentity
-    kind: local
-    verify: { method: check, check: "go test ./internal/storage/..." }
-    state: unverified
-    checked_at: "2026-10-01T15:55:21Z"
-    evidence: "init-time identity precedence per the project code map; not re-resolved at migration"
-  - claim: REQ-013
-    path: internal/storage/identity.go
-    symbol: ResolveIdentity
-    kind: flow
-    verify: { method: check, check: "go test ./internal/storage/..." }
-    state: unverified
-    checked_at: "2026-10-01T15:55:21Z"
-    evidence: "commit-time identity precedence per the project code map; not re-resolved at migration"
-  - claim: REQ-016
-    path: internal/storage/git.go
-    symbol: checkMergeConflicts
-    kind: local
-    verify: { method: ask, ask: "confirm the clean-merge detection (MERGE_HEAD) lives in the merge preflight" }
-    state: unverified
-    checked_at: "2026-10-01T15:55:21Z"
-    evidence: "extended to detect clean in-progress merges per the source record (section 7); location not re-resolved at migration"
+- checked_at: "2026-10-01T16:05:19Z"
+  claim: REQ-005
+  evidence: resolves at git.go:430; commits exactly the named paths, unrelated staged changes stay staged; named test PASS
+  kind: flow
+  path: internal/storage/git.go
+  state: live
+  symbol: CommitFiles
+  verify:
+    check: go test ./internal/storage/ -run TestGitProviderCommitLeavesUnrelatedStagedChanges
+    method: check
+- checked_at: "2026-10-01T16:05:19Z"
+  claim: REQ-006
+  evidence: resolves at mode.go:82; ParseMode(cfg.Versioning) selects the provider — mode comes from the akb.yaml key
+  kind: flow
+  path: internal/storage/mode.go
+  state: live
+  symbol: OpenStore
+  verify:
+    check: go test ./internal/storage/...
+    method: check
+- checked_at: "2026-10-01T16:05:19Z"
+  claim: REQ-011
+  evidence: resolves at identity.go:119; precedence flags -> env -> git config -> default confirmed in the body, source decides recording
+  kind: local
+  path: internal/storage/identity.go
+  state: live
+  symbol: ResolveInitIdentity
+  verify:
+    check: go test ./internal/storage/...
+    method: check
+- checked_at: "2026-10-01T16:05:19Z"
+  claim: REQ-013
+  evidence: resolves at identity.go:73; env -> akb.yaml git-author/git-email -> git-native confirmed; unresolvable yields ErrNoCommitIdentity
+  kind: flow
+  path: internal/storage/identity.go
+  state: live
+  symbol: ResolveIdentity
+  verify:
+    check: go test ./internal/storage/...
+    method: check
+- checked_at: "2026-10-01T16:05:19Z"
+  claim: REQ-016
+  evidence: resolves at git.go:197 as a GitProvider method; clean merges detected via MERGE_HEAD rev-parse in mergeInProgress
+  kind: local
+  path: internal/storage/git.go
+  state: live
+  symbol: checkMergeConflicts
+  verify:
+    check: go test ./internal/storage/...
+    method: check
+created: "2026-09-25"
+grammar: 1
+id: SPEC-001
+kind: change
+provenance: human
+scope:
+- cmd/akb/**
+- internal/storage/**
+- internal/config/**
+- internal/skill/embedded/**
+status: completed
+title: Init Selects the KB Versioning Mode and Resolves Commit Identity
+type: spec
+updated: "2026-10-01T16:05:33Z"
+verified:
+  at: "2026-10-01T16:05:19Z"
+  branch: main
+  commit: 5c0857b3111189c35a814b8d3bad8d41841805e5
+  method: symbol-resolve+blame-trace
+  next_review_by: "2027-01-01"
+  state: live
 ---
 
 # SPEC-001: Init Selects the KB Versioning Mode and Resolves Commit Identity
@@ -180,7 +194,7 @@ The versioning mode is recorded explicitly in `akb.yaml` in both modes, so the m
 
 ## Assumptions and Open Questions
 
-[ASSUMPTION: anchor symbols are named from the source design record and project documentation; their states are `unverified` because re-resolving them against the code was out of scope for this migration.]
+No open assumptions: the migration-time assumption that anchor symbols named from the source record and project documentation would resolve was discharged by the 2026-10-01 verification pass (see Drift Ledger).
 
 No open questions.
 
@@ -203,6 +217,7 @@ depends_on: []
 ## Drift Ledger
 
 - 2026-10-01 · page creation · none → completed · migrated from the pre-KB design record after the change landed · evidence: `raw/spec/init-versioning-spec.md`, the v0.22.0 release description in project `AGENTS.md`, and the `akb 0.22.0 (ff8c434)` command surface
+- 2026-10-01 · verified + anchors REQ-005/006/011/013/016 · unverified → live · anchor verification pass · evidence: all five symbols resolve at their claimed paths at 5c0857b (files last changed 2026-09-27), claims confirmed against the bodies, `go test ./internal/storage/...` green including `TestGitProviderCommitLeavesUnrelatedStagedChanges`
 
 ## Revisit Triggers
 
@@ -214,7 +229,7 @@ depends_on: []
 ## Evidence Appendix
 
 - Source record: `raw/spec/init-versioning-spec.md` (file created 2026-09-25, pre-KB; self-described as "agreed design, pre-implementation" at authoring).
-- Landed behaviour confirmed at migration only via project documentation and the `akb 0.22.0 (ff8c434)` command surface; anchors deliberately left `unverified` because codebase recon was out of scope for the migration.
+- Anchors verified 2026-10-01 (same day as creation, owner-authorized): all five symbols resolve at their claimed paths at 5c0857b; the claim of each was confirmed against the function body; `go test ./internal/storage/...` is green, including the source-named `TestGitProviderCommitLeavesUnrelatedStagedChanges`.
 - Source-cited external verifications: git 2.55.0 refuses `file` transport for local-path submodule clones without `protocol.file.allow=always`; git refuses partial commits during any in-progress merge (`fatal: cannot do a partial commit during a merge`).
 - Source-named tests evidencing the embedded-commit pin: `TestGitProviderCommitLeavesUnrelatedStagedChanges`, `TestCommitFilesRecordsDeletionInNestedKB`.
 - Discard log: marking anchors `live` from the release description alone — rejected: release notes are not symbol resolution, so `unverified` is the honest state. `provenance: agent-drafted` — rejected: the substance is a faithful restructure of a human-authored, human-agreed design; only the restructuring is the agent's contribution, disclosed here.
