@@ -1,0 +1,232 @@
+# ADR template for this knowledge base, encoding the docs-writer ADR contract
+# (pi-meta-config global-harness skills/docs-writer/references/adr.md).
+# Guard doctrine (per the showcase this derives from):
+#   schema-required keys — read UNGUARDED: akb write refuses a page missing one
+#     before any rule runs.
+#   schema-optional keys — ALWAYS guarded with has().
+#   old_page.* — ALWAYS guarded: nil on create.
+#   lint_rules — guard EVERYTHING except type and title.
+name: adr
+description: Architecture Decision Record per the docs-writer contract — machine-checkable guardrails, EARS-2119 constraints, lifecycle state machine
+dir: decisions
+schema:
+  frontmatter:
+    grammar:
+      type: int
+      required: true
+    type:
+      type: string
+      required: true
+    id:
+      type: string
+      required: true
+    title:
+      type: string
+      required: true
+    status:
+      type: string
+      required: true
+      enum:
+        - proposed
+        - accepted
+        - deprecated
+        - superseded
+        - rejected
+    created:
+      type: string
+      required: true
+    updated:
+      type: string
+      required: true
+    provenance:
+      type: string
+      required: true
+      enum:
+        - human
+        - agent-drafted
+    scope:
+      type: list
+      required: true
+    tags:
+      type: list
+      required: true
+    summary:
+      type: string
+      required: true
+    deciders:
+      type: list
+      required: false
+    supersedes:
+      type: string
+      required: false
+    superseded_by:
+      type: string
+      required: false
+    revisit:
+      type: list
+      required: false
+validations:
+  - id: grammar_is_one
+    rule: 'page.frontmatter.grammar == 1'
+    requirement: Grammar version must be 1; a validator refuses a document whose grammar is newer than itself
+    expect: grammar must be the integer 1
+
+  - id: id_format
+    rule: 'page.frontmatter.id.matches("^ADR-[0-9]{3}$")'
+    requirement: ID must be zero-padded ADR-NNN, matching the filename prefix (filename match itself is human-verified)
+    expect: id must match ^ADR-[0-9]{3}$
+
+  - id: title_nonempty
+    rule: 'page.frontmatter.title != ""'
+    requirement: Title must not be empty
+    expect: frontmatter title must be non-empty
+
+  - id: title_style
+    rule: 'page.frontmatter.title.matches("^[A-Z]") && !page.frontmatter.title.endsWith(".") && size(page.frontmatter.title) <= 80'
+    requirement: Title must be a decision-carrying statement — capitalised, no trailing period, at most 80 characters
+    expect: title must start with an uppercase letter, not end with ".", and be at most 80 characters
+
+  - id: valid_status
+    rule: 'page.frontmatter.status in ["proposed", "accepted", "deprecated", "superseded", "rejected"]'
+    requirement: Status must be a valid ADR lifecycle status
+    expect: status must be one of proposed, accepted, deprecated, superseded, rejected
+
+  - id: valid_provenance
+    rule: 'page.frontmatter.provenance in ["human", "agent-drafted"]'
+    requirement: Provenance must record who drafted the record
+    expect: provenance must be one of human, agent-drafted
+
+  - id: summary_shape
+    rule: 'page.frontmatter.summary != "" && size(page.frontmatter.summary) <= 200'
+    requirement: Summary must be a decision-carrying one-liner of at most 200 characters (it becomes the index line)
+    expect: summary must be non-empty and at most 200 characters
+
+  - id: scope_nonempty
+    rule: 'size(page.frontmatter.scope) > 0'
+    requirement: Scope must name at least one path glob the decision governs (the JIT routing key)
+    expect: scope must hold at least one entry
+
+  - id: tags_nonempty
+    rule: 'size(page.frontmatter.tags) > 0'
+    requirement: At least one retrieval tag is required
+    expect: tags must hold at least one entry
+
+  - id: tags_format
+    rule: 'page.frontmatter.tags.all(t, t.matches("^[a-z0-9-]+$"))'
+    requirement: Tags must be lowercase alphanumeric words joined by hyphens
+    expect: every tag must match ^[a-z0-9-]+$
+
+  - id: accepted_requires_deciders
+    rule: 'page.frontmatter.status != "accepted" || (has(page.frontmatter.deciders) && size(page.frontmatter.deciders) > 0)'
+    requirement: An accepted ADR must name its human ratifier(s); agent-drafted provenance can never reach accepted without them
+    expect: accepted ADRs must carry a non-empty deciders list
+
+  - id: proposed_has_no_supersedes
+    rule: 'page.frontmatter.status != "proposed" || !has(page.frontmatter.supersedes)'
+    requirement: A proposed ADR must not name what it supersedes
+    expect: proposed ADRs must not set supersedes
+
+  - id: supersedes_format
+    rule: '!has(page.frontmatter.supersedes) || page.frontmatter.supersedes.matches("^ADR-[0-9]{3}$")'
+    requirement: Supersedes must name a single ADR by ID
+    expect: supersedes must match ^ADR-[0-9]{3}$ when present
+
+  - id: superseded_requires_superseded_by
+    rule: 'page.frontmatter.status != "superseded" || (has(page.frontmatter.superseded_by) && page.frontmatter.superseded_by.matches("^ADR-[0-9]{3}$"))'
+    requirement: A superseded ADR must name the record replacing it, set in the same commit as the superseding ADR
+    expect: superseded ADRs must set superseded_by to an ADR-NNN id
+
+  - id: valid_state_transition
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.status) || old_page.frontmatter.status == page.frontmatter.status || (old_page.frontmatter.status == "proposed" && page.frontmatter.status in ["accepted", "rejected"]) || (old_page.frontmatter.status == "accepted" && page.frontmatter.status in ["deprecated", "superseded"])'
+    requirement: Status transitions must follow the lifecycle — proposed to accepted or rejected, accepted to deprecated or superseded
+    expect: only proposed->accepted, proposed->rejected, accepted->deprecated, accepted->superseded transitions are allowed
+
+  - id: created_immutable
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.created) || old_page.frontmatter.created == page.frontmatter.created'
+    requirement: Created date must never change
+    expect: created must equal the on-disk page's created date
+
+  - id: updated_not_before_created
+    rule: 'timestamp(page.frontmatter.updated) >= timestamp(page.frontmatter.created)'
+    requirement: Updated date must not precede the created date
+    expect: updated must be at or after created
+
+  - id: temporal_created
+    rule: 'timestamp(page.frontmatter.created) <= now'
+    requirement: Created date must not be in the future
+    expect: created timestamp must be less than or equal to current time
+
+  - id: require_decision
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Decision")'
+    requirement: Must include H2 'Decision' section
+    expect: page must have a '## Decision' heading
+
+  - id: require_invariants
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Invariants")'
+    requirement: Must include H2 'Invariants' section
+    expect: page must have an '## Invariants' heading
+
+  - id: require_negative_constraints
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Negative Constraints")'
+    requirement: Must include H2 'Negative Constraints' section
+    expect: page must have a '## Negative Constraints' heading
+
+  - id: require_exceptions
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Exceptions")'
+    requirement: Must include H2 'Exceptions' section — an unstated waiver policy is indistinguishable from an oversight
+    expect: page must have an '## Exceptions' heading
+
+  - id: require_verification
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Verification")'
+    requirement: Must include H2 'Verification' section with per-rule compliance checks
+    expect: page must have a '## Verification' heading
+
+  - id: require_context
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Context")'
+    requirement: Must include H2 'Context' section
+    expect: page must have a '## Context' heading
+
+  - id: require_decision_drivers
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Decision Drivers")'
+    requirement: Must include H2 'Decision Drivers' section
+    expect: page must have a '## Decision Drivers' heading
+
+  - id: require_alternatives
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Alternatives Considered")'
+    requirement: Must include H2 'Alternatives Considered' section, each with a do-not-re-propose-unless clause
+    expect: page must have an '## Alternatives Considered' heading
+
+  - id: require_consequences
+    rule: 'page.ast.headings.exists(h, h.level == 2 && h.text == "Consequences")'
+    requirement: Must include H2 'Consequences' section with accepted downsides written
+    expect: page must have a '## Consequences' heading
+
+  - id: challenge_affordance
+    rule: 'page.content.raw.contains("if your task conflicts with this ADR, stop and name the conflict")'
+    requirement: Must carry the verbatim challenge affordance granting agents permission to halt on conflict
+    expect: body must contain the challenge affordance sentence
+
+  - id: min_word_count
+    rule: 'page.content.word_count >= 50'
+    requirement: Body must carry at least 50 words — the threshold catches a stub, not a style
+    expect: body must hold at least 50 words
+
+  - id: code_blocks_have_language
+    rule: 'page.ast.code_blocks.all(c, c.language != "")'
+    requirement: Every fenced code block must declare a language
+    expect: every code block must carry a language tag
+lint_rules:
+  - id: adr_stale
+    rule: '!has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("4320h")'
+    severity: warning
+    expect: ADR hasn't been updated in 180 days
+
+  - id: proposed_too_long
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "proposed" || !has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("2160h")'
+    severity: warning
+    expect: Proposed ADRs must be revisited within 90 days
+
+  - id: deprecated_flagged
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "deprecated" || !has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("720h")'
+    severity: error
+    expect: Deprecated ADRs must be updated within 30 days
