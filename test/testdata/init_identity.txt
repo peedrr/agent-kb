@@ -29,6 +29,35 @@ grep '^git-email: agent@agent-kb$' default-kb/.agent-kb/akb.yaml
 exec git -C default-kb log -1 --format='%an <%ae>'
 stdout '^agent-kb <agent@agent-kb>$'
 
+# A complete flag pair is the identity the invoker declares for the base: it is
+# recorded in akb.yaml, attributes the init commit, and outranks every ambient
+# source.
+exec akb init flag-kb --author-name 'Grace Hopper' --author-email grace@example.com
+stdout '^commit identity: from --author-name/--author-email \(Grace Hopper <grace@example\.com>\) — recorded in akb\.yaml, edit git-author/git-email to change$'
+grep '^git-author: Grace Hopper$' flag-kb/.agent-kb/akb.yaml
+grep '^git-email: grace@example\.com$' flag-kb/.agent-kb/akb.yaml
+exec git -C flag-kb log -1 --format='%an <%ae>'
+stdout '^Grace Hopper <grace@example\.com>$'
+
+# A partial pair is ambient for the field the flag left out — here git config
+# fills the email — so nothing is recorded and the flag applies to the init
+# commit alone.
+env GIT_CONFIG_VALUE_0=ada
+env GIT_CONFIG_VALUE_1=ada@example.com
+exec akb init partial-kb --author-name 'Grace Hopper'
+stdout '^commit identity: from --author-name alone \(Grace Hopper <ada@example\.com>\) — not recorded; only a complete --author-name/--author-email pair is recorded in akb\.yaml; later commits use each machine''s identity$'
+! grep 'git-author' partial-kb/.agent-kb/akb.yaml
+! grep 'git-email' partial-kb/.agent-kb/akb.yaml
+exec git -C partial-kb log -1 --format='%an <%ae>'
+stdout '^Grace Hopper <ada@example\.com>$'
+
+# An unversioned base never commits, so the flags have nothing to attribute:
+# no identity is resolved, reported, or recorded.
+exec akb init plain-kb --no-git --author-name 'Grace Hopper' --author-email grace@example.com
+! stdout 'commit identity'
+! grep 'git-author' plain-kb/.agent-kb/akb.yaml
+! grep 'git-email' plain-kb/.agent-kb/akb.yaml
+
 cd default-kb
 exec akb template get note --full --examples
 cp stdout .agent-kb/templates/note.yaml

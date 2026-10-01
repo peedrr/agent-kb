@@ -112,10 +112,12 @@ func ResolveIdentity(kbRoot string) (*Identity, error) {
 // is read from leaves empty is filled from the next source down the chain.
 //
 // The source names the highest-precedence source that contributed, which
-// decides what the base records: an identity that a flag, the environment, or
-// git config named belongs to the invocation or to the machine and is never
-// written to akb.yaml, while the default is recorded so that a base cloned to a
-// machine without a git identity still commits.
+// decides what the base records: a complete --author-name/--author-email pair
+// is declared by the invoker for the base itself and is recorded, as is the
+// default, so that a base cloned to a machine without a git identity still
+// commits. An identity the environment or git config named — or a partial flag
+// pair, whose missing field a lower source filled — is ambient and is never
+// written to akb.yaml.
 func ResolveInitIdentity(kbDir, flagName, flagEmail string) (Identity, IdentitySource) {
 	flagName, flagEmail = strings.TrimSpace(flagName), strings.TrimSpace(flagEmail)
 	envName, envEmail := strings.TrimSpace(os.Getenv(AuthorNameEnv)), strings.TrimSpace(os.Getenv(AuthorEmailEnv))

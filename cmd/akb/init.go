@@ -51,8 +51,8 @@ var initCmd = &cobra.Command{
 
 func init() {
 	initCmd.Flags().StringVar(&initDescription, "description", "", "short description of the knowledge base's contents (optional; shown by akb discover)")
-	initCmd.Flags().StringVar(&initAuthorName, "author-name", "", "commit identity name the init commit records; never written to akb.yaml (default: AKB_AUTHOR_NAME, then git config)")
-	initCmd.Flags().StringVar(&initAuthorEmail, "author-email", "", "commit identity email the init commit records; never written to akb.yaml (default: AKB_AUTHOR_EMAIL, then git config)")
+	initCmd.Flags().StringVar(&initAuthorName, "author-name", "", "commit identity name; a complete --author-name/--author-email pair is recorded as git-author/git-email in akb.yaml (default: AKB_AUTHOR_NAME, then git config)")
+	initCmd.Flags().StringVar(&initAuthorEmail, "author-email", "", "commit identity email; a complete --author-name/--author-email pair is recorded as git-author/git-email in akb.yaml (default: AKB_AUTHOR_EMAIL, then git config)")
 	initCmd.Flags().BoolVar(&initEmbed, "embed", false, "version the KB in the enclosing repository's history; akb commits only the KB's own paths")
 	initCmd.Flags().BoolVar(&initNoGit, "no-git", false, "do not version the KB; exclude it from the enclosing repository's git status")
 	initCmd.Flags().BoolVar(&initForce, "force", false, "write .agent-kb/, kb/ and raw/ directly to a repository root")
@@ -136,7 +136,7 @@ func runInit(_ *cobra.Command, args []string) error {
 	var identityNotice string
 	if !initNoGit {
 		resolved, source := storage.ResolveInitIdentity(nearestExistingDir(absTarget), initAuthorName, initAuthorEmail)
-		identity, identityNotice = initIdentity(resolved, source, !noCommit)
+		identity, identityNotice = initIdentity(resolved, source, !noCommit, initAuthorName, initAuthorEmail)
 		// The commit path resolves the identity from AKB_AUTHOR_NAME and
 		// AKB_AUTHOR_EMAIL before anything the machine configures, so a flag
 		// attributes the init commit by naming those variables. Only a value a flag
@@ -216,25 +216,35 @@ func runInit(_ *cobra.Command, args []string) error {
 }
 
 // initIdentity decides what the new base records for its commits and what the
-// invocation reports. An identity the invocation's flags or environment named,
-// or the machine's git configuration, belongs to that invocation or machine and
-// is never written into a file that travels with the base: the file would
-// mis-attribute every commit made from another machine after a clone. Only the
-// akb default is recorded, so that a base cloned to a machine without a git
-// identity still commits. commits is false for an init that leaves its commit to
-// its caller (--no-commit), where no commit of the invocation carries the
-// identity.
-func initIdentity(identity storage.Identity, source storage.IdentitySource, commits bool) (*storage.Identity, string) {
+// invocation reports. Two identities are the base's own and are written into
+// the akb.yaml that travels with it: a complete --author-name/--author-email
+// pair, which the invoker declares for the base being created, and the akb
+// default, so that a base cloned to a machine without a git identity still
+// commits. Every other identity is ambient — the environment's, the machine's
+// git configuration, or a partial flag pair whose missing field a lower source
+// filled — and is never written into that file, where it would mis-attribute
+// every commit made from another machine after a clone. commits is false for
+// an init that leaves its commit to its caller (--no-commit), where no commit
+// of the invocation carries the identity.
+func initIdentity(identity storage.Identity, source storage.IdentitySource, commits bool, flagName, flagEmail string) (*storage.Identity, string) {
 	switch source {
 	case storage.IdentityFromDefault:
 		return &identity, fmt.Sprintf("commit identity: %s <%s> (default — no git identity found; recorded in akb.yaml, edit git-author/git-email to change)", identity.Name, identity.Email)
 	case storage.IdentityFromGitConfig:
 		return nil, fmt.Sprintf("commit identity: from git config (%s <%s>) — not recorded; each machine's git identity applies", identity.Name, identity.Email)
 	case storage.IdentityFromFlag:
-		if !commits {
-			return nil, fmt.Sprintf("commit identity: from --author-name/--author-email (%s <%s>) — not recorded; the commit stays with the caller and its own identity; later commits use each machine's identity", identity.Name, identity.Email)
+		if strings.TrimSpace(flagName) != "" && strings.TrimSpace(flagEmail) != "" {
+			notice := fmt.Sprintf("commit identity: from --author-name/--author-email (%s <%s>) — recorded in akb.yaml, edit git-author/git-email to change", identity.Name, identity.Email)
+			if !commits {
+				notice += "; the commit itself stays with the caller"
+			}
+			return &identity, notice
 		}
-		return nil, fmt.Sprintf("commit identity: from --author-name/--author-email (%s <%s>) — not recorded; this init commit uses it; later commits use each machine's identity", identity.Name, identity.Email)
+		given := "--author-name"
+		if strings.TrimSpace(flagName) == "" {
+			given = "--author-email"
+		}
+		return nil, fmt.Sprintf("commit identity: from %s alone (%s <%s>) — not recorded; only a complete --author-name/--author-email pair is recorded in akb.yaml; later commits use each machine's identity", given, identity.Name, identity.Email)
 	default:
 		return nil, fmt.Sprintf("commit identity: from AKB_AUTHOR_NAME/AKB_AUTHOR_EMAIL (%s <%s>) — not recorded; the environment of each invocation applies", identity.Name, identity.Email)
 	}
@@ -355,8 +365,10 @@ func writeAkbConfig(target, name, created, description, versioning string, ident
 		Description: strings.TrimSpace(description),
 		Versioning:  versioning,
 	}
-	// Only an identity the base itself owns is recorded: one from the machine or
-	// the invocation stays out of a file that travels with the base.
+	// Only an identity the base itself owns is recorded: a complete flag pair
+	// the invoker declared, or the akb default. An ambient identity — the
+	// environment's, git config's, or a partial flag pair's — stays out of a
+	// file that travels with the base.
 	if identity != nil {
 		cfg.GitAuthor = identity.Name
 		cfg.GitEmail = identity.Email
