@@ -1,16 +1,24 @@
 ---
+created: "2026-10-01"
 grammar: 1
-type: adr
 id: ADR-002
-title: Init Author Flags Record a Durable Commit Identity in akb.yaml
-summary: A complete --author-name/--author-email pair at akb init is recorded in the new base's akb.yaml as git-author/git-email; environment and git-config identities are never recorded.
-tags: [init, commit-identity, akb-yaml, attribution]
-status: proposed
-created: 2026-10-01
-updated: 2026-10-01
 provenance: agent-drafted
-scope: ["cmd/akb/**", "internal/storage/**"]
-revisit: ["scaffolding agents are found to pass the author flags reflexively, baking ephemeral identities into bases", "an akb command gains ownership of deliberate identity edits, making flag-recording redundant"]
+revisit:
+- scaffolding agents are found to pass the author flags reflexively, baking ephemeral identities into bases
+- an akb command gains ownership of deliberate identity edits, making flag-recording redundant
+scope:
+- cmd/akb/**
+- internal/storage/**
+status: proposed
+summary: A complete --author-name/--author-email pair at akb init is recorded in the new base's akb.yaml as git-author/git-email; environment and git-config identities are never recorded.
+tags:
+- init
+- commit-identity
+- akb-yaml
+- attribution
+title: Init Author Flags Record a Durable Commit Identity in akb.yaml
+type: adr
+updated: "2026-10-01T16:14:29Z"
 ---
 
 # ADR-002: Init Author Flags Record a Durable Commit Identity in akb.yaml
@@ -47,7 +55,7 @@ No exceptions are permitted. A case that appears to need one — a legitimate pa
 
 ## Context
 
-The pre-KB design record described every non-default identity as "resolved" and ruled that it belongs to the invocation or machine, so it is never written to the file that travels with the base. That rationale is sound for ambient sources — `AKB_AUTHOR_*` and git config describe the machine — but "resolved" misdescribes a flag: a flag is explicitly set for this act of creation. Under the status quo there is no CLI path to the durable channel at all; the only route to a recorded identity is hand-editing `akb.yaml` after init, which agents that manage bases through akb cannot always do. [[SPEC-001-init-versioning]] REQ-012 prohibits recording environment and git-config identities and is silent on flags — this record fills that gap without amending the requirement. The both-or-nothing rule exists because init resolution fills a missing flag field from git config per-field, so a recorded partial pair would bake one machine-local field into the traveling file.
+The pre-KB design record described every non-default identity as "resolved" and ruled that it belongs to the invocation or machine, so it is never written to the file that travels with the base. That rationale is sound for ambient sources — `AKB_AUTHOR_*` and git config describe the machine — but "resolved" misdescribes a flag: a flag is explicitly set for this act of creation. Under the status quo there is no CLI path to the durable channel at all; the only route to a recorded identity is hand-editing `akb.yaml` after init, which agents that manage bases through akb cannot always do. [[SPEC-001-init-versioning]] REQ-012 records the implemented rule: an identity named by the init flags, the environment, or git config is never written into `akb.yaml`. This ADR proposes reversing the flag clause of that rule while leaving the environment and git-config clauses intact. The both-or-nothing rule exists because init resolution fills a missing flag field from git config per-field, so a recorded partial pair would bake one machine-local field into the traveling file.
 
 ## Decision Drivers
 
@@ -68,7 +76,7 @@ The pre-KB design record described every non-default identity as "resolved" and 
 - Good, because the change is confined to `initIdentity` in `cmd/akb/init.go`; the write path already records any non-nil identity.
 - Bad, because reflexively passed flags now persist beyond their invocation; the mitigation is that `AKB_AUTHOR_*` outranks the file at commit time, and the `revisit` tripwire fires if this becomes a mis-attribution source.
 - Bad, because tests and documentation asserting the single-use behaviour must be reworked: `cmd/akb/init_test.go`, `test/testdata/init_identity.txt`, the flag help text, and the identity pin in the project instructions.
-- Neutral, because [[SPEC-001-init-versioning]]'s REQ-012 is untouched — it governs environment and git-config identities and is silent on flags; on ratification its Drift Ledger gains an entry pointing here, or the rule is absorbed by the planned `kind: capability` promotion.
+- Neutral, because [[SPEC-001-init-versioning]]'s REQ-012 and AC-019 describe current behavior as corrected on 2026-10-01; on ratification they are amended — or the change is absorbed by the planned `kind: capability` promotion — with a Drift Ledger row pointing here.
 
 ## References
 
