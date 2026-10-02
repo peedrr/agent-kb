@@ -1,0 +1,260 @@
+# RFC template for this knowledge base — the MINIMAL INTERIM machine contract.
+#
+# Scope (deliberate, ratified 2026-10-02): frontmatter contract + status enum +
+# identity / lifecycle / staleness rules only. This exists so proposals have a
+# typed home in the base while the RFC-002 V3 engine is built.
+#
+# DEFERRED to the V3 engine (see kb/rfc/RFC-002-open-validation-engine.md):
+#   - the ten-section H2 skeleton (docs-writer references/rfc.md section 5)
+#   - the verbatim Reviewer-brief and For-agents blockquotes
+#   - EARS-2119 constraint lint in "## Proposed Constraints"
+#   - the full accepted-state body freeze
+#   The authoring contract remains docs-writer references/rfc.md; this template
+#   gates the machine contract, not the prose.
+#
+# Guard doctrine (per the showcase this derives from):
+#   schema-required keys — read UNGUARDED: akb write refuses a page missing one
+#     before any rule runs.
+#   schema-optional keys — ALWAYS guarded with has().
+#   old_page.* — ALWAYS guarded: nil on create.
+#   lint_rules — guard EVERYTHING except type and title.
+#
+# Known residue (not mechanically checkable; human-only review):
+#   - decided_by MUST NOT be an agent — akb has no actor identity
+#   - only the steward may write abandoned or re-affirm review_by
+#   - only the raiser may mark their own blocking concern resolved
+#   - a timeout MUST NOT be recorded as agreement
+name: rfc
+description: Design proposal — machine-checkable lifecycle, identity and derived-staleness guardrails; section, evidence and EARS gates deferred to the V3 engine
+dir: rfcs
+schema:
+  frontmatter:
+    grammar:
+      type: int
+      required: true
+    type:
+      type: string
+      required: true
+    id:
+      type: string
+      required: true
+    title:
+      type: string
+      required: true
+    status:
+      type: string
+      required: true
+      enum:
+        - draft
+        - review
+        - accepted
+        - implemented
+        - rejected
+        - superseded
+        - abandoned
+    provenance:
+      type: string
+      required: true
+      enum:
+        - human
+        - agent-drafted
+    author:
+      type: string
+      required: true
+    steward:
+      type: string
+      required: true
+    created:
+      type: string
+      required: true
+    updated:
+      type: string
+      required: true
+    scope:
+      type: list
+      required: true
+    tags:
+      type: list
+      required: true
+    summary:
+      type: string
+      required: true
+    review_by:
+      type: string
+      required: false
+    decided_by:
+      type: string
+      required: false
+    decided_at:
+      type: string
+      required: false
+    resolution:
+      type: string
+      required: false
+    supersedes:
+      type: string
+      required: false
+    superseded_by:
+      type: string
+      required: false
+    spawns:
+      type: list
+      required: false
+    disposition_requested_at:
+      type: string
+      required: false
+validations:
+  - id: grammar_is_one
+    rule: 'page.frontmatter.grammar == 1'
+    requirement: Grammar version must be 1; a validator refuses a document whose grammar is newer than itself
+    expect: grammar must be the integer 1
+
+  - id: id_format
+    rule: 'page.frontmatter.id.matches("^RFC-[0-9]{3}$")'
+    requirement: ID must be zero-padded RFC-NNN, matching the filename prefix (filename match itself is human-verified)
+    expect: id must match ^RFC-[0-9]{3}$
+
+  - id: title_nonempty
+    rule: 'page.frontmatter.title != ""'
+    requirement: Title must not be empty
+    expect: frontmatter title must be non-empty
+
+  - id: title_style
+    rule: 'page.frontmatter.title.matches("^[A-Z]") && !page.frontmatter.title.endsWith(".") && size(page.frontmatter.title) <= 80'
+    requirement: Title must be a proposal-carrying statement — capitalised, no trailing period, at most 80 characters
+    expect: title must start with an uppercase letter, not end with ".", and be at most 80 characters
+
+  - id: valid_status
+    rule: 'page.frontmatter.status in ["draft", "review", "accepted", "implemented", "rejected", "superseded", "abandoned"]'
+    requirement: Status must be a valid RFC proposal-lifecycle status; only accepted or implemented authorize adjudication quotes
+    expect: status must be one of draft, review, accepted, implemented, rejected, superseded, abandoned
+
+  - id: valid_provenance
+    rule: 'page.frontmatter.provenance in ["human", "agent-drafted"]'
+    requirement: Provenance must record who drafted the proposal
+    expect: provenance must be one of human, agent-drafted
+
+  - id: author_nonempty
+    rule: 'page.frontmatter.author != ""'
+    requirement: Author must name the accountable drafting actor; an agent drafter names its operating human in the body until the actor RFC lands
+    expect: author must be non-empty
+
+  - id: steward_nonempty
+    rule: 'page.frontmatter.steward != ""'
+    requirement: Steward must name exactly one accountable party — only the steward re-affirms review_by or writes abandoned
+    expect: steward must be non-empty
+
+  - id: scope_nonempty
+    rule: 'size(page.frontmatter.scope) > 0'
+    requirement: Scope must name at least one path glob the proposal governs (the routing key)
+    expect: scope must hold at least one entry
+
+  - id: tags_nonempty
+    rule: 'size(page.frontmatter.tags) > 0'
+    requirement: At least one retrieval tag is required
+    expect: tags must hold at least one entry
+
+  - id: tags_format
+    rule: 'page.frontmatter.tags.all(t, t.matches("^[a-z0-9-]+$"))'
+    requirement: Tags must be lowercase alphanumeric words joined by hyphens
+    expect: every tag must match ^[a-z0-9-]+$
+
+  - id: summary_shape
+    rule: 'page.frontmatter.summary != "" && size(page.frontmatter.summary) <= 200'
+    requirement: Summary must be a proposal-carrying one-liner of at most 200 characters (it becomes the index line)
+    expect: summary must be non-empty and at most 200 characters
+
+  - id: review_by_required
+    rule: '!(page.frontmatter.status in ["review", "accepted"]) || (has(page.frontmatter.review_by) && page.frontmatter.review_by != "")'
+    requirement: A proposal under review or accepted must carry its deliberation deadline / revisit date
+    expect: review and accepted RFCs must set a non-empty review_by
+
+  - id: review_by_future
+    rule: '!(page.frontmatter.status in ["review", "accepted"]) || !has(page.frontmatter.review_by) || timestamp(page.frontmatter.review_by) > now'
+    requirement: An RFC under review or accepted without a future review_by is INVALID, not merely stale; the steward re-affirms by bumping it
+    expect: review and accepted RFCs must carry a review_by in the future
+
+  - id: decided_by_required
+    rule: '!(page.frontmatter.status in ["accepted", "implemented", "rejected"]) || (has(page.frontmatter.decided_by) && page.frontmatter.decided_by != "")'
+    requirement: A ratified or rejected proposal must name the human ratifier; an agent-drafted page can never reach accepted without one
+    expect: accepted, implemented and rejected RFCs must carry a non-empty decided_by
+
+  - id: decided_by_not_author
+    rule: '!has(page.frontmatter.decided_by) || page.frontmatter.decided_by != page.frontmatter.author'
+    requirement: The ratifier must not be the drafter; an agent can never ratify its own proposal (string inequality is the interim mechanism — the actor RFC will replace it)
+    expect: decided_by must differ from author
+
+  - id: decided_at_required
+    rule: '!has(page.frontmatter.decided_by) || (has(page.frontmatter.decided_at) && page.frontmatter.decided_at != "")'
+    requirement: Naming a ratifier requires the decision date — an undated ratification is unknowable provenance
+    expect: decided_at must be a non-empty date when decided_by is present
+
+  - id: supersedes_format
+    rule: '!has(page.frontmatter.supersedes) || page.frontmatter.supersedes.matches("^RFC-[0-9]{3}$")'
+    requirement: Supersedes must name a single RFC by ID
+    expect: supersedes must match ^RFC-[0-9]{3}$ when present
+
+  - id: superseded_requires_superseded_by
+    rule: 'page.frontmatter.status != "superseded" || (has(page.frontmatter.superseded_by) && page.frontmatter.superseded_by.matches("^RFC-[0-9]{3}$"))'
+    requirement: A superseded RFC must name the record replacing it, set in the same commit as the superseding RFC
+    expect: superseded RFCs must set superseded_by to an RFC-NNN id
+
+  - id: valid_state_transition
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.status) || old_page.frontmatter.status == page.frontmatter.status || page.frontmatter.status == "superseded" || (old_page.frontmatter.status == "draft" && page.frontmatter.status in ["review", "abandoned"]) || (old_page.frontmatter.status == "review" && page.frontmatter.status in ["accepted", "rejected", "abandoned"]) || (old_page.frontmatter.status == "accepted" && page.frontmatter.status == "implemented") || (old_page.frontmatter.status == "abandoned" && page.frontmatter.status == "draft")'
+    requirement: Status transitions must follow the proposal lifecycle — draft to review or abandoned, review to accepted or rejected or abandoned, accepted to implemented, abandoned back to draft, and any status to superseded
+    expect: only draft->review/abandoned, review->accepted/rejected/abandoned, accepted->implemented, abandoned->draft, *->superseded transitions are allowed
+
+  - id: created_immutable
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.created) || old_page.frontmatter.created == page.frontmatter.created'
+    requirement: Created date must never change
+    expect: created must equal the on-disk page's created date
+
+  - id: id_immutable
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.id) || old_page.frontmatter.id == page.frontmatter.id'
+    requirement: The RFC ID is allocated once and never reused or changed
+    expect: id must equal the on-disk page's id
+
+  - id: updated_not_before_created
+    rule: 'timestamp(page.frontmatter.updated) >= timestamp(page.frontmatter.created)'
+    requirement: Updated date must not precede the created date
+    expect: updated must be at or after created
+
+  - id: temporal_created
+    rule: 'timestamp(page.frontmatter.created) <= now'
+    requirement: Created date must not be in the future
+    expect: created timestamp must be less than or equal to current time
+
+  - id: min_word_count
+    rule: 'page.content.word_count >= 50'
+    requirement: Body must carry at least 50 words — the threshold catches a stub, not a style
+    expect: body must hold at least 50 words
+
+  - id: code_blocks_have_language
+    rule: 'page.ast.code_blocks.all(c, c.language != "")'
+    requirement: Every fenced code block must declare a language
+    expect: every code block must carry a language tag
+lint_rules:
+  - id: rfc_at_risk
+    rule: '!has(page.frontmatter.status) || !(page.frontmatter.status in ["review", "accepted"]) || !has(page.frontmatter.review_by) || now < (timestamp(page.frontmatter.review_by) - duration("336h")) || now > timestamp(page.frontmatter.review_by)'
+    severity: warning
+    expect: RFC is within 14 days of its review_by deadline
+
+  - id: rfc_stale
+    rule: '!has(page.frontmatter.status) || !(page.frontmatter.status in ["review", "accepted"]) || !has(page.frontmatter.review_by) || has(page.frontmatter.disposition_requested_at) || now <= timestamp(page.frontmatter.review_by)'
+    severity: error
+    expect: RFC is past review_by with no ratification request filed — advisory only until the steward re-affirms it
+
+  - id: rfc_dormant
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "draft" || !has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("4320h")'
+    severity: warning
+    expect: Draft RFC has been silent for 180 days — surface it to the steward, never auto-kill it
+
+  - id: resolution_missing
+    rule: '!has(page.frontmatter.decided_by) || (has(page.frontmatter.resolution) && page.frontmatter.resolution != "")'
+    severity: warning
+    expect: A ratified RFC should link the decision record that resolved it
+
+  - id: accepted_without_spawns
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "accepted" || (has(page.frontmatter.spawns) && size(page.frontmatter.spawns) > 0)'
+    severity: warning
+    expect: An accepted RFC should name the ADR/SPEC documents it spawns
