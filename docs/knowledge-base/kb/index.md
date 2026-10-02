@@ -12,4 +12,5 @@
 ## Rfcs
 
 - [Give akb a Declared Actor Identity So Rules Can Assert Who Acted](kb/rfcs/RFC-003-declared-actor-identity.md) — Expose a resolved actor identity to akb's rule engine so templates can assert who drafted, stewards, and ratifies — mechanism in akb, roster policy in the KB.
+- [JSON Schema / CEL Coexistence and JSON I/O in akb](kb/rfcs/RFC-001-json-schema-cel-coexistence.md) — JSON Schema 2020-12 alongside CEL plus JSON I/O for agent pipelines; superseded by RFC-002.
 
