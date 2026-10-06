@@ -26,7 +26,7 @@ tags:
 - rfc-002
 title: CEL Runs on cel.dev/cel-go v0.32 with a Pinned Extension Set
 type: adr
-updated: "2026-10-06T18:58:29Z"
+updated: "2026-10-06T19:22:34Z"
 ---
 
 # ADR-004: CEL Runs on cel.dev/cel-go v0.32 with a Pinned Extension Set
@@ -52,7 +52,7 @@ Upgrade cel-go from `github.com/google/cel-go` v0.28.0 to `cel.dev/cel-go` v0.32
 
 - **N1** (MUST NOT · scope: `go.mod`, `go.sum`, `internal/**`, `cmd/akb/**`, `test/**`): The system MUST NOT reference `github.com/google/cel-go` in any require line or import statement; the system MUST reference `cel.dev/cel-go` everywhere.
 - **N2** (MUST NOT · scope: `internal/cel/**`): WHEN an extension library publishes numbered versions, the system MUST NOT enable it via the no-option default — the default installs every future version on each dependency bump; the system MUST pass the explicit pinned version of I5.
-- **N3** (MUST NOT · scope: `internal/cel/**`, `cmd/akb/**`): The system MUST NOT enable extension families beyond the five of I4 — including `ext.Regex`, `cel.OptionalTypes`, `ext.TwoVarComprehensions`, `ext.Encoders`, and `ext.NativeTypes`; a new capability MUST arrive through its own ADR per the RFC-001 §9 deferral list.
+- **N3** (MUST NOT · scope: `internal/cel/**`, `cmd/akb/**`): The system MUST NOT enable extension families beyond the five of I4 — including `ext.Regex`, `cel.OptionalTypes`, `ext.TwoVarComprehensions`, `ext.Encoders`, and `ext.NativeTypes`; a new capability MUST arrive through its own ADR per RFC-002 §10's deferral list.
 - **N4** (MUST NOT · scope: `internal/cel/**`): The A3 upgrade MUST NOT change the program-cache key and MUST NOT introduce per-template environment variation; the `(env identity, expression)` cache key and function selection are RFC-002-A5's scope, and this upgrade keeps one environment shape.
 - **N5** (MUST NOT · scope: `internal/cel/**`): The system MUST NOT set `cel.RegexProgramSizeLimit`; the system MUST rely on the 100000 runtime cost bound, RE2's linear-time guarantee, and cel-go v0.30's compile-time expression caps (100k code points, 100k nodes, depth 250).
 - **N6** (MUST NOT · scope: `internal/**`): The system MUST NOT define date-time acceptance by cel-go's string-to-timestamp gate or adopt v0.32's `types.ParseTimestamp` helper; the ADR-003 I4 schema checkers remain the sole acceptance definition, and `convertDateField`'s Go-stdlib pre-conversion stays the only bridge.
@@ -84,7 +84,7 @@ Origin: [[RFC-002-open-validation-engine|RFC-002]] candidate RFC-002-A3 (RFC §1
 - Security posture: the v0.28 pin is exposed to two advisories fixed upstream by v0.30.
 - The ADR-003 interlock: date-time acceptance must be identical before and after the upgrade, with no page re-validation.
 - Minimal blast radius: every cel-go API akb calls is stable across the four releases; the migration is mechanical.
-- Scope discipline: the program-cache key and per-template function selection belong to RFC-002-A5; the remaining extension families are RFC-001's deferral list.
+- Scope discipline: the program-cache key and per-template function selection belong to RFC-002-A5; the remaining extension families are deferred in RFC-002 §10.
 - Threat-model honesty: regex plan-size hardening guards against untrusted rule authors, which akb does not have — pages are data and are never compiled (owner-ratified declination).
 
 ## Alternatives Considered
@@ -94,7 +94,7 @@ Origin: [[RFC-002-open-validation-engine|RFC-002]] candidate RFC-002-A3 (RFC §1
 - **Pin Strings only** — rejected: partial determinism; behavior-versioned changes in Math or Lists would still drift. Do not re-propose unless pinning all five proves a real maintenance burden in practice.
 - **Set `cel.RegexProgramSizeLimit`** — rejected by the owner 2026-10-06: the knob guards a threat model akb does not have (rule authors are KB owners; page content is never compiled), and its bounds duplicate the runtime cost limit and v0.30's parser caps. Do not re-propose unless akb ingests templates from untrusted sources.
 - **Adopt v0.32's `types.ParseTimestamp` or `NativeToValue` JSON support** — rejected: `convertDateField` is two stdlib calls and the page builder constructs plain maps; the helpers add coupling for no gain. Do not re-propose unless the document builder (RFC-002-A6) adopts CEL-native types.
-- **Enable the remaining extension families now (Regex, OptionalTypes, TwoVarComprehensions, Encoders, Native)** — rejected: RFC-001 §9's deferral; each materially changes the rule-authoring surface. Do not re-propose except as a per-capability ADR with a concrete rule that needs it.
+- **Enable the remaining extension families now (Regex, OptionalTypes, TwoVarComprehensions, Encoders, Native)** — rejected: RFC-002 §10's deferral list; each materially changes the rule-authoring surface. Do not re-propose except as a per-capability ADR with a concrete rule that needs it.
 - **Wait for a post-#1476 tag (v0.32.1 or later)** — rejected: the drift touches `optional.*` estimates only; akb enables no optional types and its cost test is behavioral. Do not re-propose unless the upgrade's own test run shows real cost fallout.
 
 ## Consequences
@@ -114,4 +114,4 @@ Origin: [[RFC-002-open-validation-engine|RFC-002]] candidate RFC-002-A3 (RFC §1
 - cel-go releases v0.29.0–v0.32.0 and PR #1413 (module switch): `https://github.com/cel-expr/cel-go/releases/tag/v0.32.0` and siblings; PR #1338 (`timestamp()` gate); `common/types/timestamp.go`, `common/types/string.go`, `cel/options.go`, `cel/program.go`, `ext/strings.go`, `ext/README.md` at tag v0.32.0.
 - cel-go issues #1476 (v0.32 cost drift) and #1329 (repository move); advisories CVE-2026-83530 and GHSA-gcjh-h69q-9w9g.
 - [[ADR-003-santhosh-v6-format-assertion|ADR-003]] — the date-time profile this upgrade must not disturb; its cel-go-upgrade revisit trigger is discharged by this record.
-- [[RFC-002-open-validation-engine|RFC-002]] §10 (upgrade and extension set), §17 Phase 1, §18 (candidate lifecycle); [[RFC-001-json-schema-cel-coexistence|RFC-001]] §9 (release analysis and the deferral list).
+- [[RFC-002-open-validation-engine|RFC-002]] §10 (upgrade, extension set, and the deferred extension families), §17 Phase 1, §18 (candidate lifecycle); [[RFC-001-json-schema-cel-coexistence|RFC-001]] §9 (release analysis — historical research record only).
