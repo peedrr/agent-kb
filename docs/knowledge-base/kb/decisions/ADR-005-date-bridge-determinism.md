@@ -24,7 +24,7 @@ tags:
 - rfc-002
 title: The Date Bridge Coerces Only Schema-Declared Fields and Is Statically Checked
 type: adr
-updated: "2026-10-06"
+updated: "2026-10-06T21:22:45Z"
 ---
 
 # ADR-005: The Date Bridge Coerces Only Schema-Declared Fields and Is Statically Checked
@@ -49,7 +49,7 @@ The CEL page map's temporal coercion becomes a deterministic bridge: akb statica
 - **I8**: The system MUST apply one identical coercion plan when building the `page` map and the `old_page` map for a write or append, with `old_page` built from a fresh on-disk read under the current template's declarations.
 - **I9**: WHEN `akb template write` compiles a validation rule or a lint rule, the system MUST statically inspect the compiled CEL AST for `timestamp` and `duration` calls whose argument is a `page.frontmatter.*` or `old_page.frontmatter.*` attribute path.
 - **I10**: WHEN the static inspection finds a `timestamp()` call on a frontmatter path where the schema declares no `format: date-time` or `format: date` assertion, the system MUST emit a stderr warning naming the rule ID, the attribute path, and the remediation.
-- **I11**: WHEN the static inspection finds a `duration()` call on a frontmatter path where the schema declares `format: duration`, the system MUST emit a stderr warning stating that the schema asserts ISO 8601 (RFC 3339 Appendix A) syntax while CEL `duration()` parses Go `time.ParseDuration` syntax.
+- **I11**: WHEN the static inspection finds a `duration()` call on a frontmatter path where the schema declares `format: duration`, the system MUST emit a stderr warning naming the rule ID, the attribute path, the vocabulary mismatch (the schema asserts ISO 8601 per RFC 3339 Appendix A while CEL `duration()` parses Go `time.ParseDuration` syntax), and the remediations: assert Go-style syntax with a `pattern` in place of `format: duration`, or remove the `duration()` call from the rule.
 - **I12**: WHEN the argument of a `timestamp()` or `duration()` call is not a statically resolvable frontmatter attribute path, the system MUST NOT emit a static-check warning for that call.
 - **I13**: The kb-management SKILL MUST document the duration vocabulary seam: JSON Schema `format: duration` asserts the RFC 3339 Appendix A `duration` ABNF, CEL `duration()` accepts Go `time.ParseDuration` syntax only, and no akb bridge converts between the two.
 
@@ -76,7 +76,7 @@ No exceptions are permitted. A case that appears to need one — including a tem
 - **I7**: unit test asserting a coerced `format: date` value equals midnight UTC · gate: `go test ./internal/cel/` · mode: **block** once implemented.
 - **I8**: unit test asserting `page` and `old_page` receive identical coercions under one template · gate: `go test ./internal/cel/` · mode: **block** once implemented.
 - **N3**: testscript case: after a write with declared temporal fields, the on-disk bytes and `akb read --json` show the raw strings · gate: `go test ./test/` · mode: **block** once implemented.
-- **I9–I12, N6**: testscript matrix — `timestamp(page.frontmatter.x)` with `x` undeclared → exit 0 plus a stderr warning naming rule and path; `x` declared → silent; `old_page.` variant → warning; `duration(page.frontmatter.d)` with `format: duration` → ISO-versus-Go seam warning; non-path argument → silent · gate: `go test ./test/` · mode: **block** once implemented.
+- **I9–I12, N6**: testscript matrix — `timestamp(page.frontmatter.x)` with `x` undeclared → exit 0 plus a stderr warning naming rule and path; `x` declared → silent; `old_page.` variant → warning; `duration(page.frontmatter.d)` with `format: duration` → seam warning naming rule, path, and both remediations; non-path argument → silent · gate: `go test ./test/` · mode: **block** once implemented.
 - **I13**: human check at the Phase-2 doctrine update that the SKILL carries the seam paragraph · mode: **advisory**.
 - **N5**: `rg -n 'iso_duration' internal/ cmd/` returns zero hits · mode: **block** until RFC-002-A5 ratifies a registry.
 - **N8**: review confirms `internal/cel/engine.go` cache-key and environment construction are unchanged in the implementing PR · mode: **advisory**.
