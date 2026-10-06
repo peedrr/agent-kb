@@ -40,7 +40,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-06T21:40:13Z"
+updated: "2026-10-06T22:49:49Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -274,7 +274,7 @@ lint_rules: []              # UNCHANGED: CEL, sweep-time; gains kb.* in Phase 4 
 ```
 
 - **`schema.frontmatter` (homegrown block) is retired** with the RFC-001 hard-rejection
-  migration path (precedent: `detectOldFormat`). Its presence job moves to schema
+  migration path (precedent: `detectOldFormat`; retirement and migration mechanics resolved by [[ADR-006-schema-frontmatter-retirement|ADR-006]] — hard rejection with a self-sufficient message, a CHANGELOG recipe, no migrate command). Its presence job moves to schema
   `required`; the guard invariant stands: *the schema `required` set under
   `properties.frontmatter` is exactly the set of keys CEL rules may read unguarded.*
 - **`type`/`title` stop being engine gates** (D10). `type` survives only as the
@@ -789,7 +789,7 @@ it is the last document approved, and this table is its progress tracker.
 | ID | Kind | Candidate | Status | Resolves-as |
 |---|---|---|---|---|
 | RFC-002-A1 | ADR | Validator library (santhosh v6 recommended) + `format` assertion policy | ratified | [[ADR-003-santhosh-v6-format-assertion|ADR-003]] |
-| RFC-002-A2 | ADR | `schema.frontmatter` retirement + migration (`akb template migrate`?) | proposed | — |
+| RFC-002-A2 | ADR | `schema.frontmatter` retirement + migration (`akb template migrate`?) | ratified | [[ADR-006-schema-frontmatter-retirement|ADR-006]] |
 | RFC-002-A3 | ADR | cel-go upgrade (v0.28.0 → v0.32.x, `cel.dev/cel-go`) + extension set | ratified | [[ADR-004-cel-go-upgrade-pinned-extensions|ADR-004]] |
 | RFC-002-A4 | ADR | Date bridge determinism + `template write` static temporal check; duration seam | ratified | [[ADR-005-date-bridge-determinism|ADR-005]] |
 | RFC-002-A5 | ADR | Closed function registry: contents, selection syntax, per-function cost treatment; cache key | proposed | — |
