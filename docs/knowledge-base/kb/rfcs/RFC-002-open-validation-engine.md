@@ -40,7 +40,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-06T19:22:34Z"
+updated: "2026-10-06T19:36:58Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -109,7 +109,7 @@ valid KB entry is, how entries are compared, and how their KB is laid out.
 rationale and external research, JSON Schema 2020-12 + library-first coverage (G1),
 cel-go upgrade + extension libraries (G2), the three-surface failure contract (write
 fails closed, sweep degrades per page, `template write` proves mockups), JSON I/O
-commands, the merged error model, `lint --json` envelope stability, and the phasing
+commands (envelopes re-specified in §15), the merged error model, `lint --json` envelope stability, and the phasing
 skeleton.
 
 **Superseded by this RFC:** the fixed `document` shape (→ flattened, projections
@@ -292,8 +292,14 @@ lint_rules: []              # UNCHANGED: CEL, sweep-time; gains kb.* in Phase 4 
   `template.go:106-114`, would silently ignore a typo'd `projection:`): `template
   write` hard-rejects unknown keys; *load* time only warns, so a template authored by
   a newer akb never bricks an older binary (same forward-compat story as RFC-002-A13).
-- **Overlap rejection** (warning, not error — permissive P2) and mockup obligations
-  carry from RFC-001 §6.2, extended to `<!-- FAILS: schema: /frontmatter/status -->`.
+- **Overlap rejection** (warning, not error — permissive P2) carries from RFC-001 §6.2.
+- **Mockup obligations** (restated from RFC-001 §6.2 for self-containment): the pass
+  mockup must satisfy the `schema:` block **and** every CEL rule — the cheapest
+  satisfiability check for has-no-solution schemas; the fail mockup must fail the
+  **intended** validator via the machine-readable convention `<!-- FAILS: rule_id — … -->`,
+  extended here to `<!-- FAILS: schema: /frontmatter/status -->`; the optional-key-stripping
+  and self-`old_page` proofs stay CEL-side, with "declared optional keys" re-derived from
+  the schema block.
 - **Overlap guidance (G6, carries from RFC-001 §10 — owner-ratified session 3):** the
   kb-management SKILL carries a one-screen, low-token "which validator?" decision rule
   — *checkable on this page alone, right now (type, presence, enum, pattern, length,
@@ -481,7 +487,7 @@ arithmetic, and body-text constraints beyond `pattern`.
   | `missing_frontmatter` | Built-in (structural given the page model); scope/severity configurable |
   | `empty_pages` | Demotable to a shipped example `lint_rule` (`size(page.content)`-expressible) |
   | `required_fields` | Subsumed by the sweep-time schema checker (RFC-001 §13 carries) |
-  | `type_orphan` | Built-in — the selector's sweep counterpart (D10) |
+  | `type_orphan` | Built-in — the selector's sweep counterpart (D10; this supersedes RFC-001 §13's claim that the schema checker subsumes this checker) |
   | `cel_lint` | Already user-owned |
   | `broken_links`, `orphans` | Built-in until `kb.*`; then user-re-expressible (`delete --orphans`, a user-invoked convenience, is untouched) |
   | `citations` | Built-in; `sources` key name configurable; `kb.*`-re-expressible later |
@@ -881,9 +887,10 @@ merged error model + `runTemplateValidations` widening; JSON→YAML assembly lan
 (`kb.*`), §12 (derivation), and §14.1 (indexer declarations) touch search/linkgraph/
 index, but as data sources for user rules and derived artifacts, never as validators;
 no subsystem gains validation authority; overlap warning at `template write`;
-mockup obligations; the `--json`/`--append`/`--frontmatter` mutual exclusion (§7);
+mockup obligations (now defined in §6); the `--json`/`--append`/`--frontmatter` mutual exclusion (§8.2);
 DESIGN.md roadmap interactions (T1 subsumption, typed-gate synergy,
-D11 sweep criticality); the §4.3 secret-scanning write gate — unchanged, a third,
+D11 sweep criticality); the secret-scanning write gate (a pre-RFC design-doc gate) —
+unchanged, a third,
 separate, opt-in gate that is *not* a validator (so §1's "only validators" claim is
 unaffected); cel-go release analysis (v0.29–v0.32).
 
