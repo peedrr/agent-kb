@@ -4,6 +4,7 @@ deciders:
 - Pete Hope
 grammar: 1
 id: ADR-004
+is_draft: false
 provenance: agent-drafted
 revisit:
 - cel-go publishes a release newer than v0.32.0 — re-check timestamp() acceptance, the cost model, and the pinned extension versions before any bump
