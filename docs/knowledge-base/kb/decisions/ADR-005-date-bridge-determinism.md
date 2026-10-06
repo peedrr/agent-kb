@@ -24,7 +24,7 @@ tags:
 - rfc-002
 title: The Date Bridge Coerces Only Schema-Declared Fields and Is Statically Checked
 type: adr
-updated: "2026-10-06T21:22:45Z"
+updated: "2026-10-06T21:32:47Z"
 ---
 
 # ADR-005: The Date Bridge Coerces Only Schema-Declared Fields and Is Statically Checked
@@ -113,6 +113,7 @@ Origin: [[RFC-002-open-validation-engine|RFC-002]] candidate RFC-002-A4 (RFC §5
 - Bad, because the static check is syntactic: dynamically constructed `timestamp()` arguments receive no warning (I12's documented limitation).
 - Bad, because `BuildPage` and `BuildOldPage` gain a template (or plan) parameter, rippling to five call sites — mechanical, since every caller already holds the template.
 - Neutral, because `format: duration` assertion works with zero new code under ADR-003's assert-all policy, and `iso_duration()` can arrive through RFC-002-A5 without re-opening this record.
+- Neutral, because an RFC-002-A5 decision ratifying `iso_duration()` adds a third remediation to I11's warning rather than retiring it: `duration()` is a CEL builtin the closed registry cannot redefine, so the vocabulary mismatch — and the warning's trigger — persists in every registry outcome.
 
 ## References
 
