@@ -4,6 +4,7 @@ deciders:
 - Pete Hope
 grammar: 1
 id: ADR-006
+is_draft: false
 provenance: agent-drafted
 revisit:
 - external KBs running TemplateV2 templates appear in the wild before Phase 1 ships (revisit the no-command decision)
