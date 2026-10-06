@@ -40,7 +40,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-06T17:16:30Z"
+updated: "2026-10-06T18:58:29Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -199,7 +199,7 @@ registered/overridden accordingly — the library's built-in accepts lowercase `
 seconds, and ADR-003 tightened the profile beyond raw Go acceptance: under the pinned cel-go
 v0.28, `time.Parse(time.RFC3339)` additionally admits comma fractions, single-digit hours, and
 out-of-range offsets, so ADR-003 I4 pins the strict pattern — the intersection of the cel-go
-v0.28 and v0.32 acceptance sets — keeping this guarantee intact across the A3 upgrade) and documented in the SKILL as *akb's date rules*
+v0.28 and v0.32 acceptance sets — keeping this guarantee intact across the ADR-004 upgrade) and documented in the SKILL as *akb's date rules*
 (the same one-sentence treatment as "akb is RE2 everywhere"). `format: time` has no
 CEL counterpart (no time type) — it validates as a string format only, never coerced.
 For `format: date` fields, akb coerces date-only to **midnight UTC, in memory only,
@@ -418,7 +418,7 @@ arithmetic, and body-text constraints beyond `pattern`.
 ## 10. CEL coverage (G2 + D8)
 
 - **cel-go v0.28.0 → v0.32.x** (breaking module-path migration to `cel.dev/cel-go`;
-  RFC-002-A3), then enable `ext.Strings`, `ext.Lists`, `ext.Sets`, `ext.Math`,
+  [[ADR-004-cel-go-upgrade-pinned-extensions|ADR-004]]), then enable `ext.Strings`, `ext.Lists`, `ext.Sets`, `ext.Math`,
   `ext.Bindings` in `NewEnv`. Additive; every existing rule keeps working. Note the
   v0.30 `timestamp()` strictness — the §5.2 bridge is designed around it.
 - **Closed function registry (D8).** akb ships a curated, documented, O(content)-bounded
@@ -779,7 +779,7 @@ it is the last document approved, and this table is its progress tracker.
 |---|---|---|---|---|
 | RFC-002-A1 | ADR | Validator library (santhosh v6 recommended) + `format` assertion policy | ratified | [[ADR-003-santhosh-v6-format-assertion|ADR-003]] |
 | RFC-002-A2 | ADR | `schema.frontmatter` retirement + migration (`akb template migrate`?) | proposed | — |
-| RFC-002-A3 | ADR | cel-go upgrade (v0.28.0 → v0.32.x, `cel.dev/cel-go`) + extension set | proposed | — |
+| RFC-002-A3 | ADR | cel-go upgrade (v0.28.0 → v0.32.x, `cel.dev/cel-go`) + extension set | ratified | [[ADR-004-cel-go-upgrade-pinned-extensions|ADR-004]] |
 | RFC-002-A4 | ADR | Date bridge determinism + `template write` static temporal check; duration seam | proposed | — |
 | RFC-002-A5 | ADR | Closed function registry: contents, selection syntax, per-function cost treatment; cache key | proposed | — |
 | RFC-002-S1 | SPEC | Structured validation report (widened `runTemplateValidations`) | proposed | — |
