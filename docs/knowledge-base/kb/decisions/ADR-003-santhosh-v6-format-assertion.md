@@ -1,20 +1,29 @@
 ---
-grammar: 1
-type: adr
-id: ADR-003
-title: JSON Schema Validation Uses santhosh v6 and Asserts Every Declared Format
-summary: JSON Schema validation delegates to santhosh-tekuri/jsonschema v6; every declared format asserts; akb-registered date-time/date checkers pin the strict RFC 3339 profile cel-go accepts.
-tags: [json-schema, validation, format-assertion, rfc-002]
-status: proposed
 created: "2026-10-06"
-updated: "2026-10-06T15:45:00Z"
+deciders:
+- Pete Hope
+grammar: 1
+id: ADR-003
 provenance: agent-drafted
-scope: ["internal/**", "cmd/akb/**", "go.mod"]
 revisit:
 - kaptinlin/jsonschema or another Go validator publishes draft 2020-12 test-suite or bowtie compliance plus a documented built-in-format override hook
 - santhosh-tekuri/jsonschema maintenance lapses (no commits for a year) or the module is abandoned
 - cel-go changes timestamp() string acceptance again (re-check at every cel-go upgrade)
 - a built-in non-temporal format checker false-rejects values a template author reasonably declared
+scope:
+- internal/**
+- cmd/akb/**
+- go.mod
+status: accepted
+summary: JSON Schema validation delegates to santhosh-tekuri/jsonschema v6; every declared format asserts; akb-registered date-time/date checkers pin the strict RFC 3339 profile cel-go accepts.
+tags:
+- json-schema
+- validation
+- format-assertion
+- rfc-002
+title: JSON Schema Validation Uses santhosh v6 and Asserts Every Declared Format
+type: adr
+updated: "2026-10-06T16:12:59Z"
 ---
 
 # ADR-003: JSON Schema Validation Uses santhosh v6 and Asserts Every Declared Format
@@ -62,7 +71,7 @@ No exceptions are permitted. The library's one un-overridable format (`regex`) i
 
 ## Context
 
-Origin: RFC-002 candidate RFC-002-A1 (RFC-002 §18 lifecycle — on ratification the RFC's A1 row moves to ratified as ADR-003 and body references are rewritten). RFC-002 §9 committed to library-first full 2020-12 coverage and left the library choice and the `format` assertion default to this record; §5.2 pinned a "Go-strict RFC3339" `date-time` profile to guarantee that any schema-accepted value is parseable by CEL `timestamp()`. Two findings from the research run (`.pi/research/rfc-002-a1-validator/`, 2026-10-06) shaped the final form. First, "Go-strict" is version-dependent: akb pins cel-go v0.28.0 (`go.mod:12`), whose `timestamp()` is raw `time.Parse(time.RFC3339)` — it rejects lowercase `t`/`z` and leap seconds but accepts comma fractions, single-digit hours, and `+24:00` offsets; cel-go v0.30 added a `strictRFC3339Pattern` gate (PR #1338) that rejects those too. I4's strict pattern is the intersection both versions accept, so the guarantee survives the A3 upgrade. Second, the library's built-in `date-time` checker accepts lowercase `t`/`z` and leap seconds (`format.go` source, confirmed by an in-repo runtime probe), so overriding it is necessary, not cosmetic — and `Compiler.RegisterFormat` verifiably shadows built-ins. The narrowing itself is licensed by RFC 3339 §5.6 ("a consuming spec MAY further limit the date/time syntax so that the letters 'T' and 'Z' must always be upper case") and by JSON Schema 2020-12 §7.2.1 (assertion is an implementation option; akb opts in globally). The owner ratified the assert-everything-declared policy in the research session: template writers own their mistakes.
+Origin: RFC-002 candidate RFC-002-A1; ratified 2026-10-06 by Pete Hope in the research session (`.pi/research/rfc-002-a1-validator/`), and per the RFC-002 §18 lifecycle the RFC's A1 row moves to ratified as ADR-003 and its body references are rewritten on that ratification. RFC-002 §9 committed to library-first full 2020-12 coverage and left the library choice and the `format` assertion default to this record; §5.2 pinned a "Go-strict RFC3339" `date-time` profile to guarantee that any schema-accepted value is parseable by CEL `timestamp()`. Two findings from the research run shaped the final form. First, "Go-strict" is version-dependent: akb pins cel-go v0.28.0 (`go.mod:12`), whose `timestamp()` is raw `time.Parse(time.RFC3339)` — it rejects lowercase `t`/`z` and leap seconds but accepts comma fractions, single-digit hours, and `+24:00` offsets; cel-go v0.30 added a `strictRFC3339Pattern` gate (PR #1338) that rejects those too. I4's strict pattern is the intersection both versions accept, so the guarantee survives the A3 upgrade. Second, the library's built-in `date-time` checker accepts lowercase `t`/`z` and leap seconds (`format.go` source, confirmed by an in-repo runtime probe), so overriding it is necessary, not cosmetic — and `Compiler.RegisterFormat` verifiably shadows built-ins. The narrowing itself is licensed by RFC 3339 §5.6 ("a consuming spec MAY further limit the date/time syntax so that the letters 'T' and 'Z' must always be upper case") and by JSON Schema 2020-12 §7.2.1 (assertion is an implementation option; akb opts in globally). The owner ratified the assert-everything-declared policy in the research session: template writers own their mistakes.
 
 ## Decision Drivers
 
@@ -94,7 +103,7 @@ Origin: RFC-002 candidate RFC-002-A1 (RFC-002 §18 lifecycle — on ratification
 - Bad, because the library is single-maintainer with a low bus factor; mitigated by confining it behind one compiler-construction seam and by the `revisit` trigger watching kaptinlin and maintenance lapse.
 - Bad, because assert-all fails writes on formats an author meant as documentation (a loose `format: email`); mitigated by the I7 unknown-format warning and by doctrine that teaches `format` equals assertion.
 - Bad, because `Compiler.Compile` is documented as not thread-safe and concurrent `Validate` on one compiled schema is undocumented; akb compiles once per template at load and validates serially in the CLI today — safe, but a constraint to re-check before any concurrent validation is introduced.
-- Neutral, because RFC-002 §5.2's "Go-strict RFC3339" wording is refined by I4 (strict pattern rather than raw Go acceptance); the RFC is amended per its §18 lifecycle when this record is ratified.
+- Neutral, because RFC-002 §5.2's "Go-strict RFC3339" wording is refined by I4 (strict pattern rather than raw Go acceptance), and the RFC is amended per its §18 lifecycle on this record's ratification (row A1 → ratified as ADR-003, references rewritten).
 
 ## References
 
