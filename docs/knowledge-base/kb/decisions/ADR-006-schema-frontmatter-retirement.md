@@ -1,5 +1,7 @@
 ---
 created: "2026-10-06"
+deciders:
+- Pete Hope
 grammar: 1
 id: ADR-006
 provenance: agent-drafted
@@ -13,7 +15,7 @@ scope:
 - cmd/akb/**
 - internal/skill/embedded/**
 - CHANGELOG.md
-status: proposed
+status: accepted
 summary: TemplateV3 hard-rejects the retired schema.frontmatter block with one self-sufficient message; migration is a CHANGELOG recipe driven by ADR-005 warnings — no command, no alias, no page rewriting.
 tags:
 - template-format
@@ -23,7 +25,7 @@ tags:
 - rfc-002
 title: TemplateV3 Retires schema.frontmatter — Migration Is a Recipe, Not a Command
 type: adr
-updated: "2026-10-06T22:20:54Z"
+updated: "2026-10-06T22:49:48Z"
 ---
 
 # ADR-006: TemplateV3 Retires schema.frontmatter — Migration Is a Recipe, Not a Command
@@ -103,7 +105,7 @@ Origin: [[RFC-002-open-validation-engine|RFC-002]] candidate RFC-002-A2 (RFC §6
 - Bad, because the CHANGELOG recipe can drift from the code it describes; mitigated because the I4 message carries the four-step essence independently of the recipe.
 - Bad, because the old file itself never receives ADR-005 warnings — it refuses at load, so the warnings fire on the author's in-progress V3 draft; accepted, because that is when they are actionable.
 - Neutral, because `<!-- FAILS: -->` machine parsing, `type`/`title` un-routing, and the embedded adr/note rewrite are Phase-1 implementation scope outside this record, and this repo's own KB templates (adr, rfc, spec) migrate via the recipe as its dogfood.
-- Neutral, because on ratification RFC-002 is amended per its §18 lifecycle: row A2 moves to ratified as ADR-006 and body references are rewritten.
+- Neutral, because on ratification RFC-002 was amended per its §18 lifecycle: row A2 moved to ratified as ADR-006 and its body references were rewritten.
 
 ## References
 
