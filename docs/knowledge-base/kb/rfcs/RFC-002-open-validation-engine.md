@@ -40,7 +40,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-06T19:36:58Z"
+updated: "2026-10-06T21:40:13Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -188,7 +188,7 @@ writer of page bytes is the write path persisting what it was given (P6).
 **Date bridge (D7).** Silent, name-agnostic coercion dies. A temporal field is one the
 template's schema declares with `format: date-time` or `format: date` (at whatever
 depth it is declared — the old top-level-only limitation dies with name-agnostic
-coercion; traversal mechanics → RFC-002-A4). Write-time schema validation **guarantees
+coercion; traversal mechanics → [[ADR-005-date-bridge-determinism|ADR-005]]). Write-time schema validation **guarantees
 CEL's preconditions** — a value reaching `timestamp()` is always parseable — because
 akb's `date-time` assertion is **defined as the CEL acceptance set**, not the full
 RFC 3339 grammar: RFC 3339 permits lowercase `t`/`z` and leap seconds, Go's
@@ -209,7 +209,7 @@ fresh on-disk read coerced under the *current* template's declarations — every
 immutability/comparison rule calls `timestamp()` on both sides, so both sides must be
 bridged. Pages bypassing write
 (git pull) are flagged by the sweep's schema checker per-page (P4 degrade).
-RFC-002-A4 scope: bridge determinism spec; `template write`-time static check (a rule
+Resolved by ADR-005: bridge determinism spec; `template write`-time static check (a rule
 calling `timestamp(x)` where `x` lacks a format assertion → warning); the duration
 vocabulary mismatch (CEL `duration()` is Go-style `time.ParseDuration`; JSON Schema
 `format: duration` is ISO 8601 — document the seam; an `iso_duration()` registry
@@ -791,7 +791,7 @@ it is the last document approved, and this table is its progress tracker.
 | RFC-002-A1 | ADR | Validator library (santhosh v6 recommended) + `format` assertion policy | ratified | [[ADR-003-santhosh-v6-format-assertion|ADR-003]] |
 | RFC-002-A2 | ADR | `schema.frontmatter` retirement + migration (`akb template migrate`?) | proposed | — |
 | RFC-002-A3 | ADR | cel-go upgrade (v0.28.0 → v0.32.x, `cel.dev/cel-go`) + extension set | ratified | [[ADR-004-cel-go-upgrade-pinned-extensions|ADR-004]] |
-| RFC-002-A4 | ADR | Date bridge determinism + `template write` static temporal check; duration seam | proposed | — |
+| RFC-002-A4 | ADR | Date bridge determinism + `template write` static temporal check; duration seam | ratified | [[ADR-005-date-bridge-determinism|ADR-005]] |
 | RFC-002-A5 | ADR | Closed function registry: contents, selection syntax, per-function cost treatment; cache key | proposed | — |
 | RFC-002-S1 | SPEC | Structured validation report (widened `runTemplateValidations`) | proposed | — |
 | RFC-002-A6 | ADR | Document builder rewrite (typed structs, one parse, line conventions) | proposed | — |
@@ -830,7 +830,7 @@ surface. Every body reference was rewritten accordingly.
 | Migration pain for existing KBs | Template V3 hard rejection with migration message (precedent: v1); existing pages' `created`/`updated` stay on disk (they're just data now); guarded temporal rules degrade to vacuous until templates declare |
 | `kb.*` becomes permanent vaporware | Committed in-register (D5); Phase-4 placement is scheduling, not optionality; tech-spec follows ratification |
 | Known unknowns (unaudited residue) | Embedded-skill prose consumers of `created`/`updated` never audited; DESIGN.md typed-gate dependency cited secondhand; testscript integration churn per demotion unenumerated — each phase's tech-spec must enumerate its test fallout and re-verify these (tracked in research/LOG.md) |
-| Date bridge becomes a new silent-coercion | It is schema-declared, assertion-gated, in-memory-only, and the only conversion akb performs — specified by RFC-002-A4 with a `template write`-time static check |
+| Date bridge becomes a new silent-coercion | It is schema-declared, assertion-gated, in-memory-only, and the only conversion akb performs — specified by ADR-005 with a `template write`-time static check |
 
 ## Appendix A — Decision register (owner-ratified)
 
