@@ -40,7 +40,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-06T14:34:11Z"
+updated: "2026-10-06T17:16:30Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -50,7 +50,7 @@ updated: "2026-10-06T14:34:11Z"
 | **Status** | Draft — awaiting owner ratification |
 | **Date** | 2026-09-27 |
 | **Authors** | pete (owner), pi session + subagent research team |
-| **Supersedes** | RFC-001 (`RFC-001-json-schema-cel-coexistence.md`) — retained as research record |
+| **Supersedes** | [[RFC-001-json-schema-cel-coexistence|RFC-001]] (`RFC-001-json-schema-cel-coexistence.md`) — retained as research record |
 | **Decision register** | Appendix A (D1–D19 + D-seq + P-a…P-i, all owner-ratified 2026-09-26/27) |
 | **Research base** | `.pi/subagents/proposals/json-cel/research/` — 13 reports incl. the openness audit (`openness-*.md`) and `SYNTHESIS-openness.md` |
 | **Downstream artifacts** | ADRs + tech-specs spawned as RFC-local candidates per §18 (`RFC-002-A*`/`RFC-002-S*` — nothing here is implementation-final) |
@@ -194,8 +194,12 @@ akb's `date-time` assertion is **defined as the CEL acceptance set**, not the fu
 RFC 3339 grammar: RFC 3339 permits lowercase `t`/`z` and leap seconds, Go's
 `time.RFC3339` (what cel-go's `timestamp()` parses with) rejects both — verified. So
 the assertion profile is Go-strict RFC3339 (uppercase `T`, numeric offset or uppercase
-`Z`, no leap seconds), pinned by RFC-002-A1 (the validator's format checker is
-registered/overridden accordingly) and documented in the SKILL as *akb's date rules*
+`Z`, no leap seconds), pinned by [[ADR-003-santhosh-v6-format-assertion|ADR-003]] (the validator's format checker is
+registered/overridden accordingly — the library's built-in accepts lowercase `t`/`z` and leap
+seconds, and ADR-003 tightened the profile beyond raw Go acceptance: under the pinned cel-go
+v0.28, `time.Parse(time.RFC3339)` additionally admits comma fractions, single-digit hours, and
+out-of-range offsets, so ADR-003 I4 pins the strict pattern — the intersection of the cel-go
+v0.28 and v0.32 acceptance sets — keeping this guarantee intact across the A3 upgrade) and documented in the SKILL as *akb's date rules*
 (the same one-sentence treatment as "akb is RE2 everywhere"). `format: time` has no
 CEL counterpart (no time type) — it validates as a string format only, never coerced.
 For `format: date` fields, akb coerces date-only to **midnight UTC, in memory only,
@@ -402,11 +406,12 @@ fail-closed at write like any other rule.
 ## 9. JSON Schema coverage (G1 — carries from RFC-001)
 
 Library-first: `github.com/santhosh-tekuri/jsonschema/v6` recommended (full 2020-12,
-Go-native; final choice → RFC-002-A1). Full keyword coverage over the flattened document
+Go-native; ratified as the validator by ADR-003). Full keyword coverage over the flattened document
 (`contains`/`minContains`, `if/then/else`, `$ref`/`$defs` including cycles,
 `dependentRequired`/`dependentSchemas`, `unevaluated*`, etc.). Go validator ⇒ RE2
-everywhere ⇒ the ECMA-262/RE2 dialect concern stays dissolved. **`format` policy (RFC-002-A1):** assertion enabled at least for declared temporal fields (the §5.2 precondition
-guarantee depends on it); default for other formats decided per RFC-002-A1. What schema can
+everywhere ⇒ the ECMA-262/RE2 dialect concern stays dissolved. **`format` policy (resolved by ADR-003):** assertion enabled for every declared format — a
+declared format always asserts, at write time and at sweep; akb registers strict-profile
+`date-time`/`date` checkers per §5.2; unknown format names warn at `template write`. What schema can
 never express is unchanged and permanent: `old_page`, `now`, value-to-value comparison,
 arithmetic, and body-text constraints beyond `pattern`.
 
@@ -772,7 +777,7 @@ it is the last document approved, and this table is its progress tracker.
 
 | ID | Kind | Candidate | Status | Resolves-as |
 |---|---|---|---|---|
-| RFC-002-A1 | ADR | Validator library (santhosh v6 recommended) + `format` assertion policy | proposed | — |
+| RFC-002-A1 | ADR | Validator library (santhosh v6 recommended) + `format` assertion policy | ratified | [[ADR-003-santhosh-v6-format-assertion|ADR-003]] |
 | RFC-002-A2 | ADR | `schema.frontmatter` retirement + migration (`akb template migrate`?) | proposed | — |
 | RFC-002-A3 | ADR | cel-go upgrade (v0.28.0 → v0.32.x, `cel.dev/cel-go`) + extension set | proposed | — |
 | RFC-002-A4 | ADR | Date bridge determinism + `template write` static temporal check; duration seam | proposed | — |
