@@ -4,6 +4,7 @@ deciders:
 - Pete Hope
 grammar: 1
 id: ADR-003
+is_draft: false
 provenance: agent-drafted
 revisit:
 - kaptinlin/jsonschema or another Go validator publishes draft 2020-12 test-suite or bowtie compliance plus a documented built-in-format override hook
