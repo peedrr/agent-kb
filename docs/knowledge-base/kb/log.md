@@ -8,3 +8,7 @@ Ingested pre-KB init-versioning design record as raw/spec/init-versioning-spec.m
 
 Removed page rfcs/RFC-999-positive-control.md
 
+## 2026-10-06 distill
+
+Drafted ADR-006 (RFC-002-A2): schema.frontmatter retirement = hard reject + CHANGELOG recipe, no migrate command; owner ratified forks in .pi/research/rfc-002-a2
+
