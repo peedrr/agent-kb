@@ -6,7 +6,30 @@ id: RFC-002
 provenance: agent-drafted
 scope:
 - "**"
-spawns: []
+spawns:
+- RFC-002-A1
+- RFC-002-A2
+- RFC-002-A3
+- RFC-002-A4
+- RFC-002-A5
+- RFC-002-A6
+- RFC-002-A7
+- RFC-002-A8
+- RFC-002-A9
+- RFC-002-A10
+- RFC-002-A11
+- RFC-002-A12
+- RFC-002-A13
+- RFC-002-A14
+- RFC-002-A15
+- RFC-002-A16
+- RFC-002-A17
+- RFC-002-A18
+- RFC-002-S1
+- RFC-002-S2
+- RFC-002-S3
+- RFC-002-S4
+- RFC-002-S5
 status: draft
 steward: pete
 summary: Make akb an unopinionated validation-and-persistence engine — JSON Schema 2020-12 and CEL as its only validators, byte-faithful writes, every other mandate removed, demoted, or made configurable.
@@ -17,7 +40,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-06T14:28:23Z"
+updated: "2026-10-06T14:34:11Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
