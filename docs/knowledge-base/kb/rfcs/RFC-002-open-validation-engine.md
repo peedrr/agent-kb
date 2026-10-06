@@ -40,7 +40,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-06T18:58:29Z"
+updated: "2026-10-06T19:22:34Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -435,6 +435,11 @@ arithmetic, and body-text constraints beyond `pattern`.
 - **Cache key becomes `(env identity, expression)`** — required once function selection
   makes envs vary per template (today's expression-only key would silently return stale
   programs).
+- **Deferred extension families** (carries RFC-001 §9's deferral list, restated here for
+  self-containment): `ext.Regex` (requires `cel.OptionalTypes()`), optional types,
+  two-variable comprehensions, `ext.Encoders`, `ext.NativeTypes` — each materially changes
+  the rule-authoring surface and arrives, if at all, through its own per-capability ADR
+  with a concrete rule that needs it ([[ADR-004-cel-go-upgrade-pinned-extensions|ADR-004]], N3).
 
 ## 11. Lint ownership (D5)
 
