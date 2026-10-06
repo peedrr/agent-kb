@@ -1,11 +1,13 @@
 ---
 created: "2026-10-06"
+deciders:
+- Pete Hope
 grammar: 1
 id: ADR-004
 provenance: agent-drafted
 revisit:
 - cel-go publishes a release newer than v0.32.0 — re-check timestamp() acceptance, the cost model, and the pinned extension versions before any bump
-- the issue #1476 macro-cost revert ships in a tagged cel-go release — re-run the behavioral cost tests
+- the issue
 - akb begins ingesting templates from untrusted sources — set cel.RegexProgramSizeLimit
 - a rule needs a capability behind OptionalTypes, ext.Regex, TwoVarComprehensions, Encoders, or Native — draft that capability's own ADR
 - cel-go deprecates cel.CostLimit or changes interpreter.EvalCancelledError
@@ -14,7 +16,7 @@ scope:
 - cmd/akb/**
 - go.mod
 - go.sum
-status: proposed
+status: accepted
 summary: cel-go upgrades to cel.dev/cel-go v0.32.0 in one require+import rewrite; five ext libraries enabled in NewEnv pinned at their highest v0.32.0 versions; regex plan-size knob stays unbounded.
 tags:
 - cel
@@ -24,7 +26,7 @@ tags:
 - rfc-002
 title: CEL Runs on cel.dev/cel-go v0.32 with a Pinned Extension Set
 type: adr
-updated: "2026-10-06T18:32:46Z"
+updated: "2026-10-06T18:58:29Z"
 ---
 
 # ADR-004: CEL Runs on cel.dev/cel-go v0.32 with a Pinned Extension Set
@@ -74,7 +76,7 @@ No exceptions are permitted. A case that appears to need one — including a rul
 
 ## Context
 
-Origin: [[RFC-002-open-validation-engine|RFC-002]] candidate RFC-002-A3 (RFC §10), researched 2026-10-06 in `.pi/research/rfc-002-a3-celgo/`; both decision forks were owner-ratified that day via interview. akb pins cel-go v0.28.0 — four releases behind v0.32.0 (2026-08-19) and exposed to CVE-2026-83530 and GHSA-gcjh-h69q-9w9g, both fixed by v0.30. v0.32.0 moved the module to `cel.dev/cel-go` (PR #1413); the old path is a read-only alias shim whose last release is v0.31.0, so the require line and all imports must change together — a version-only bump fails with a module-identity error. akb's cel-go surface is small (seven files, four subpackages): `cel.CostLimit` is doc-identical at v0.28 and v0.32 (no `ActualCostLimit` exists anywhere in the v0.32 API), the panic-recovery contract is unchanged, and the one compile-break surface across the four releases (v0.29's `InterpretableV2`) touches only custom `Interpretable` implementors, which akb is not. The v0.30 `timestamp()` strictness gate (PR #1338) does not disturb [[ADR-003-santhosh-v6-format-assertion|ADR-003]]: I4's profile is a verified subset of both versions' acceptance sets, and akb pre-converts declared temporal fields to `time.Time` before CEL sees them, so only literal `timestamp("…")` rules ever hit the gate. Extension functions participate in cost accounting where estimators are registered — Strings registers them from its version 5, which the no-option default already selects today; I5 makes that explicit and stable. Uncosted functions count as one. Upstream's v0.32 cost-number drift (issue #1476) touches `optional.*` macro estimates only; akb enables no optional types and its cost test is behavioral (a cubic rule over 2048 headings must abort inside the limit), not numeric.
+Origin: [[RFC-002-open-validation-engine|RFC-002]] candidate RFC-002-A3 (RFC §10), researched 2026-10-06 in `.pi/research/rfc-002-a3-celgo/`; both decision forks were owner-ratified that day via interview. Ratified 2026-10-06 by Pete Hope on review of the research record, and per the RFC-002 §18 lifecycle the RFC's A3 row moves to ratified as ADR-004 and its body references are rewritten on that ratification. akb pins cel-go v0.28.0 — four releases behind v0.32.0 (2026-08-19) and exposed to CVE-2026-83530 and GHSA-gcjh-h69q-9w9g, both fixed by v0.30. v0.32.0 moved the module to `cel.dev/cel-go` (PR #1413); the old path is a read-only alias shim whose last release is v0.31.0, so the require line and all imports must change together — a version-only bump fails with a module-identity error. akb's cel-go surface is small (seven files, four subpackages): `cel.CostLimit` is doc-identical at v0.28 and v0.32 (no `ActualCostLimit` exists anywhere in the v0.32 API), the panic-recovery contract is unchanged, and the one compile-break surface across the four releases (v0.29's `InterpretableV2`) touches only custom `Interpretable` implementors, which akb is not. The v0.30 `timestamp()` strictness gate (PR #1338) does not disturb [[ADR-003-santhosh-v6-format-assertion|ADR-003]]: I4's profile is a verified subset of both versions' acceptance sets, and akb pre-converts declared temporal fields to `time.Time` before CEL sees them, so only literal `timestamp("…")` rules ever hit the gate. Extension functions participate in cost accounting where estimators are registered — Strings registers them from its version 5, which the no-option default already selects today; I5 makes that explicit and stable. Uncosted functions count as one. Upstream's v0.32 cost-number drift (issue #1476) touches `optional.*` macro estimates only; akb enables no optional types and its cost test is behavioral (a cubic rule over 2048 headings must abort inside the limit), not numeric.
 
 ## Decision Drivers
 
