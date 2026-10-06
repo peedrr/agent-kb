@@ -4,6 +4,7 @@ deciders:
 - Pete Hope
 grammar: 1
 id: ADR-005
+is_draft: false
 provenance: agent-drafted
 revisit:
 - cel-go changes duration() or timestamp() string acceptance (re-check at every cel-go upgrade alongside ADR-004's revisit)
