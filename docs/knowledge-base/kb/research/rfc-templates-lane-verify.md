@@ -4,10 +4,11 @@ created: "2026-10-01"
 grammar: 1
 informs:
 - RFC-003
+is_draft: false
 provenance: agent-drafted
 run: rfc-templates
 scope:
-- "docs/knowledge-base/**"
+- docs/knowledge-base/**
 status: final
 summary: "Verification lane: four IETF and KEP/kepval items re-checked against primaries, correcting the I-D-stage structure premise and confirming metadata validation."
 tags:
@@ -15,7 +16,7 @@ tags:
 - verification
 - rfc-format
 - ietf
-title: "Lane verify — four recorded-but-unverified RFC/IETF and KEP items (rfc-templates)"
+title: Lane verify — four recorded-but-unverified RFC/IETF and KEP items (rfc-templates)
 type: research
 updated: "2026-10-01"
 ---
