@@ -1,24 +1,25 @@
 ---
-grammar: 1
-type: research
-title: Prior-Research Extraction on Validator Libraries and Date/Format Handling (RFC-002-A1)
-summary: "Audit of the RFC-001-era research base on JSON Schema validator libraries and date/format handling, flagging verified, unverified, and stale claims."
-status: final
-provenance: agent-drafted
-created: "2026-10-06"
-updated: "2026-10-06"
 as_of: "2026-10-06"
-run: rfc-002-a1-validator
+created: "2026-10-06"
+grammar: 1
 informs:
 - ADR-003
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-a1-validator
 scope:
-- "internal/cel/**"
-- "internal/template/**"
+- internal/cel/**
+- internal/template/**
+status: final
+summary: Audit of the RFC-001-era research base on JSON Schema validator libraries and date/format handling, flagging verified, unverified, and stale claims.
 tags:
 - prior-research
 - json-schema
 - validation
 - rfc-002
+title: Prior-Research Extraction on Validator Libraries and Date/Format Handling (RFC-002-A1)
+type: research
+updated: "2026-10-06"
 ---
 # Extract: prior research on JSON Schema validator libraries & date/format handling
 
