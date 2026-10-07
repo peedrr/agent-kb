@@ -4,10 +4,11 @@ created: "2026-10-01"
 grammar: 1
 informs:
 - RFC-003
+is_draft: false
 provenance: agent-drafted
 run: rfc-templates
 scope:
-- "docs/knowledge-base/**"
+- docs/knowledge-base/**
 status: final
 summary: "Web recon: published RFC/proposal templates mapped by revision lifecycle, their converging sections, and where machine-parseable status and review disposition live."
 tags:
@@ -15,7 +16,7 @@ tags:
 - rfc-format
 - prior-art
 - landscape
-title: "Recon landscape — proposal-document formats for agent consumers (rfc-templates)"
+title: Recon landscape — proposal-document formats for agent consumers (rfc-templates)
 type: research
 updated: "2026-10-01"
 ---
