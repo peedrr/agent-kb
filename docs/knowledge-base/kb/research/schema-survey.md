@@ -1,21 +1,26 @@
 ---
+as_of: "2026-09-26"
+created: "2026-09-26"
 grammar: 1
-type: research
-title: JSON-Schema side of the pi-subagents ↔ akb-CEL bridge — survey
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-26
-created: 2026-09-26
-updated: 2026-09-26
 scope:
-  - internal/cel/**
-  - internal/template/**
-tags: [json-schema, pi-subagents, survey, gap-analysis]
+- internal/cel/**
+- internal/template/**
+status: final
 summary: Survey of outputSchema usage across pi-meta-config agents (4 of 7), pi-subagents validation (TypeBox, draft 3→2020-12), typed gates, and the feature/gap analysis against CEL.
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- json-schema
+- pi-subagents
+- survey
+- gap-analysis
+title: JSON-Schema side of the pi-subagents ↔ akb-CEL bridge — survey
+type: research
+updated: "2026-09-26"
 ---
 # JSON-Schema side of the pi-subagents ↔ akb-CEL bridge — survey
 
