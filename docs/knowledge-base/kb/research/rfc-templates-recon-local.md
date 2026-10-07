@@ -4,10 +4,11 @@ created: "2026-10-01"
 grammar: 1
 informs:
 - RFC-003
+is_draft: false
 provenance: agent-drafted
 run: rfc-templates
 scope:
-- "docs/knowledge-base/**"
+- docs/knowledge-base/**
 status: final
 summary: "Local recon: the owner's akb RFC-001/002 exemplars, the RFC doc type's missing committed home, and how the harness consumes — or fails to consume — RFCs."
 tags:
