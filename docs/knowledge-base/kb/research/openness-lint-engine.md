@@ -1,21 +1,26 @@
 ---
+as_of: "2026-09-27"
+created: "2026-09-27"
 grammar: 1
-type: research
-title: "Openness audit — lint engine and its 10 shipped checkers"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-27
-created: 2026-09-27
-updated: 2026-09-27
 scope:
-  - internal/lint/**
-  - cmd/akb/**
-tags: [openness, lint, audit, checkers]
+- internal/lint/**
+- cmd/akb/**
+status: final
 summary: "Audit of the lint engine: the checker registry is open in code but closed in the CLI, and each of the 10 built-in checkers is classified by what it forces and whether that is structural."
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- openness
+- lint
+- audit
+- checkers
+title: Openness audit — lint engine and its 10 shipped checkers
+type: research
+updated: "2026-09-27"
 ---
 # OPENNESS AUDIT — Lint Engine and its 10 Shipped Checkers
 
