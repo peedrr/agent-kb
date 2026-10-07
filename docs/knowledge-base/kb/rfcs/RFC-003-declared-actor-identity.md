@@ -1,18 +1,25 @@
 ---
-grammar: 1
-type: rfc
-id: RFC-003
-title: Give akb a Declared Actor Identity So Rules Can Assert Who Acted
-status: draft
-provenance: agent-drafted
 author: pi/session
-steward: pete
-created: 2026-10-02
-updated: 2026-10-02
-scope: ["docs/knowledge-base/**", "cmd/akb/**", "internal/**"]
-tags: [identity, authorization, validation, governance]
-summary: Expose a resolved actor identity to akb's rule engine so templates can assert who drafted, stewards, and ratifies — mechanism in akb, roster policy in the KB.
+created: "2026-10-02"
+grammar: 1
+id: RFC-003
+provenance: agent-drafted
+scope:
+- docs/knowledge-base/**
+- cmd/akb/**
+- internal/**
 spawns: []
+status: draft
+steward: pete
+summary: Expose a resolved actor identity to akb's rule engine so templates can assert who drafted, stewards, and ratifies — mechanism in akb, roster policy in the KB.
+tags:
+- identity
+- authorization
+- validation
+- governance
+title: Give akb a Declared Actor Identity So Rules Can Assert Who Acted
+type: rfc
+updated: "2026-10-07T19:01:14Z"
 ---
 
 # RFC-003: Give akb a Declared Actor Identity So Rules Can Assert Who Acted
@@ -90,6 +97,6 @@ Not filled. Ratification is human-only and requires `decided_by` to differ from 
 ## Evidence and Prior Art
 
 - docs-writer `references/rfc.md` — the proposal lifecycle this page follows, including human-only ratification and the status-gated authority boundary.
-- `.pi/research/rfc-templates/REPORT.md` and `SYNTHESIS.md` — the research run that produced the RFC contract; approver-distinct-from-author (KEP), human arbitration (AIDR), and the two-axis disposition model (CSSWG) are the relevant prior art.
+- The research run that produced the RFC contract (prior art: approver-distinct-from-author (KEP), human arbitration (AIDR), the two-axis disposition model (CSSWG)) was recorded in `.pi/research/rfc-templates/REPORT.md` and `SYNTHESIS.md` — untracked scratch, since deleted; the record is unrecoverable and its loss is the motivating case for [[ADR-007-research-reports-first-class|ADR-007]].
 - `kb/rfc/RFC-002-open-validation-engine.md` sections 5.1, 14, 15 and 16 — the document model with no actor surface, the config surface, the harness flow, and the commit-identity chain that stops at git.
 - The 2026-10-02 session that produced the interim `rfc` template — this RFC's origin and motivating example.
