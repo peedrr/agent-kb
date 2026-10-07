@@ -32,3 +32,7 @@ Backfilled RFC-002-A1/A2 research runs as 7 byte-faithful research pages (all ap
 
 rfc-templates run recovered from pi-meta-config scratch and backfilled (10 pages, informs RFC-003) per ADR-007
 
+## 2026-10-07 ingest
+
+Backfilled the json-cel research run (RFC-001/RFC-002 base): 14 research pages written byte-faithfully under kb/research/ (5 approved, 9 held draft per STRIP-RISK); RFC-001 and RFC-002 citations rewritten from .pi/ scratch to wikilinks; index.md corruption from the parseEntryLine title bug escalated for a supervisor-run index rebuild.
+
