@@ -1,24 +1,29 @@
 ---
+as_of: "2026-09-27"
+created: "2026-09-27"
 grammar: 1
-type: research
-title: "Openness audit — configurability"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-27
-created: 2026-09-27
-updated: 2026-09-27
 scope:
-  - internal/config/**
-  - internal/path/**
-  - internal/cel/**
-  - internal/search/**
-  - internal/storage/**
-tags: [openness, configuration, akb-yaml, audit]
+- internal/config/**
+- internal/path/**
+- internal/cel/**
+- internal/search/**
+- internal/storage/**
+status: final
 summary: "Audit finding: akb.yaml holds three fields, two read and zero behavioral; every knob worth exposing (compute budget, drift threshold, indexed fields, layout) is a Go constant."
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- openness
+- configuration
+- akb-yaml
+- audit
+title: Openness audit — configurability
+type: research
+updated: "2026-09-27"
 ---
 # Openness Audit — Seam: CONFIGURABILITY
 
