@@ -1,21 +1,26 @@
 ---
+as_of: "2026-09-26"
+created: "2026-09-26"
 grammar: 1
-type: research
-title: "akb CLI user-facing surface inventory (JSON-vs-CEL recon)"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-26
-created: 2026-09-26
-updated: 2026-09-26
 scope:
-  - cmd/akb/**
-  - internal/**
-tags: [cli, inventory, recon, json]
+- cmd/akb/**
+- internal/**
+status: final
 summary: "Inventory of 31 akb leaf commands: purpose, inputs, outputs/exit codes, subsystems touched, and which already expose --json — the surface a JSON-I/O design must fit."
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- cli
+- inventory
+- recon
+- json
+title: akb CLI user-facing surface inventory (JSON-vs-CEL recon)
+type: research
+updated: "2026-09-26"
 ---
 # akb CLI — user-facing surface inventory (JSON-vs-CEL recon)
 
