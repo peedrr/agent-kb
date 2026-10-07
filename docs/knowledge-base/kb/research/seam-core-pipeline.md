@@ -1,22 +1,27 @@
 ---
+as_of: "2026-09-26"
+created: "2026-09-26"
 grammar: 1
-type: research
-title: "JSON ⇄ CEL seam: core pipeline deep-dive"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-26
-created: 2026-09-26
-updated: 2026-09-26
 scope:
-  - internal/cel/**
-  - internal/frontmatter/**
-  - cmd/akb/**
-tags: [json-schema, cel, page-model, recon]
-summary: "Deep-dive on where a combined frontmatter+body JSON view and schema validation can run; 8 of 22 shipped CEL rules read body-derived views, so derived keys must stay output-only on write."
-informs:
-  - RFC-001
-  - RFC-002
+- internal/cel/**
+- internal/frontmatter/**
+- cmd/akb/**
+status: final
+summary: Deep-dive on where a combined frontmatter+body JSON view and schema validation can run; 8 of 22 shipped CEL rules read body-derived views, so derived keys must stay output-only on write.
+tags:
+- json-schema
+- cel
+- page-model
+- recon
+title: "JSON ⇄ CEL seam: core pipeline deep-dive"
+type: research
+updated: "2026-09-26"
 ---
 # JSON ⇄ CEL Seam: Core Pipeline Deep-Dive (READ-ONLY recon)
 
