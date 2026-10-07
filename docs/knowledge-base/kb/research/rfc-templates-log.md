@@ -4,10 +4,11 @@ created: "2026-10-02"
 grammar: 1
 informs:
 - RFC-003
+is_draft: false
 provenance: agent-drafted
 run: rfc-templates
 scope:
-- "docs/knowledge-base/**"
+- docs/knowledge-base/**
 status: final
 summary: "Run log for the rfc-templates research: question, method, owner-ratified forks F1–F5, lane activity, and the decision trail behind the RFC authoring contract."
 tags:
@@ -15,7 +16,7 @@ tags:
 - rfc-format
 - rfc-templates
 - process
-title: "Research run log — RFC format for agents (rfc-templates)"
+title: Research run log — RFC format for agents (rfc-templates)
 type: research
 updated: "2026-10-02"
 ---
