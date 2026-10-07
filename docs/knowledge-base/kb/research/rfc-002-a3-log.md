@@ -1,25 +1,26 @@
 ---
-grammar: 1
-type: research
-title: "RFC-002-A3 research log — cel-go upgrade and pinned extension set"
-status: final
-provenance: agent-drafted
-run: rfc-002-a3-celgo
 as_of: "2026-10-06"
 created: "2026-10-06"
-updated: "2026-10-06"
-scope:
-  - "internal/cel/**"
-  - "go.mod"
-  - "cmd/akb/**"
-tags:
-  - cel-go
-  - validation
-  - adr-004
-  - research-log
-summary: "Run log for the RFC-002-A3 cel-go upgrade research: question, RFC constraints, subagent inventory, and the interview forks that resolved ADR-004's pin and regex-limit decisions."
+grammar: 1
 informs:
-  - ADR-004
+- ADR-004
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-a3-celgo
+scope:
+- internal/cel/**
+- go.mod
+- cmd/akb/**
+status: final
+summary: "Run log for the RFC-002-A3 cel-go upgrade research: question, RFC constraints, subagent inventory, and the interview forks that resolved ADR-004's pin and regex-limit decisions."
+tags:
+- cel-go
+- validation
+- adr-004
+- research-log
+title: RFC-002-A3 research log — cel-go upgrade and pinned extension set
+type: research
+updated: "2026-10-06"
 ---
 # RESEARCH LOG — RFC-002-A3: cel-go upgrade + extension set
 
