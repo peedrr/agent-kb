@@ -1,25 +1,26 @@
 ---
-grammar: 1
-type: research
-title: TemplateV2 to V3 Migration Recon (RFC-002-A2)
-summary: "Read-only code recon of the TemplateV2 loader, write-path required-field gate, embedded templates, and in-tree inventory for the RFC-002-A2 migration."
-status: final
-provenance: agent-drafted
-created: "2026-10-06"
-updated: "2026-10-06"
 as_of: "2026-10-06"
-run: rfc-002-a2
+created: "2026-10-06"
+grammar: 1
 informs:
 - ADR-006
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-a2
 scope:
-- "internal/template/**"
-- "cmd/akb/**"
-- "internal/skill/**"
+- internal/template/**
+- cmd/akb/**
+- internal/skill/**
+status: final
+summary: Read-only code recon of the TemplateV2 loader, write-path required-field gate, embedded templates, and in-tree inventory for the RFC-002-A2 migration.
 tags:
 - code-recon
 - templates
 - migration
 - rfc-002
+title: TemplateV2 to V3 Migration Recon (RFC-002-A2)
+type: research
+updated: "2026-10-06"
 ---
 # Recon: TemplateV2 → V3 migration (RFC-002-A2)
 
