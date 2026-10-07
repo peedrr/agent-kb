@@ -1,0 +1,210 @@
+# Research template for this knowledge base — the MINIMAL INTERIM machine contract,
+# created under ADR-007 (research reports are first-class pages).
+#
+# Scope: frontmatter contract + snapshot lifecycle (draft → final → superseded,
+# as_of frozen once final) + retrieval keys only. Research pages are SNAPSHOTS:
+# the body is the report as the run produced it; correctness is anchored to the
+# as_of date and stale findings are corrected by a superseding page, never by
+# rewriting the snapshot (ADR-007 I4, N2).
+#
+# Two species carry this type:
+#   - findings reports (code recon, ecosystem surveys, audits, syntheses)
+#   - run logs (the decision history and hub page of one research run)
+#
+# Guard doctrine (per the showcase this derives from):
+#   schema-required keys — read UNGUARDED: akb write refuses a page missing one
+#     before any rule runs.
+#   schema-optional keys (informs, supersedes, superseded_by) — ALWAYS guarded
+#     with has().
+#   old_page.* — ALWAYS guarded: nil on create.
+#   lint_rules — guard EVERYTHING except type and title.
+#
+# V2 ENGINE INTERACTIONS (interim only; RFC-002 section 8 deletes these):
+#   - akb auto-bumps `updated` to write time AFTER validation: rules see the
+#     caller's value, then akb overwrites it.
+#   - the V2 date bridge coerces date-like strings to time.Time before CEL, so
+#     temporal format checks go through timestamp() and fail closed on garbage.
+name: research
+description: Research report or run log — agent-generated findings filed as
+  snapshot pages; the evidence layer that ADR/SPEC/RFC pages cite (ADR-007)
+dir: research
+schema:
+  frontmatter:
+    grammar:
+      type: int
+      required: true
+    type:
+      type: string
+      required: true
+    title:
+      type: string
+      required: true
+    status:
+      type: string
+      required: true
+      enum:
+        - draft
+        - final
+        - superseded
+    provenance:
+      type: string
+      required: true
+      enum:
+        - human
+        - agent-drafted
+    run:
+      type: string
+      required: true
+    as_of:
+      type: string
+      required: true
+    created:
+      type: string
+      required: true
+    updated:
+      type: string
+      required: true
+    scope:
+      type: list
+      required: true
+    tags:
+      type: list
+      required: true
+    summary:
+      type: string
+      required: true
+    informs:
+      type: list
+      required: false
+    supersedes:
+      type: string
+      required: false
+    superseded_by:
+      type: string
+      required: false
+validations:
+  - id: grammar_is_one
+    rule: 'page.frontmatter.grammar == 1'
+    requirement: Grammar version must be 1; a validator refuses a document whose
+      grammar is newer than itself
+    expect: grammar must be the integer 1
+
+  - id: title_nonempty
+    rule: 'page.frontmatter.title != ""'
+    requirement: Title must not be empty
+    expect: frontmatter title must be non-empty
+
+  - id: title_length
+    rule: 'size(page.frontmatter.title) <= 120'
+    requirement: Title must fit an index line; research titles describe the
+      report, they do not carry a decision
+    expect: title must be at most 120 characters
+
+  - id: valid_status
+    rule: 'page.frontmatter.status in ["draft", "final", "superseded"]'
+    requirement: Status must be a valid research snapshot-lifecycle status
+    expect: status must be one of draft, final, superseded
+
+  - id: valid_provenance
+    rule: 'page.frontmatter.provenance in ["human", "agent-drafted"]'
+    requirement: Provenance must record who produced the report
+    expect: provenance must be one of human, agent-drafted
+
+  - id: run_nonempty
+    rule: 'page.frontmatter.run != ""'
+    requirement: Run must name the research run that produced the page (e.g.
+      rfc-002-a1-validator); it is the grouping key in the flat layout (ADR-007 N4)
+    expect: run must be non-empty
+
+  - id: as_of_not_future
+    rule: 'timestamp(page.frontmatter.as_of) <= now'
+    requirement: The snapshot date must be a real date, not future-dated — a
+      snapshot of the future is unknowable provenance
+    expect: as_of must parse as a date at or before now
+
+  - id: scope_nonempty
+    rule: 'size(page.frontmatter.scope) > 0'
+    requirement: Scope must name at least one path glob the research investigated
+      (the routing key)
+    expect: scope must hold at least one entry
+
+  - id: tags_nonempty
+    rule: 'size(page.frontmatter.tags) > 0'
+    requirement: At least one retrieval tag is required
+    expect: tags must hold at least one entry
+
+  - id: tags_format
+    rule: 'page.frontmatter.tags.all(t, t.matches("^[a-z0-9-]+$"))'
+    requirement: Tags must be lowercase alphanumeric words joined by hyphens
+    expect: every tag must match ^[a-z0-9-]+$
+
+  - id: summary_shape
+    rule: 'page.frontmatter.summary != "" && size(page.frontmatter.summary) <= 200'
+    requirement: Summary must be a one-liner of at most 200 characters (it becomes
+      the index line)
+    expect: summary must be non-empty and at most 200 characters
+
+  - id: informs_format
+    rule: '!has(page.frontmatter.informs) || page.frontmatter.informs.all(i, i.matches("^(ADR|SPEC|RFC)-[0-9]{3}$"))'
+    requirement: Informs must name the decision records this research fed, by
+      global ID
+    expect: every informs entry must match ^(ADR|SPEC|RFC)-[0-9]{3}$ when present
+
+  - id: superseded_requires_superseded_by
+    rule: 'page.frontmatter.status != "superseded" || (has(page.frontmatter.superseded_by) && page.frontmatter.superseded_by.endsWith(".md"))'
+    requirement: A superseded research page must name the successor page that
+      replaces its findings
+    expect: superseded pages must set superseded_by to a page filename
+
+  - id: valid_state_transition
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.status) || old_page.frontmatter.status == page.frontmatter.status || (old_page.frontmatter.status == "draft" && page.frontmatter.status in ["final", "superseded"]) || (old_page.frontmatter.status == "final" && page.frontmatter.status == "superseded")'
+    requirement: Status transitions must follow the snapshot lifecycle — draft to
+      final or superseded, final to superseded; a concluded run never reopens
+    expect: only draft->final, draft->superseded, final->superseded transitions
+      are allowed
+
+  - id: created_immutable
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.created) || old_page.frontmatter.created == page.frontmatter.created'
+    requirement: Created date must never change
+    expect: created must equal the on-disk page's created date
+
+  - id: as_of_frozen_after_final
+    rule: '!has(old_page.frontmatter) || !has(old_page.frontmatter.status) || !(old_page.frontmatter.status in ["final", "superseded"]) || !has(old_page.frontmatter.as_of) || old_page.frontmatter.as_of == page.frontmatter.as_of'
+    requirement: The snapshot date is frozen once the run concludes; corrections
+      happen by supersession, not by rewriting history (ADR-007 I4)
+    expect: as_of must equal the on-disk page's as_of once status is final or
+      superseded
+
+  - id: updated_not_before_created
+    rule: 'timestamp(page.frontmatter.updated) >= timestamp(page.frontmatter.created)'
+    requirement: Updated date must not precede the created date
+    expect: updated must be at or after created
+
+  - id: temporal_created
+    rule: 'timestamp(page.frontmatter.created) <= now'
+    requirement: Created date must not be in the future
+    expect: created timestamp must be less than or equal to current time
+
+  - id: min_word_count
+    rule: 'page.content.word_count >= 50'
+    requirement: Body must carry at least 50 words — the threshold catches a
+      stub, not a style
+    expect: body must hold at least 50 words
+lint_rules:
+  - id: research_draft_stale
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status != "draft" || !has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("2160h")'
+    severity: warning
+    expect: A research run left in draft for 90 days should be concluded (final)
+      or abandoned (superseded)
+
+  - id: final_without_informs
+    rule: '!has(page.frontmatter.status) || page.frontmatter.status == "draft" || (has(page.frontmatter.informs) && size(page.frontmatter.informs) > 0)'
+    severity: warning
+    expect: A concluded research page should name the decision records it fed —
+      unlinked evidence is an orphan risk
+
+  - id: code_blocks_have_language
+    rule: 'page.ast.code_blocks.all(c, c.language != "")'
+    severity: warning
+    expect: Every fenced code block should declare a language — a warning, not a
+      write gate, so historical reports ingest byte-faithfully (ADR-007 N2)
