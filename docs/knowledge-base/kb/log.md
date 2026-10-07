@@ -36,3 +36,7 @@ rfc-templates run recovered from pi-meta-config scratch and backfilled (10 pages
 
 Backfilled the json-cel research run (RFC-001/RFC-002 base): 14 research pages written byte-faithfully under kb/research/ (5 approved, 9 held draft per STRIP-RISK); RFC-001 and RFC-002 citations rewritten from .pi/ scratch to wikilinks; index.md corruption from the parseEntryLine title bug escalated for a supervisor-run index rebuild.
 
+## 2026-10-07 distill
+
+Backfill closeout (ADR-007): verified akb approve is body-safe for reports quoting olw-auto/^[ markers (AST-aware strip) — 9 held-draft pages approved byte-identically; repaired 2 unresolved historical wikilinks inside run logs ([[ADR-005]] and [[ADR-003-...|ADR-003]] retargeted to real basenames, display text preserved — documented citation repair, not a content edit). DOGFOODING FINDING: index_consistency checker misparses titles containing '(' or ' — ' via parseEntryLine (internal/index/index.go:80) — 10 phantom error-severity issues are read-side artifacts of this one bug; kb/index.md on disk is clean post-rebuild. Doctrine until code fix: akb index rebuild only, never akb index add.
+
