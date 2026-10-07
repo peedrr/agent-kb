@@ -4,10 +4,11 @@ created: "2026-10-01"
 grammar: 1
 informs:
 - RFC-003
+is_draft: false
 provenance: agent-drafted
 run: rfc-templates
 scope:
-- "docs/knowledge-base/**"
+- docs/knowledge-base/**
 status: final
 summary: "Deep lane on deliberation and ratification: institutional comment-disposition processes, agent-era machine-readable precedents, and the human-only ratification gate."
 tags:
@@ -15,7 +16,7 @@ tags:
 - deliberation
 - ratification
 - rfc-format
-title: "Lane deliberation — disposition of comments and ratification semantics (rfc-templates)"
+title: Lane deliberation — disposition of comments and ratification semantics (rfc-templates)
 type: research
 updated: "2026-10-01"
 ---
