@@ -1,21 +1,26 @@
 ---
+as_of: "2026-09-26"
+created: "2026-09-26"
 grammar: 1
-type: research
-title: "Feasibility of bridging JSON Schema ⇄ CEL for akb page validation"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-26
-created: 2026-09-26
-updated: 2026-09-26
 scope:
-  - internal/cel/**
-  - internal/template/**
-tags: [json-schema, cel, prior-art, validation]
+- internal/cel/**
+- internal/template/**
+status: final
 summary: "External prior-art survey: no JSON-Schema→CEL compiler exists; K8s/protovalidate use coexistence; a declared-subset Go generator is the sensible path for schema→CEL, AST extraction only partial."
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- json-schema
+- cel
+- prior-art
+- validation
+title: Feasibility of bridging JSON Schema ⇄ CEL for akb page validation
+type: research
+updated: "2026-09-26"
 ---
 # Research: Feasibility of bridging JSON Schema <-> CEL for akb page validation
 
