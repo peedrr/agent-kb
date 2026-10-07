@@ -1,26 +1,27 @@
 ---
-grammar: 1
-type: research
-title: "Research extract — RFC-002-S1 structured validation report"
-status: final
-provenance: agent-drafted
-run: rfc-002-s1
 as_of: "2026-10-07"
 created: "2026-10-07"
-updated: "2026-10-07"
-scope:
-  - "docs/knowledge-base/**"
-  - "cmd/akb/**"
-  - "internal/cel/**"
-  - "internal/lint/**"
-tags:
-  - validation-report
-  - research-extract
-  - spec-002
-  - prior-art
-summary: "Verbatim extraction of the RFC-001 merged-error-model requirements and prior a1–a4 error findings that constrain the SPEC-002 report design, with gaps marked."
+grammar: 1
 informs:
-  - SPEC-002
+- SPEC-002
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-s1
+scope:
+- docs/knowledge-base/**
+- cmd/akb/**
+- internal/cel/**
+- internal/lint/**
+status: final
+summary: Verbatim extraction of the RFC-001 merged-error-model requirements and prior a1–a4 error findings that constrain the SPEC-002 report design, with gaps marked.
+tags:
+- validation-report
+- research-extract
+- spec-002
+- prior-art
+title: Research extract — RFC-002-S1 structured validation report
+type: research
+updated: "2026-10-07"
 ---
 # Research extract — RFC-002-S1 (structured validation report / widened `runTemplateValidations`)
 
