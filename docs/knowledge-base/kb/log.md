@@ -40,3 +40,7 @@ Backfilled the json-cel research run (RFC-001/RFC-002 base): 14 research pages w
 
 Backfill closeout (ADR-007): verified akb approve is body-safe for reports quoting olw-auto/^[ markers (AST-aware strip) — 9 held-draft pages approved byte-identically; repaired 2 unresolved historical wikilinks inside run logs ([[ADR-005]] and [[ADR-003-...|ADR-003]] retargeted to real basenames, display text preserved — documented citation repair, not a content edit). DOGFOODING FINDING: index_consistency checker misparses titles containing '(' or ' — ' via parseEntryLine (internal/index/index.go:80) — 10 phantom error-severity issues are read-side artifacts of this one bug; kb/index.md on disk is clean post-rebuild. Doctrine until code fix: akb index rebuild only, never akb index add.
 
+## 2026-10-07 distill
+
+parseEntryLine fixed (internal/index/index.go): title/path boundary now parsed from the LAST '](' and the summary separator only after the path; hostile-title regression tests pin the renderer contract. Real-KB lint now exits 0 with zero index_consistency phantoms. The 'rebuild only, never index add' doctrine is relaxed — index add is safe again. Note: the fix is source work awaiting owner commit; this KB's binary (bin/akb) carries it, the PATH install may not. RFC-002 Phase 3 still deletes this parse path entirely (index.md becomes write-only derived).
+
