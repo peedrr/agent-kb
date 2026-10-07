@@ -1,18 +1,22 @@
 ---
-grammar: 1
-type: rfc
-id: RFC-001
-title: JSON Schema / CEL Coexistence and JSON I/O in akb
-status: superseded
-provenance: agent-drafted
 author: pete
+created: "2026-09-26"
+grammar: 1
+id: RFC-001
+provenance: agent-drafted
+scope:
+- "**"
+status: superseded
 steward: pete
-created: 2026-09-26
-updated: 2026-10-02
-scope: ["**"]
-tags: [validation, json-schema, cel]
 summary: Add JSON Schema 2020-12 alongside CEL plus JSON I/O for agent pipelines; superseded by RFC-002, which replaces akb's prescriptive core rather than augmenting it.
 superseded_by: RFC-002
+tags:
+- validation
+- json-schema
+- cel
+title: JSON Schema / CEL Coexistence and JSON I/O in akb
+type: rfc
+updated: "2026-10-07T19:08:48Z"
 ---
 
 # RFC-001: JSON Schema / CEL Coexistence and JSON I/O in akb
@@ -22,7 +26,7 @@ superseded_by: RFC-002
 | **Status** | **SUPERSEDED by RFC-002** (`RFC-002-open-validation-engine.md`, 2026-09-27) — retained as research record; its technical spine carries into RFC-002 (see RFC-002 §3 and Appendix B) |
 | **Date** | 2026-09-26 |
 | **Authors** | pete (owner), pi session + subagent research team |
-| **Research base** | `.pi/subagents/proposals/json-cel/research/` (7 reports + LOG.md) |
+| **Research base** | [[akb-recon]], [[schema-survey]], [[cel-bridge-research]], [[cel-bridge-research-b]], [[command-inventory]], [[seam-core-pipeline]], [[seam-periphery]], [[json-cel-log]] — filed per [[ADR-007-research-reports-first-class|ADR-007]] |
 | **Supersedes / amends** | `agent-memory/DESIGN.md` §4.2/§4.3/§5 (amends; JSON direction is new relative to that ratified design) |
 | **Downstream artifacts** | ADRs + tech-specs per §15 (nothing here is implementation-final) |
 
@@ -52,7 +56,7 @@ gates with TypeBox, full draft 3→2020-12). Today an agent cannot:
    currently unenforced (known; fix in progress), and every real constraint must be hand-written
    as a CEL string.
 
-External research (two independent surveys; see `research/cel-bridge-research*.md`) established
+External research (two independent surveys; see [[cel-bridge-research]] and [[cel-bridge-research-b]]) established
 that no JSON-Schema→CEL compiler exists anywhere, and that every production system facing this
 exact pairing — Kubernetes CRDs (`x-kubernetes-validations`), protovalidate, flux-schema,
 Datree — converged on **coexistence**: declarative schema for structure, CEL for the residue.
@@ -134,7 +138,7 @@ drift (the dead typed structs in `internal/cel/types.go` are the natural home fo
 
 `content.word_count/char_count`, `ast.*`, `akb.*` are deterministic pure functions of the
 markdown body (goldmark + wikilink/annotation/provenance parsers — all verified pure,
-`research/seam-core-pipeline.md` §3). On **write**, the caller supplies exactly
+[[seam-core-pipeline]] §3). On **write**, the caller supplies exactly
 `{frontmatter, content.raw}`; **supplying any derived key is a usage error (exit 2)**, never
 silently ignored — a caller must not be able to assert AST facts that contradict the body.
 Structured-content input (akb generates markdown from JSON) is **rejected**: the derived view
@@ -272,7 +276,7 @@ schema gets title/status/tags rules, heading presence (`contains` over materiali
 `ast.headings`), code-block language, word-count floor, wikilink existence, and the
 `if/then` status↔supersedes pair; CEL gets the state machine, immutability, sibling
 comparison, the cross-subtree `supersedes`↔wikilink rule, and all four temporal lint rules.
-Full table: `research/seam-core-pipeline.md` §2.
+Full table: [[seam-core-pipeline]] §2.
 
 ## 9. CEL coverage commitment (G2)
 
@@ -405,9 +409,11 @@ write-time `validations` re-run with `old_page` = on-disk page, `now` = approval
 
 ## Appendix A — Research base
 
-All in `.pi/subagents/proposals/json-cel/research/`: `LOG.md` (session log + decisions),
-`akb-recon.md`, `schema-survey.md`, `cel-bridge-research.md`, `cel-bridge-research-b.md`,
-`command-inventory.md`, `seam-core-pipeline.md`, `seam-periphery.md`.
+All in the json-cel research run: [[json-cel-log]] (session log + decisions),
+[[akb-recon]], [[schema-survey]], [[cel-bridge-research]], [[cel-bridge-research-b]],
+[[command-inventory]], [[seam-core-pipeline]], [[seam-periphery]], [[openness-write-path]],
+[[openness-lint-engine]], [[openness-document-model]], [[openness-config-surface]],
+[[recon-search-after]], [[synthesis-openness]].
 
 ## Appendix B — Glossary
 
