@@ -1,22 +1,27 @@
 ---
+as_of: "2026-09-27"
+created: "2026-09-27"
 grammar: 1
-type: research
-title: "Recon: how akb search --after <date> behaves"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-27
-created: 2026-09-27
-updated: 2026-09-27
 scope:
-  - cmd/akb/**
-  - internal/search/**
-  - internal/db/**
-tags: [search, recon, probe, database]
+- cmd/akb/**
+- internal/search/**
+- internal/db/**
+status: final
 summary: "Probe-verified recon: --after filters on documents.created, which is always index time and reset by rebuild/append/approve — not the page's creation date the help text promises."
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- search
+- recon
+- probe
+- database
+title: "Recon: how akb search --after <date> behaves"
+type: research
+updated: "2026-09-27"
 ---
 # Recon: how `akb search --after <date>` behaves (read-only)
 
