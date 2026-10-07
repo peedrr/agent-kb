@@ -4,10 +4,11 @@ created: "2026-10-01"
 grammar: 1
 informs:
 - RFC-003
+is_draft: false
 provenance: agent-drafted
 run: rfc-templates
 scope:
-- "docs/knowledge-base/**"
+- docs/knowledge-base/**
 status: final
 summary: "Deep lane on the 2026 agent-era RFC literature: a hybrid contract of machine-extractable header, mandatory alternatives slot, pre-flight rubric, and prose argument."
 tags:
@@ -15,7 +16,7 @@ tags:
 - agent-era
 - rfc-format
 - prose
-title: "Lane agent-era — RFC format decisions for agent consumers (rfc-templates)"
+title: Lane agent-era — RFC format decisions for agent consumers (rfc-templates)
 type: research
 updated: "2026-10-01"
 ---
