@@ -1,21 +1,26 @@
 ---
+as_of: "2026-09-26"
+created: "2026-09-26"
 grammar: 1
-type: research
-title: "JSON Schema ⇄ CEL bridge feasibility for akb template validation (duplicate survey)"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-26
-created: 2026-09-26
-updated: 2026-09-26
 scope:
-  - internal/cel/**
-  - internal/template/**
-tags: [json-schema, cel, prior-art, validation]
+- internal/cel/**
+- internal/template/**
+status: final
 summary: "De-duplicated second survey: no library compiles JSON Schema into CEL; reverse extraction is provably partial; recommends a hand-rolled Go generator over a declared subset, display-only AST extractor."
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- json-schema
+- cel
+- prior-art
+- validation
+title: JSON Schema ⇄ CEL bridge feasibility for akb template validation (duplicate survey)
+type: research
+updated: "2026-09-26"
 ---
 # Research: JSON Schema ⇄ CEL bridge feasibility for akb template validation
 
