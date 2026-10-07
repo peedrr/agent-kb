@@ -1,25 +1,26 @@
 ---
-grammar: 1
-type: research
-title: "RFC-002-A4 research log — date-bridge determinism and the duration seam"
-status: final
-provenance: agent-drafted
-run: rfc-002-a4
 as_of: "2026-10-06"
 created: "2026-10-06"
-updated: "2026-10-06"
-scope:
-  - "internal/cel/**"
-  - "cmd/akb/**"
-  - "internal/template/**"
-tags:
-  - date-bridge
-  - determinism
-  - adr-005
-  - research-log
-summary: "Run log for RFC-002-A4: date-bridge determinism spec, template-write static temporal check, duration seam, recon anchors, and the decision forks behind ADR-005."
+grammar: 1
 informs:
-  - ADR-005
+- ADR-005
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-a4
+scope:
+- internal/cel/**
+- cmd/akb/**
+- internal/template/**
+status: final
+summary: "Run log for RFC-002-A4: date-bridge determinism spec, template-write static temporal check, duration seam, recon anchors, and the decision forks behind ADR-005."
+tags:
+- date-bridge
+- determinism
+- adr-005
+- research-log
+title: RFC-002-A4 research log — date-bridge determinism and the duration seam
+type: research
+updated: "2026-10-06"
 ---
 # RESEARCH LOG — rfc-002-a4
 
