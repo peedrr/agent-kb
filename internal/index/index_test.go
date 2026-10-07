@@ -365,3 +365,131 @@ func TestRenderIndex_EntryWithoutSummary(t *testing.T) {
 		t.Errorf("RenderIndex()\ngot:\n%s\nwant:\n%s", result, expected)
 	}
 }
+
+// parseEntryLine regression tests for the corruption discovered by KB dogfooding
+// (ADR-007 backfill): titles containing "(" or " — " misparsed because the path
+// and summary were extracted with first-occurrence strings.Cut over the whole
+// line. The entry contract is the renderer's: - [Title](Path)[ — Summary], so
+// the "](" boundary is the LAST one and the summary separator only counts after
+// the path. These tests pin that contract; the function they exercise is
+// scheduled for deletion in RFC-002 Phase 3 and the tests die with it.
+func TestParseEntryLine_HostileTitles(t *testing.T) {
+	cases := []struct {
+		name        string
+		line        string
+		wantTitle   string
+		wantPath    string
+		wantSummary string
+	}{
+		{
+			name:        "title with parenthesized suffix",
+			line:        "- [Go JSON Schema 2020-12 Validators and RFC 3339 Parsing Facts (RFC-002-A1)](kb/research/rfc-002-a1-research-web.md) — Sourced ecosystem survey",
+			wantTitle:   "Go JSON Schema 2020-12 Validators and RFC 3339 Parsing Facts (RFC-002-A1)",
+			wantPath:    "kb/research/rfc-002-a1-research-web.md",
+			wantSummary: "Sourced ecosystem survey",
+		},
+		{
+			name:        "title with em dash and parens",
+			line:        "- [Research run log — JSON Schema/CEL bridge (json-cel)](kb/research/json-cel-log.md) — The run log and hub page",
+			wantTitle:   "Research run log — JSON Schema/CEL bridge (json-cel)",
+			wantPath:    "kb/research/json-cel-log.md",
+			wantSummary: "The run log and hub page",
+		},
+		{
+			name:        "title with em dash and no summary",
+			line:        "- [Openness audit — write path](kb/research/openness-write-path.md)",
+			wantTitle:   "Openness audit — write path",
+			wantPath:    "kb/research/openness-write-path.md",
+			wantSummary: "",
+		},
+		{
+			name:        "summary containing em dash is preserved whole",
+			line:        "- [Note](kb/notes/n.md) — first part — second part",
+			wantTitle:   "Note",
+			wantPath:    "kb/notes/n.md",
+			wantSummary: "first part — second part",
+		},
+		{
+			name:        "multiple paren groups in title",
+			line:        "- [TemplateV2 to V3 Migration Recon (RFC-002-A2) (interim)](kb/research/rfc-002-a2-recon-code.md) — recon",
+			wantTitle:   "TemplateV2 to V3 Migration Recon (RFC-002-A2) (interim)",
+			wantPath:    "kb/research/rfc-002-a2-recon-code.md",
+			wantSummary: "recon",
+		},
+		{
+			name:        "title containing bracket pair",
+			line:        "- [Draft [WIP] notes](kb/notes/d.md) — s",
+			wantTitle:   "Draft [WIP] notes",
+			wantPath:    "kb/notes/d.md",
+			wantSummary: "s",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			entry, err := parseEntryLine(tc.line, "research")
+			if err != nil {
+				t.Fatalf("parseEntryLine(%q) returned error: %v", tc.line, err)
+			}
+			if entry.Title != tc.wantTitle {
+				t.Errorf("Title = %q, want %q", entry.Title, tc.wantTitle)
+			}
+			if entry.Path != tc.wantPath {
+				t.Errorf("Path = %q, want %q", entry.Path, tc.wantPath)
+			}
+			if entry.Summary != tc.wantSummary {
+				t.Errorf("Summary = %q, want %q", entry.Summary, tc.wantSummary)
+			}
+		})
+	}
+}
+
+func TestRenderParseRoundTrip_HostileTitles(t *testing.T) {
+	entries := []IndexEntry{
+		{Path: "kb/research/rfc-002-a1-research-web.md", Title: "Go JSON Schema 2020-12 Validators and RFC 3339 Parsing Facts (RFC-002-A1)", Summary: "Sourced ecosystem survey", Type: "research"},
+		{Path: "kb/research/json-cel-log.md", Title: "Research run log — JSON Schema/CEL bridge (json-cel)", Summary: "The run log and hub page", Type: "research"},
+		{Path: "kb/research/openness-write-path.md", Title: "Openness audit — write path", Summary: "", Type: "research"},
+	}
+
+	parsed, err := parseIndex(RenderIndex(entries))
+	if err != nil {
+		t.Fatalf("parseIndex(RenderIndex(entries)) failed: %v", err)
+	}
+	if len(parsed) != len(entries) {
+		t.Fatalf("round trip lost entries: got %d, want %d", len(parsed), len(entries))
+	}
+	for i := range entries {
+		if parsed[i] != entries[i] {
+			t.Errorf("entry %d = %+v, want %+v", i, parsed[i], entries[i])
+		}
+	}
+}
+
+// Regression for the compounding corruption: with the hostile entry already in
+// the index, a subsequent AddEntry read-modify-write must leave it intact.
+func TestAddEntry_DoesNotCorruptHostileTitles(t *testing.T) {
+	kbRoot := setupKB(t)
+	hostile := IndexEntry{
+		Path:    "kb/research/rfc-002-a1-research-web.md",
+		Title:   "Go JSON Schema 2020-12 Validators (RFC-002-A1)",
+		Summary: "Sourced ecosystem survey",
+		Type:    "research",
+	}
+	if err := AddEntry(kbRoot, hostile); err != nil {
+		t.Fatalf("AddEntry(hostile) failed: %v", err)
+	}
+	other := IndexEntry{Path: "kb/research/plain.md", Title: "Plain", Summary: "plain summary", Type: "research"}
+	if err := AddEntry(kbRoot, other); err != nil {
+		t.Fatalf("AddEntry(other) failed: %v", err)
+	}
+
+	entries, err := ReadIndex(kbRoot)
+	if err != nil {
+		t.Fatalf("ReadIndex failed: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	if entries[0] != hostile {
+		t.Errorf("first entry corrupted by second AddEntry: got %+v, want %+v", entries[0], hostile)
+	}
+}

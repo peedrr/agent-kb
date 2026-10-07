@@ -77,27 +77,26 @@ func parseIndex(content string) ([]IndexEntry, error) {
 	return entries, nil
 }
 
+// parseEntryLine parses one rendered entry line: "- [Title](Path)" with an
+// optional " — Summary" tail. RenderIndex is the contract: the "](" boundary
+// is the LAST one in the line (a title may contain "(" or " — "), the path
+// ends at the first ")" after that boundary, and the " — " separator only
+// counts in the tail after the path, so a summary may itself contain " — ".
 func parseEntryLine(line string, typ string) (IndexEntry, error) {
-	_, after, ok := strings.Cut(line, "[")
-	if !ok {
+	open := strings.IndexByte(line, '[')
+	boundary := strings.LastIndex(line, "](")
+	if open < 0 || boundary < open {
 		return IndexEntry{}, fmt.Errorf("malformed entry line: missing title")
 	}
-	title, _, ok := strings.Cut(after, "]")
-	if !ok {
-		return IndexEntry{}, fmt.Errorf("malformed entry line: missing title")
-	}
+	title := line[open+1 : boundary]
 
-	_, after, ok = strings.Cut(line, "(")
-	if !ok {
-		return IndexEntry{}, fmt.Errorf("malformed entry line: missing path")
-	}
-	path, _, ok := strings.Cut(after, ")")
+	path, after, ok := strings.Cut(line[boundary+2:], ")")
 	if !ok {
 		return IndexEntry{}, fmt.Errorf("malformed entry line: missing path")
 	}
 
 	summary := ""
-	if _, after, ok := strings.Cut(line, " \u2014 "); ok {
+	if _, after, ok := strings.Cut(after, " \u2014 "); ok {
 		summary = after
 	}
 
