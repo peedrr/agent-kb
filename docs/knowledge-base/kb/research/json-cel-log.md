@@ -1,21 +1,26 @@
 ---
+as_of: "2026-09-27"
+created: "2026-09-27"
 grammar: 1
-type: research
-title: "Research run log — JSON Schema/CEL bridge (json-cel)"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-27
-created: 2026-09-27
-updated: 2026-09-27
 scope:
-  - internal/**
-  - cmd/akb/**
-tags: [run-log, json-cel, json-schema, cel]
+- internal/**
+- cmd/akb/**
+status: final
 summary: "The run log and hub page for the json-cel research run: sessions 1-5, commissioned reports, owner decisions, and the RFC-001 to RFC-002 trajectory."
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- run-log
+- json-cel
+- json-schema
+- cel
+title: Research run log — JSON Schema/CEL bridge (json-cel)
+type: research
+updated: "2026-09-27"
 ---
 # JSON ⇄ CEL Bridge — Research Log
 
