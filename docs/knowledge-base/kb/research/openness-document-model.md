@@ -1,22 +1,27 @@
 ---
+as_of: "2026-09-27"
+created: "2026-09-27"
 grammar: 1
-type: research
-title: "Openness audit — document model & markdown parsing architecture"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-27
-created: 2026-09-27
-updated: 2026-09-27
 scope:
-  - internal/cel/**
-  - internal/markdown/**
-  - internal/frontmatter/**
-tags: [openness, document-model, markdown, audit]
+- internal/cel/**
+- internal/markdown/**
+- internal/frontmatter/**
+status: final
 summary: "Empirically probe-verified audit of the document model: frontmatter/file-identity mandates, derived page-map projections, and markdown parsing drift across goldmark call sites."
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- openness
+- document-model
+- markdown
+- audit
+title: Openness audit — document model & markdown parsing architecture
+type: research
+updated: "2026-09-27"
 ---
 # OPENNESS AUDIT — Seam: Document Model & Markdown Parsing Architecture
 
