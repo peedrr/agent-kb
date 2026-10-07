@@ -4,10 +4,11 @@ created: "2026-10-02"
 grammar: 1
 informs:
 - RFC-003
+is_draft: false
 provenance: agent-drafted
 run: rfc-templates
 scope:
-- "docs/knowledge-base/**"
+- docs/knowledge-base/**
 status: final
 summary: "Coordinator's design analysis of the RFC as deliberation-stage process unit: its machine contract, ratification gate, lifecycle postures, and the ratified forks F1–F5."
 tags:
@@ -15,7 +16,7 @@ tags:
 - rfc-format
 - design-proposals
 - agent-consumption
-title: "RFC format for agents — synthesis and implication analysis (rfc-templates)"
+title: RFC format for agents — synthesis and implication analysis (rfc-templates)
 type: research
 updated: "2026-10-02"
 ---
