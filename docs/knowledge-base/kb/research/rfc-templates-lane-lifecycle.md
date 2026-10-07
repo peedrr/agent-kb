@@ -4,10 +4,11 @@ created: "2026-10-01"
 grammar: 1
 informs:
 - RFC-003
+is_draft: false
 provenance: agent-drafted
 run: rfc-templates
 scope:
-- "docs/knowledge-base/**"
+- docs/knowledge-base/**
 status: final
 summary: "Deep lane on proposal lifecycle: IETF's 185-day expiry and its abolition, rotting hand-maintained status fields, and derived staleness postures over clock-driven kills."
 tags:
@@ -15,7 +16,7 @@ tags:
 - lifecycle
 - staleness
 - rfc-format
-title: "Lane lifecycle — proposal expiry, staleness, and abandonment mechanics (rfc-templates)"
+title: Lane lifecycle — proposal expiry, staleness, and abandonment mechanics (rfc-templates)
 type: research
 updated: "2026-10-01"
 ---
