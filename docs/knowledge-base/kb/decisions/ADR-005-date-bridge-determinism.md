@@ -27,7 +27,7 @@ tags:
 - rfc-002
 title: The Date Bridge Coerces Only Schema-Declared Fields and Is Statically Checked
 type: adr
-updated: "2026-10-06T21:39:49Z"
+updated: "2026-10-07T19:01:00Z"
 ---
 
 # ADR-005: The Date Bridge Coerces Only Schema-Declared Fields and Is Statically Checked
@@ -87,7 +87,7 @@ No exceptions are permitted. A case that appears to need one — including a tem
 
 ## Context
 
-Origin: [[RFC-002-open-validation-engine|RFC-002]] candidate RFC-002-A4 (RFC §5.2 names the scope: bridge determinism spec, `template write` static temporal check, duration seam), researched 2026-10-06 in `.pi/research/rfc-002-a4/`; ratified 2026-10-06 by Pete Hope on review of the research record (two owner-directed amendments during review: the I11 remediation wording and the A5-lifecycle consequence), and per the RFC-002 §18 lifecycle the RFC's A4 row moves to ratified as ADR-005 and its body references are rewritten on that ratification. Today's bridge is name-agnostic, top-level-only string parsing (`internal/cel/pagebuilder.go:29-44`) whose acceptance is wider than the ADR-003 strict profile and whose nested values are never coerced — the asymmetry this record kills; every `BuildPage` call site already holds the template, so schema-driven traversal is mechanical, not architectural. Upstream facts verified against pinned sources during the research run: cel-go v0.32's `duration()` is Go `time.ParseDuration` only, with no ISO 8601 duration anywhere in core or extension libraries; santhosh-tekuri/jsonschema v6 ships a built-in `duration` checker implementing exactly the RFC 3339 Appendix A profile, so under ADR-003's assert-all policy `format: duration` already asserts with zero new code; the two vocabularies share zero string syntax, so any bridge is a translation, not a parse. The AST the static check needs is discarded by `CompileRule` today; cel-go's `common/ast` navigable API (`MatchDescendants`, `FunctionMatcher`, `SelectExpr` chains) was probe-verified at the pinned v0.28 and confirmed unchanged at v0.32. Permissive applicator traversal is the declaration-faithful reading of RFC-002 §5.2 ("a temporal field is one the template's schema declares … at whatever depth it is declared"); a declared path whose value sits under a non-matching branch simply fails the parse and stays a string (I6), which the sweep's schema checker reports per P4.
+Origin: [[RFC-002-open-validation-engine|RFC-002]] candidate RFC-002-A4 (RFC §5.2 names the scope: bridge determinism spec, `template write` static temporal check, duration seam), researched 2026-10-06 in the research session ([[rfc-002-a4-log]]); ratified 2026-10-06 by Pete Hope on review of the research record (two owner-directed amendments during review: the I11 remediation wording and the A5-lifecycle consequence), and per the RFC-002 §18 lifecycle the RFC's A4 row moves to ratified as ADR-005 and its body references are rewritten on that ratification. Today's bridge is name-agnostic, top-level-only string parsing (`internal/cel/pagebuilder.go:29-44`) whose acceptance is wider than the ADR-003 strict profile and whose nested values are never coerced — the asymmetry this record kills; every `BuildPage` call site already holds the template, so schema-driven traversal is mechanical, not architectural. Upstream facts verified against pinned sources during the research run: cel-go v0.32's `duration()` is Go `time.ParseDuration` only, with no ISO 8601 duration anywhere in core or extension libraries; santhosh-tekuri/jsonschema v6 ships a built-in `duration` checker implementing exactly the RFC 3339 Appendix A profile, so under ADR-003's assert-all policy `format: duration` already asserts with zero new code; the two vocabularies share zero string syntax, so any bridge is a translation, not a parse. The AST the static check needs is discarded by `CompileRule` today; cel-go's `common/ast` navigable API (`MatchDescendants`, `FunctionMatcher`, `SelectExpr` chains) was probe-verified at the pinned v0.28 and confirmed unchanged at v0.32. Permissive applicator traversal is the declaration-faithful reading of RFC-002 §5.2 ("a temporal field is one the template's schema declares … at whatever depth it is declared"); a declared path whose value sits under a non-matching branch simply fails the parse and stays a string (I6), which the sweep's schema checker reports per P4.
 
 ## Decision Drivers
 
@@ -120,7 +120,7 @@ Origin: [[RFC-002-open-validation-engine|RFC-002]] candidate RFC-002-A4 (RFC §5
 
 ## References
 
-- Research run record: `.pi/research/rfc-002-a4/LOG.md` (decision log); child reports in the session's subagent artifacts (code recon, prior-research extraction, upstream facts).
+- Research run record: [[rfc-002-a4-log]] (decision log); child reports in the session's subagent artifacts (code recon, prior-research extraction, upstream facts).
 - [[RFC-002-open-validation-engine|RFC-002]] §5.2 (date bridge scope), §6 (template format), §18 (candidate lifecycle).
 - [[ADR-003-santhosh-v6-format-assertion|ADR-003]] — I4/I5 strict profiles, I6 `format: time` exclusion, I7 unknown-format warning precedent, assert-all policy.
 - [[ADR-004-cel-go-upgrade-pinned-extensions|ADR-004]] — N4 (cache key, single environment), N6 (`convertDateField` pre-conversion is the only bridge).
