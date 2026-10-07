@@ -16,3 +16,7 @@ Drafted ADR-006 (RFC-002-A2): schema.frontmatter retirement = hard reject + CHAN
 
 Drafted specs/SPEC-002-structured-validation-report.md (proposed change SPEC; RFC-002 candidate RFC-002-S1)
 
+## 2026-10-07 distill
+
+ADR-007 ratified by owner: research reports are first-class kb/research/ pages; raw/ for external sources only; backfill of .pi research corpus begins
+
