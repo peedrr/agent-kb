@@ -12,3 +12,7 @@ Removed page rfcs/RFC-999-positive-control.md
 
 Drafted ADR-006 (RFC-002-A2): schema.frontmatter retirement = hard reject + CHANGELOG recipe, no migrate command; owner ratified forks in .pi/research/rfc-002-a2
 
+## 2026-10-07 plan | SPEC-002 structured validation report
+
+Drafted specs/SPEC-002-structured-validation-report.md (proposed change SPEC; RFC-002 candidate RFC-002-S1)
+
