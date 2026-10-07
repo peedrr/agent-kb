@@ -20,3 +20,7 @@ Drafted specs/SPEC-002-structured-validation-report.md (proposed change SPEC; RF
 
 ADR-007 ratified by owner: research reports are first-class kb/research/ pages; raw/ for external sources only; backfill of .pi research corpus begins
 
+## 2026-10-07 ingest
+
+Backfilled RFC-002-A3/A4/S1 research runs (7 byte-faithful research pages under kb/research/, all approved) and rewrote .pi/ citations in ADR-004, ADR-005, SPEC-002; RFC-003 loss note kept as its documented accepted warning.
+
