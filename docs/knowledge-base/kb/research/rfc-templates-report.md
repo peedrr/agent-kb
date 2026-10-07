@@ -4,10 +4,11 @@ created: "2026-10-02"
 grammar: 1
 informs:
 - RFC-003
+is_draft: false
 provenance: agent-drafted
 run: rfc-templates
 scope:
-- "docs/knowledge-base/**"
+- docs/knowledge-base/**
 status: final
 summary: "Findings report: the RFC authoring contract for agent-consumed design proposals — closed-world frontmatter, human-only ratification, derived staleness postures, prose argument."
 tags:
@@ -15,7 +16,7 @@ tags:
 - agent-consumption
 - design-proposals
 - research-report
-title: "RFC format for agent-consumed design proposals — research report (rfc-templates)"
+title: RFC format for agent-consumed design proposals — research report (rfc-templates)
 type: research
 updated: "2026-10-02"
 ---
