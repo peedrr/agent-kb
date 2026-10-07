@@ -230,3 +230,10 @@ lint_rules:
     rule: '!has(page.frontmatter.status) || page.frontmatter.status != "deprecated" || !has(page.frontmatter.updated) || now - timestamp(page.frontmatter.updated) < duration("720h")'
     severity: error
     expect: Deprecated ADRs must be updated within 30 days
+
+  - id: no_external_citations
+    rule: '!page.content.raw.contains(".pi/") && !page.content.raw.contains(".sisyphus/")'
+    severity: warning
+    expect: Page must not cite evidence in untracked scratch trees (ADR-007 I2);
+      accepted warnings are the pages that narrate the historical paths they
+      document (ADR-006, ADR-007, RFC-003)
