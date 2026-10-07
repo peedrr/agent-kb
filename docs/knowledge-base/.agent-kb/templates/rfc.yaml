@@ -359,4 +359,4 @@ lint_rules:
     severity: warning
     expect: Page must not cite evidence in untracked scratch trees (ADR-007 I2);
       accepted warnings are the pages that narrate the historical paths they
-      document (ADR-006, ADR-007, RFC-003)
+      document (ADR-006 and ADR-007)
