@@ -4,17 +4,18 @@ created: "2026-10-02"
 grammar: 1
 informs:
 - RFC-003
+is_draft: false
 provenance: agent-drafted
 run: rfc-templates
 scope:
-- "docs/knowledge-base/**"
+- docs/knowledge-base/**
 status: final
 summary: "Independent lighter audit of the rfc-templates run: all 18 claims verified against fresh primaries — 18 supported, 0 corrected, 0 killed, with caveats noted."
 tags:
 - audit
 - evidence
 - rfc-format
-title: "Evidence audit — RFC format research, 18 claims (rfc-templates)"
+title: Evidence audit — RFC format research, 18 claims (rfc-templates)
 type: research
 updated: "2026-10-02"
 ---
