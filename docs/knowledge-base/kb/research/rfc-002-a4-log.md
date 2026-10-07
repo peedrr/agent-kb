@@ -20,7 +20,7 @@ tags:
 - research-log
 title: RFC-002-A4 research log — date-bridge determinism and the duration seam
 type: research
-updated: "2026-10-06"
+updated: "2026-10-07T19:18:10Z"
 ---
 # RESEARCH LOG — rfc-002-a4
 
@@ -108,7 +108,7 @@ definition; ADR-004 N4/N6 (no cache-key/env changes here).
 - is_draft left True: ALL KB pages incl. accepted ADR-003/004 show is_draft True
   (implicit-draft precedent) — akb approve deliberately NOT run.
 - RFC-002 amended per §18 lifecycle: A4 row → ratified | ADR-005 (link);
-  §5.2 traversal-mechanics ref → [[ADR-005]] link (first prose mention);
+  §5.2 traversal-mechanics ref → [[ADR-005-date-bridge-determinism|ADR-005]] link (first prose mention);
   §5.2 scope line → "Resolved by ADR-005:"; §19 risk row → plain ADR-005;
   updated → 2026-10-06T21:38:41Z. Remaining RFC-002-A4 occurrences = 2,
   both correct: spawns list + §18 ID column (A1/A3 precedent).
