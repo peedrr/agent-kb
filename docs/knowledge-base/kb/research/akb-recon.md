@@ -1,21 +1,26 @@
 ---
+as_of: "2026-09-26"
+created: "2026-09-26"
 grammar: 1
-type: research
-title: akb feasibility recon — TemplateV2, CEL, write/read flows, JSON I/O options
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-26
-created: 2026-09-26
-updated: 2026-09-26
 scope:
-  - internal/**
-  - cmd/akb/**
-tags: [recon, akb, json-schema, cel]
+- internal/**
+- cmd/akb/**
+status: final
 summary: Read-only recon of akb internals (TemplateV2, CEL env, write/read/template-write flows, JSON precedents) rating feasibility of JSON Schema↔CEL bridging and read/write --json.
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- recon
+- akb
+- json-schema
+- cel
+title: akb feasibility recon — TemplateV2, CEL, write/read flows, JSON I/O options
+type: research
+updated: "2026-09-26"
 ---
 # akb feasibility recon (READ-ONLY)
 
