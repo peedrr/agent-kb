@@ -1,24 +1,25 @@
 ---
-grammar: 1
-type: research
-title: "cel-go v0.28.0 → v0.32.x upgrade research (long-form)"
-status: final
-provenance: agent-drafted
-run: rfc-002-a3-celgo
 as_of: "2026-10-06"
 created: "2026-10-06"
-updated: "2026-10-06"
-scope:
-  - "go.mod"
-  - "internal/cel/**"
-tags:
-  - cel-go
-  - dependencies
-  - upstream
-  - adr-004
-summary: "Source-verified survey of the cel-go v0.28.0→v0.32.x upgrade: module-path migration, v0.30 timestamp strictness, extension library costs, and advisories, with evidence labels and open gaps."
+grammar: 1
 informs:
-  - ADR-004
+- ADR-004
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-a3-celgo
+scope:
+- go.mod
+- internal/cel/**
+status: final
+summary: "Source-verified survey of the cel-go v0.28.0→v0.32.x upgrade: module-path migration, v0.30 timestamp strictness, extension library costs, and advisories, with evidence labels and open gaps."
+tags:
+- cel-go
+- dependencies
+- upstream
+- adr-004
+title: cel-go v0.28.0 → v0.32.x upgrade research (long-form)
+type: research
+updated: "2026-10-06"
 ---
 # cel-go v0.28.0 → v0.32.x upgrade research (long-form)
 
