@@ -1,21 +1,26 @@
 ---
+as_of: "2026-09-26"
+created: "2026-09-26"
 grammar: 1
-type: research
-title: "Seam periphery — JSON Schema / CEL coexistence across akb subsystems"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-26
-created: 2026-09-26
-updated: 2026-09-26
 scope:
-  - internal/**
-  - cmd/akb/**
-tags: [json-schema, cel, subsystems, recon]
+- internal/**
+- cmd/akb/**
+status: final
 summary: "Read-only survey of subsystems outside the core pipeline (search, link graph, lint, raw, index, log, git): where a JSON-Schema/CEL seam could attach and where it cannot."
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- json-schema
+- cel
+- subsystems
+- recon
+title: Seam periphery — JSON Schema / CEL coexistence across akb subsystems
+type: research
+updated: "2026-09-26"
 ---
 # Seam Periphery — JSON Schema / CEL coexistence across akb subsystems
 
