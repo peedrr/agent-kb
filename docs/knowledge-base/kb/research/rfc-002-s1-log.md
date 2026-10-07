@@ -20,7 +20,7 @@ tags:
 - research-log
 title: RFC-002-S1 research log — structured validation report (SPEC-002)
 type: research
-updated: "2026-10-07"
+updated: "2026-10-07T19:18:27Z"
 ---
 # LOG — RFC-002-S1
 
@@ -114,7 +114,7 @@ and commit it to the KB via `akb` (AKB_KB set).
   Current Behaviour, Requirements, Acceptance Criteria, Contract and Invariants, Preserved
   Behaviour, Decisions and Rejected Alternatives, Assumptions and Open Questions, Affected
   Surface and Ordering (+ bare depends_on: []), Verification Plan, Drift Ledger, Revisit
-  Triggers, Evidence Appendix. Wikilinks [[ADR-003-...|ADR-003]].
+  Triggers, Evidence Appendix. Wikilinks [[ADR-003-santhosh-v6-format-assertion|ADR-003]].
 - index.md `## Specs` entry = title link + em-dash description; log.md `## <date> <verb>`.
 
 ## Key findings
