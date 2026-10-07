@@ -1,21 +1,26 @@
 ---
+as_of: "2026-09-27"
+created: "2026-09-27"
 grammar: 1
-type: research
-title: "Synthesis — openness audit vs RFC-001"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-27
-created: 2026-09-27
-updated: 2026-09-27
 scope:
-  - internal/**
-  - cmd/akb/**
-tags: [openness, synthesis, rfc-002, audit]
+- internal/**
+- cmd/akb/**
+status: final
 summary: "Synthesis of the four openness-audit seams: classifies every mandate as structurally required, opinionated-but-load-bearing, or historical accident, and reframes RFC-001 into RFC-002."
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- openness
+- synthesis
+- rfc-002
+- audit
+title: Synthesis — openness audit vs RFC-001
+type: research
+updated: "2026-09-27"
 ---
 # SYNTHESIS — Openness audit vs RFC-001
 
