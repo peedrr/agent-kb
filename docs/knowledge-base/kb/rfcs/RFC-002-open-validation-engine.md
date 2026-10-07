@@ -40,7 +40,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-06T22:49:49Z"
+updated: "2026-10-07T19:09:11Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -52,7 +52,7 @@ updated: "2026-10-06T22:49:49Z"
 | **Authors** | pete (owner), pi session + subagent research team |
 | **Supersedes** | [[RFC-001-json-schema-cel-coexistence|RFC-001]] (`RFC-001-json-schema-cel-coexistence.md`) — retained as research record |
 | **Decision register** | Appendix A (D1–D19 + D-seq + P-a…P-i, all owner-ratified 2026-09-26/27) |
-| **Research base** | `.pi/subagents/proposals/json-cel/research/` — 13 reports incl. the openness audit (`openness-*.md`) and `SYNTHESIS-openness.md` |
+| **Research base** | [[json-cel-log]], [[akb-recon]], [[schema-survey]], [[cel-bridge-research]], [[cel-bridge-research-b]], [[command-inventory]], [[seam-core-pipeline]], [[seam-periphery]], [[openness-write-path]], [[openness-lint-engine]], [[openness-document-model]], [[openness-config-surface]], [[recon-search-after]], [[synthesis-openness]] — filed per [[ADR-007-research-reports-first-class|ADR-007]] |
 | **Downstream artifacts** | ADRs + tech-specs spawned as RFC-local candidates per §18 (`RFC-002-A*`/`RFC-002-S*` — nothing here is implementation-final) |
 
 ---
@@ -69,7 +69,7 @@ mandate akb enforces is exactly one of:
 3. **User-declared** — expressed in the user's own templates (JSON Schema + CEL +
    template declarations) or KB config (`akb.yaml`).
 
-Everything else — and the audit (`research/openness-*.md`) found ~20 such mandates —
+Everything else — and the audit ([[openness-write-path]], [[openness-lint-engine]], [[openness-document-model]], [[openness-config-surface]]) found ~20 such mandates —
 is removed, demoted, or made configurable. Validation is two co-equal layers the user
 authors: **JSON Schema 2020-12** over a materialized **document** view, and **CEL** for
 everything schema cannot express (`old_page`, `now`, cross-value comparison, arithmetic).
@@ -639,7 +639,7 @@ to UTC `YYYY-MM-DD HH:MM:SS` so the lexicographic TEXT comparison stays sane, wi
 `COALESCE` fallback to index time for pages whose type declares none. Today `documents.created`
 is always `datetime('now')` at index time — reset by every rebuild *and* every
 append/approve re-index — while the help text promises "creation date" (probe-verified,
-`research/recon-search-after.md`). Also fixed: `--after` input validation (garbage
+[[recon-search-after]]). Also fixed: `--after` input validation (garbage
 currently returns silent empty, exit 0) and RFC3339-input normalization (currently
 silently wrong same-day — `' '` < `'T'`). `documents.updated` (index-time, zero
 readers) is dropped or documented (RFC-002-S4); `--limit` becomes a real flag. The
@@ -714,7 +714,7 @@ After all demotions, akb mandates exactly: the `.agent-kb/akb.yaml` marker; `kb/
 `raw/` roots and the `.md` page extension; path containment (symlinks, segment-wise
 `..`, absolute); the template-name regex; a page must carry frontmatter naming a known
 template (the selector — the one write-time refusal); git versioning per the
-**init-versioning spec** (`docs/kb/spec/init-versioning-spec.md`, lands before
+**init-versioning spec** ([[SPEC-001-init-versioning|SPEC-001]], lands before
 this RFC's phases — D-seq): `versioning: git|none`, and in git mode auto-commit with
 `--no-commit` escape, merge preflight (conflicted *and* clean-merge detection), and the
 spec §6 identity chain (env `AKB_AUTHOR_*` → `akb.yaml` `git-author`/`git-email` →
@@ -829,7 +829,7 @@ surface. Every body reference was rewritten accordingly.
 | Scope explosion | Four independently-shippable phases; openness demotions slotted by audited blast radius, not enthusiasm |
 | Migration pain for existing KBs | Template V3 hard rejection with migration message (precedent: v1); existing pages' `created`/`updated` stay on disk (they're just data now); guarded temporal rules degrade to vacuous until templates declare |
 | `kb.*` becomes permanent vaporware | Committed in-register (D5); Phase-4 placement is scheduling, not optionality; tech-spec follows ratification |
-| Known unknowns (unaudited residue) | Embedded-skill prose consumers of `created`/`updated` never audited; DESIGN.md typed-gate dependency cited secondhand; testscript integration churn per demotion unenumerated — each phase's tech-spec must enumerate its test fallout and re-verify these (tracked in research/LOG.md) |
+| Known unknowns (unaudited residue) | Embedded-skill prose consumers of `created`/`updated` never audited; DESIGN.md typed-gate dependency cited secondhand; testscript integration churn per demotion unenumerated — each phase's tech-spec must enumerate its test fallout and re-verify these (tracked in [[json-cel-log]]) |
 | Date bridge becomes a new silent-coercion | It is schema-declared, assertion-gated, in-memory-only, and the only conversion akb performs — specified by ADR-005 with a `template write`-time static check |
 
 ## Appendix A — Decision register (owner-ratified)
@@ -896,8 +896,8 @@ unaffected); cel-go release analysis (v0.29–v0.32).
 
 ## Appendix C — Research base
 
-`research/`: `LOG.md` (full session log + decision history); RFC-001-era: `akb-recon.md`,
-`schema-survey.md`, `cel-bridge-research.md`, `cel-bridge-research-b.md`,
-`command-inventory.md`, `seam-core-pipeline.md`, `seam-periphery.md`; openness audit:
-`openness-write-path.md`, `openness-lint-engine.md`, `openness-document-model.md`,
-`openness-config-surface.md`; `recon-search-after.md`; `SYNTHESIS-openness.md`.
+[[json-cel-log]] (full session log + decision history); RFC-001-era: [[akb-recon]],
+[[schema-survey]], [[cel-bridge-research]], [[cel-bridge-research-b]],
+[[command-inventory]], [[seam-core-pipeline]], [[seam-periphery]]; openness audit:
+[[openness-write-path]], [[openness-lint-engine]], [[openness-document-model]],
+[[openness-config-surface]]; [[recon-search-after]]; [[synthesis-openness]].
