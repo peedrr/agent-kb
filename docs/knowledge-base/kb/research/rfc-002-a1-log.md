@@ -1,25 +1,26 @@
 ---
-grammar: 1
-type: research
-title: RFC-002-A1 Validator Research Run Log
-summary: "Run log for RFC-002-A1: closed validator-library and format-assertion questions, owner-ratified forks, and the decision trail behind ADR-003."
-status: final
-provenance: agent-drafted
-created: "2026-10-06"
-updated: "2026-10-06"
 as_of: "2026-10-06"
-run: rfc-002-a1-validator
+created: "2026-10-06"
+grammar: 1
 informs:
 - ADR-003
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-a1-validator
 scope:
-- "internal/cel/**"
-- "internal/template/**"
-- "cmd/akb/**"
+- internal/cel/**
+- internal/template/**
+- cmd/akb/**
+status: final
+summary: "Run log for RFC-002-A1: closed validator-library and format-assertion questions, owner-ratified forks, and the decision trail behind ADR-003."
 tags:
 - research-log
 - json-schema
 - validation
 - rfc-002
+title: RFC-002-A1 Validator Research Run Log
+type: research
+updated: "2026-10-06"
 ---
 # Research run: RFC-002-A1 — Validator library + `format` assertion policy
 
