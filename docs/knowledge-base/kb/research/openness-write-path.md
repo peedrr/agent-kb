@@ -1,24 +1,29 @@
 ---
+as_of: "2026-09-27"
+created: "2026-09-27"
 grammar: 1
-type: research
-title: "Openness audit — write path & frontline policy"
-status: final
+informs:
+- RFC-001
+- RFC-002
+is_draft: false
 provenance: agent-drafted
 run: json-cel
-as_of: 2026-09-27
-created: 2026-09-27
-updated: 2026-09-27
 scope:
-  - cmd/akb/**
-  - internal/frontmatter/**
-  - internal/storage/**
-  - internal/index/**
-  - internal/log/**
-tags: [openness, write-path, audit, frontmatter]
+- cmd/akb/**
+- internal/frontmatter/**
+- internal/storage/**
+- internal/index/**
+- internal/log/**
+status: final
 summary: "Audit of akb's write path: created/updated injection, is_draft deletion, whole-frontmatter re-marshal, type-dir prefix forcing — which prescriptions are structural, load-bearing, or accidental."
-informs:
-  - RFC-001
-  - RFC-002
+tags:
+- openness
+- write-path
+- audit
+- frontmatter
+title: Openness audit — write path & frontline policy
+type: research
+updated: "2026-09-27"
 ---
 # Openness Audit — WRITE PATH & FRONTLINE POLICY (scout 4/4, read-only)
 
