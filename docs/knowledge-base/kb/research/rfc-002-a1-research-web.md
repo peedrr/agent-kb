@@ -1,24 +1,25 @@
 ---
-grammar: 1
-type: research
-title: Go JSON Schema 2020-12 Validators and RFC 3339 Parsing Facts (RFC-002-A1)
-summary: "Sourced ecosystem survey of Go JSON Schema 2020-12 validators and RFC 3339 parsing behavior, closing the format-assertion questions behind ADR-003."
-status: final
-provenance: agent-drafted
-created: "2026-10-06"
-updated: "2026-10-06"
 as_of: "2026-10-06"
-run: rfc-002-a1-validator
+created: "2026-10-06"
+grammar: 1
 informs:
 - ADR-003
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-a1-validator
 scope:
-- "internal/cel/**"
-- "internal/template/**"
+- internal/cel/**
+- internal/template/**
+status: final
+summary: Sourced ecosystem survey of Go JSON Schema 2020-12 validators and RFC 3339 parsing behavior, closing the format-assertion questions behind ADR-003.
 tags:
 - json-schema
 - validation
 - ecosystem-survey
 - rfc-002
+title: Go JSON Schema 2020-12 Validators and RFC 3339 Parsing Facts (RFC-002-A1)
+type: research
+updated: "2026-10-06"
 ---
 # Research: Go JSON Schema 2020-12 validators + RFC 3339 parsing facts (for RFC-002-A1 ADR)
 
