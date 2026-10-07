@@ -1,23 +1,24 @@
 ---
-grammar: 1
-type: research
-title: "ADR conventions and governing decisions for SPEC-002 (RFC-002-S1)"
-status: final
-provenance: agent-drafted
-run: rfc-002-s1
 as_of: "2026-10-07"
 created: "2026-10-07"
-updated: "2026-10-07"
-scope:
-  - "docs/knowledge-base/**"
-tags:
-  - adr
-  - conventions
-  - spec-002
-  - knowledge-base
-summary: "Conventions and governing decisions (ADR-003..006, SPEC-001, the template contract) for authoring the SPEC-002 page recording RFC-002-S1."
+grammar: 1
 informs:
-  - SPEC-002
+- SPEC-002
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-s1
+scope:
+- docs/knowledge-base/**
+status: final
+summary: Conventions and governing decisions (ADR-003..006, SPEC-001, the template contract) for authoring the SPEC-002 page recording RFC-002-S1.
+tags:
+- adr
+- conventions
+- spec-002
+- knowledge-base
+title: ADR conventions and governing decisions for SPEC-002 (RFC-002-S1)
+type: research
+updated: "2026-10-07"
 ---
 # Code Context
 
