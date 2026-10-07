@@ -1,17 +1,25 @@
 ---
+created: "2026-10-07"
+deciders:
+- Pete Hope
 grammar: 1
-type: adr
 id: ADR-007
-title: Research Reports Are First-Class Pages, Not Raw Sources or Chat Residue
-summary: Agent-generated research reports and run logs are first-class research pages under kb/research/; raw/ holds external sources only; KB pages never cite files that do not travel with the KB.
-tags: [research, kb-layout, agent-memory]
-status: accepted
-created: 2026-10-07
-updated: 2026-10-07
+is_draft: false
 provenance: agent-drafted
-deciders: [Pete Hope]
-scope: ["docs/knowledge-base/**"]
-revisit: ["RFC-002's kb.* sweep-level rules land and the no-external-citation guard becomes a user-authored cross-page rule", "akb gains search or link-graph coverage of the raw layer, re-opening where externally-sourced research captures live"]
+revisit:
+- RFC-002's kb.* sweep-level rules land and the no-external-citation guard becomes a user-authored cross-page rule
+- akb gains search or link-graph coverage of the raw layer, re-opening where externally-sourced research captures live
+scope:
+- docs/knowledge-base/**
+status: accepted
+summary: Agent-generated research reports and run logs are first-class research pages under kb/research/; raw/ holds external sources only; KB pages never cite files that do not travel with the KB.
+tags:
+- research
+- kb-layout
+- agent-memory
+title: Research Reports Are First-Class Pages, Not Raw Sources or Chat Residue
+type: adr
+updated: "2026-10-07"
 ---
 
 # ADR-007: Research Reports Are First-Class Pages, Not Raw Sources or Chat Residue
