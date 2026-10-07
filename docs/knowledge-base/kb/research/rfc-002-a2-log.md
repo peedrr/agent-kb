@@ -1,24 +1,25 @@
 ---
-grammar: 1
-type: research
-title: RFC-002-A2 schema.frontmatter Retirement Research Run Log
-summary: "Run log for RFC-002-A2: owner-ratified forks on schema.frontmatter retirement and migration, constraint anchors, and the trail behind ADR-006."
-status: final
-provenance: agent-drafted
-created: "2026-10-06"
-updated: "2026-10-06"
 as_of: "2026-10-06"
-run: rfc-002-a2
+created: "2026-10-06"
+grammar: 1
 informs:
 - ADR-006
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-a2
 scope:
-- "internal/template/**"
-- "cmd/akb/**"
+- internal/template/**
+- cmd/akb/**
+status: final
+summary: "Run log for RFC-002-A2: owner-ratified forks on schema.frontmatter retirement and migration, constraint anchors, and the trail behind ADR-006."
 tags:
 - research-log
 - templates
 - migration
 - rfc-002
+title: RFC-002-A2 schema.frontmatter Retirement Research Run Log
+type: research
+updated: "2026-10-06"
 ---
 # Research run: RFC-002-A2 — `schema.frontmatter` retirement + migration
 
