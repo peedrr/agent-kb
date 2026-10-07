@@ -20,7 +20,7 @@ tags:
 - research-log
 title: RFC-002-A4 research log — date-bridge determinism and the duration seam
 type: research
-updated: "2026-10-07T19:18:10Z"
+updated: "2026-10-07T19:18:27Z"
 ---
 # RESEARCH LOG — rfc-002-a4
 
