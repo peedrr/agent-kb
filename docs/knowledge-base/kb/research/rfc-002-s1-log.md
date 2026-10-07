@@ -1,25 +1,26 @@
 ---
-grammar: 1
-type: research
-title: "RFC-002-S1 research log — structured validation report (SPEC-002)"
-status: final
-provenance: agent-drafted
-run: rfc-002-s1
 as_of: "2026-10-07"
 created: "2026-10-07"
-updated: "2026-10-07"
-scope:
-  - "cmd/akb/**"
-  - "internal/cel/**"
-  - "internal/lint/**"
-tags:
-  - validation-report
-  - spec-002
-  - decision-log
-  - research-log
-summary: "Run log for RFC-002-S1: SPEC-002 scope, format authority, decision-fork strategy, and the child-run index for the structured validation report spec."
+grammar: 1
 informs:
-  - SPEC-002
+- SPEC-002
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-s1
+scope:
+- cmd/akb/**
+- internal/cel/**
+- internal/lint/**
+status: final
+summary: "Run log for RFC-002-S1: SPEC-002 scope, format authority, decision-fork strategy, and the child-run index for the structured validation report spec."
+tags:
+- validation-report
+- spec-002
+- decision-log
+- research-log
+title: RFC-002-S1 research log — structured validation report (SPEC-002)
+type: research
+updated: "2026-10-07"
 ---
 # LOG — RFC-002-S1
 
