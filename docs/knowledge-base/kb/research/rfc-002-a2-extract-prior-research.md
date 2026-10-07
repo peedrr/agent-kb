@@ -1,24 +1,25 @@
 ---
-grammar: 1
-type: research
-title: Prior-Research Extraction on schema.frontmatter Retirement and Migration (RFC-002-A2)
-summary: "Audit of the openness/coexistence research base and RFC-001-era material on schema.frontmatter retirement, migration mechanics, and deferrals for RFC-002-A2."
-status: final
-provenance: agent-drafted
-created: "2026-10-06"
-updated: "2026-10-06"
 as_of: "2026-10-06"
-run: rfc-002-a2
+created: "2026-10-06"
+grammar: 1
 informs:
 - ADR-006
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-a2
 scope:
-- "internal/template/**"
-- "cmd/akb/**"
+- internal/template/**
+- cmd/akb/**
+status: final
+summary: Audit of the openness/coexistence research base and RFC-001-era material on schema.frontmatter retirement, migration mechanics, and deferrals for RFC-002-A2.
 tags:
 - prior-research
 - templates
 - migration
 - rfc-002
+title: Prior-Research Extraction on schema.frontmatter Retirement and Migration (RFC-002-A2)
+type: research
+updated: "2026-10-06"
 ---
 # Prior-research extraction — RFC-002-A2 (`schema.frontmatter` retirement + migration)
 
