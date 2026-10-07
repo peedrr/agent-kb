@@ -1,25 +1,26 @@
 ---
-grammar: 1
-type: research
-title: RFC-002-A1 Integration-Point Map (recon-code)
-summary: "Read-only code recon mapping where RFC-002-A1's validator-library and format-assertion decisions touch the akb codebase, with file:line anchors."
-status: final
-provenance: agent-drafted
-created: "2026-10-06"
-updated: "2026-10-06"
 as_of: "2026-10-06"
-run: rfc-002-a1-validator
+created: "2026-10-06"
+grammar: 1
 informs:
 - ADR-003
+is_draft: false
+provenance: agent-drafted
+run: rfc-002-a1-validator
 scope:
-- "internal/cel/**"
-- "internal/template/**"
-- "cmd/akb/**"
+- internal/cel/**
+- internal/template/**
+- cmd/akb/**
+status: final
+summary: Read-only code recon mapping where RFC-002-A1's validator-library and format-assertion decisions touch the akb codebase, with file:line anchors.
 tags:
 - code-recon
 - json-schema
 - validation
 - rfc-002
+title: RFC-002-A1 Integration-Point Map (recon-code)
+type: research
+updated: "2026-10-06"
 ---
 # RFC-002-A1 Validator — Integration-Point Map (recon-code)
 
