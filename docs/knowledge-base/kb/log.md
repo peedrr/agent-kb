@@ -28,3 +28,7 @@ Backfilled RFC-002-A3/A4/S1 research runs (7 byte-faithful research pages under 
 
 Backfilled RFC-002-A1/A2 research runs as 7 byte-faithful research pages (all approved) and rewrote .pi/ citations in ADR-003 and ADR-006; surfaced the akb index add parseEntryLine corruption bug (index rebuild deferred to supervisor)
 
+## 2026-10-07 ingest
+
+rfc-templates run recovered from pi-meta-config scratch and backfilled (10 pages, informs RFC-003) per ADR-007
+
