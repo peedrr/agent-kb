@@ -63,6 +63,7 @@ anchors:
 created: "2026-09-25"
 grammar: 1
 id: SPEC-001
+is_draft: false
 kind: change
 provenance: human
 scope:
