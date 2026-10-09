@@ -17,7 +17,7 @@ tags:
 - harness
 title: "Recon local — RFC document formats: akb exemplars and harness consumption (rfc-templates)"
 type: research
-updated: "2026-10-01"
+updated: "2026-10-09T16:35:05Z"
 ---
 # recon-local — RFC document formats (akb exemplars + harness consumption)
 
@@ -47,7 +47,7 @@ Files (all of them): `RFC-001-json-schema-cel-coexistence.md` (**402 lines**), `
 
 **(b) Ordered headings** (H1 has line 1 both files).
 RFC-001:
-```
+```text
 14 ## 1. Abstract          25 ## 2. Motivation        46 ## 3. Goals / Non-goals
 48 ### Goals               70 ### Non-goals          84 ## 4. Design principles
 102 ## 5. The document model 104 ### 5.1 Two artifacts 116 ### 5.2 Derived views are akb-authored, output-only
@@ -61,7 +61,7 @@ RFC-001:
 395 ## Appendix B — Glossary
 ```
 RFC-002 (same spine, longer):
-```
+```text
 15 ## 1. Abstract  40 ## 2. Motivation  61 ## 3. Relationship to RFC-001  77 ## 4. Design principles
 99 ## 5. The document model (D12, D13, D7)  101 ### 5.1 Shape  131 ### 5.2 Two artifacts, one builder…  169 ### 5.3 Declared projections
 189 ## 6. Template format (V3 — breaking…)     263 ## 7. Validation pipeline (write/append)
