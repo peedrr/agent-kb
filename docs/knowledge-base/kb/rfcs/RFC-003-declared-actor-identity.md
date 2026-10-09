@@ -19,7 +19,7 @@ tags:
 - governance
 title: Give akb a Declared Actor Identity So Rules Can Assert Who Acted
 type: rfc
-updated: "2026-10-07T19:10:52Z"
+updated: "2026-10-09T16:35:25Z"
 ---
 
 # RFC-003: Give akb a Declared Actor Identity So Rules Can Assert Who Acted
@@ -97,6 +97,6 @@ Not filled. Ratification is human-only and requires `decided_by` to differ from 
 ## Evidence and Prior Art
 
 - docs-writer `references/rfc.md` — the proposal lifecycle this page follows, including human-only ratification and the status-gated authority boundary.
-- The research run that produced the RFC contract: [[rfc-templates-report|REPORT.md]] and [[rfc-templates-synthesis|SYNTHESIS.md]] (run log: [[rfc-templates-log|LOG.md]]) — performed in the pi-meta-config repository's scratch and backfilled into this KB under [[ADR-007-research-reports-first-class|ADR-007]]; approver-distinct-from-author (KEP), human arbitration (AIDR), and the two-axis disposition model (CSSWG) are the relevant prior art.
+- The research run that produced the RFC contract: [[rfc-templates-report|REPORT.md]] and [[rfc-templates-synthesis|SYNTHESIS.md]] (run log: [[rfc-templates-log|LOG.md]]) — performed in the pi-meta-config repository's scratch and backfilled into this KB under [[ADR-007-research-reports-first-class|ADR-007]]; approver-distinct-from-author (KEP), human arbitration (AIDR), and the two-axis disposition model (CSSWG) are the relevant prior art; its eighteen claims were independently audited in [[rfc-templates-audit-report|the audit report]] (18 supported, 0 corrected, 0 killed).
 - `kb/rfc/RFC-002-open-validation-engine.md` sections 5.1, 14, 15 and 16 — the document model with no actor surface, the config surface, the harness flow, and the commit-identity chain that stops at git.
 - The 2026-10-02 session that produced the interim `rfc` template — this RFC's origin and motivating example.
