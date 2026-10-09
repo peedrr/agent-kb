@@ -2,6 +2,15 @@
 
 Behavior changes and fixes worth acting on. Versions before 0.18.0 predate this file.
 
+## [0.23.1] — 2026-10-09
+
+### Fixed
+
+- **A page title containing a parenthesis or an em dash no longer corrupts `kb/index.md`.**
+  Such a title was parsed wrong, so `akb index add` wrote the entry back with a wrong path
+  and summary, and `akb lint` reported the page as missing from the index. An index already
+  damaged this way is repaired by `akb index rebuild`, which rebuilds it from the pages.
+
 ## [0.23.0] — 2026-10-01
 
 ### Changed
