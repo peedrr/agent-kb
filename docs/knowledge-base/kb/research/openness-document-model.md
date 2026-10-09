@@ -21,7 +21,7 @@ tags:
 - audit
 title: Openness audit — document model & markdown parsing architecture
 type: research
-updated: "2026-10-09T16:35:05Z"
+updated: "2026-10-09T16:36:23Z"
 ---
 # OPENNESS AUDIT — Seam: Document Model & Markdown Parsing Architecture
 
@@ -96,7 +96,7 @@ Owner's claim verified and made precise. `internal/markdown/wikilink.go` is **93
 **Live inconsistencies (all probed; probe output verbatim):**
 
 1. **`^[inferred]` in a 4-space indented code block** — the divergence the owner predicted, confirmed:
-   ```
+   ```text
    markdown.ParseProvenanceMarkers -> []
    CEL page.akb                    -> {"provenance_markers":[{position:15,"type":"inferred"}], ...}
    ```
@@ -106,7 +106,7 @@ Owner's claim verified and made precise. `internal/markdown/wikilink.go` is **93
 4. **Tilde fence** — both parsers report `^[inferred]` inside `~~~...~~~`, while goldmark yields `FencedCodeBlock(4..16)`. Both wrong, jointly.
 5. **Annotation inside an indented code block** — **both** parsers report it (`markdown.ParseAnnotations -> [{olw-auto ... Position:83}]`, CEL agrees) although goldmark renders that line as `CodeBlock` — a shared false positive, not a drift.
 6. **Annotation inside the YAML frontmatter** — lint path passes the *full content* (`cmd/akb/lint.go:130`), CEL path the *body* (`pagebuilder.go:83`):
-   ```
+   ```text
    lint path  ParseAnnotations(full content) -> [{in_frontmatter:true pos=38} {in_body:true pos=114}]
    CEL  path  parseAnnotations(body)        -> [{in_body:true pos=25}]
    ```
