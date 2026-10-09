@@ -32,7 +32,3 @@ dormant-test: "build-tagged / t.Skip()ped"
 - Reuse existing module deps before adding; any dep beyond the plan's enumeration
   needs supervisor approval (canonical module, minimal, approval in commit body).
 - Code comments describe non-obvious behaviour only.
-
-## AUTHORITY
-ADR: none
-SPEC: /home/pete/code/projects/tools/llm-wiki/agent-kb/agent-kb/.pi/subagents/specs/init-versioning-spec.md
