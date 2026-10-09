@@ -59,6 +59,6 @@
 
 ## Specs
 
-- [Init Selects the KB Versioning Mode and Resolves Commit Identity](kb/specs/SPEC-001-init-versioning.md)
+- [Init Selects the KB Versioning Mode and Resolves Commit Identity](kb/specs/SPEC-001-init-versioning.md) — Make `akb init` choose the KB's versioning mode explicitly — embed in the host's history, a repository of its own, or none — and resolve commit identity from the environment, `akb.yaml`, then git, never from config akb writes.
 - [Write-Time Validation Failures Merge Into One Structured Report](kb/specs/SPEC-002-structured-validation-report.md) — Merge every write-time schema and CEL validation failure into one ordered report — one JSON object on stdout under `akb write --json`, exit 1.
 
