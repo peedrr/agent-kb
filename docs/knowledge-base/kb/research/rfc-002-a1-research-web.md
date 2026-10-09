@@ -19,7 +19,7 @@ tags:
 - rfc-002
 title: Go JSON Schema 2020-12 Validators and RFC 3339 Parsing Facts (RFC-002-A1)
 type: research
-updated: "2026-10-06"
+updated: "2026-10-09T16:35:05Z"
 ---
 # Research: Go JSON Schema 2020-12 validators + RFC 3339 parsing facts (for RFC-002-A1 ADR)
 
@@ -258,7 +258,7 @@ RE2 detail (santhosh): `compiler.go` — "UseRegexpEngine changes the regexp-eng
 ### (a) What RFC 3339 permits — exact text
 Source: https://www.rfc-editor.org/rfc/rfc3339.html (§5.6, §5.7, Appendix D; same text at https://datatracker.ietf.org/doc/html/rfc3339)
 
-```
+```abnf
       date-fullyear   = 4DIGIT
       date-month      = 2DIGIT  ; 01-12
       date-mday       = 2DIGIT  ; 01-28, 01-29, 01-30, 01-31 based on
@@ -289,7 +289,7 @@ Source: https://www.rfc-editor.org/rfc/rfc3339.html (§5.6, §5.7, Appendix D; s
       upper case letters.
 ```
 and §5.7:
-```
+```text
    The grammar element time-second may have the value "60" at the end of
    months in which a leap second occurs -- to date: June (XXXX-06-
    30T23:59:60Z) or December (XXXX-12-31T23:59:60Z); see Appendix D ...
