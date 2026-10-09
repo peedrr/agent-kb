@@ -25,6 +25,9 @@ spawns:
 - RFC-002-A16
 - RFC-002-A17
 - RFC-002-A18
+- RFC-002-A19
+- RFC-002-A20
+- RFC-002-A21
 - RFC-002-S1
 - RFC-002-S2
 - RFC-002-S3
@@ -40,7 +43,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-09T16:51:04Z"
+updated: "2026-10-09T19:08:49Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -232,8 +235,10 @@ breaking-change inventory): `page.content` is the string; projections live at
 `page.derived.ast.*`; declared marker/annotation projections live at
 `page.derived.markers` / `page.derived.annotations`. The embedded templates' rules
 rename mechanically — `page.ast.headings/code_blocks/links` → `page.derived.ast.*`,
-`page.content.word_count >= 50` → `word_count(page.content) >= 50` — riding the
-already-breaking V3 revision.
+`page.content.word_count >= 50` → `word_count(page.content) >= 50` — shipping with the
+flatten's own cohort, **not** the V3 revision: [[ADR-008-phase1-current-document-shape|ADR-008]]
+bounds Phase 1 to the current document shape (`content.raw`, `ast.*`), so these renames,
+the `word_count()` registry, and the `char_count` scrap all land when the flatten lands.
 
 ## 6. Template format (V3 — breaking, loudly rejected like the v1/v2 rejections)
 
@@ -314,6 +319,11 @@ lint_rules: []              # UNCHANGED: CEL, sweep-time; gains kb.* in Phase 4 
   `approve` on such a page is a usage error pointing at `lint` (there is no state to
   flip; validation is the sweep's job).
 - **`dir` is renamed/re-specified as `path`** with resolution-hint semantics (D11, §8.3).
+- **Phase-1 key set ([[ADR-010-templatev3-minimal-key-set|ADR-010]]):** the recognized
+  top-level keys in Phase 1 are exactly `name`, `description`, `dir`, `schema`,
+  `validations`, `lint_rules`; the remaining keys in this section arrive with their
+  phases — `template write` hard-rejects anything else with a self-sufficient message,
+  and the load path warns only (forward-compat).
 
 ## 7. Validation pipeline (write/append)
 
@@ -748,7 +758,11 @@ its storage plumbing to be designed twice, and it gifts this RFC the first behav
 
 - **Phase 1 — validation core:** santhosh v6 integration; TemplateV3 `schema:` block;
   pipeline reorder; merged error model; cel-go v0.32.x + ext libraries; `template write`
-  schema obligations; `schema.frontmatter` hard rejection.
+  schema obligations; `schema.frontmatter` hard rejection; sweep-time schema checker
+  ([[ADR-009-phase1-sweep-schema-checker|ADR-009]]). Phase-1 scope is bounded by
+  [[ADR-008-phase1-current-document-shape|ADR-008]] (current document shape — no flatten,
+  no `word_count` registry, no `write --json`) and
+  [[ADR-010-templatev3-minimal-key-set|ADR-010]] (minimal V3 key set).
 - **Phase 2 — write-path honesty + JSON I/O:** input=output (injection/re-marshal/state
   deletion removed); approve unbundled; `read/write --json`; `--input-schema` export;
   round-trip invariant tests; date bridge (declared temporal coercion); the §8.4
@@ -811,6 +825,9 @@ it is the last document approved, and this table is its progress tracker.
 | RFC-002-A18 | ADR | Lint per-issue-class granularity (issue typing for checkers; audit G4) | proposed | — |
 | RFC-002-S4 | SPEC | Search: `search.index_fields` DDL + rebuild, `--tag` matching semantics, `documents.updated` disposition | proposed | — |
 | RFC-002-S5 | SPEC | Input-schema derivation mechanics (normalization, reference keyword-walk) | proposed | — |
+| RFC-002-A19 | ADR | Phase-1 document shape: validate the current shape; flatten, renames, `word_count` registry, `write --json` ship with the flatten's cohort | ratified | [[ADR-008-phase1-current-document-shape|ADR-008]] |
+| RFC-002-A20 | ADR | Sweep-time schema checker ships in Phase 1; `required_fields` retained until the Phase-3 registry | ratified | [[ADR-009-phase1-sweep-schema-checker|ADR-009]] |
+| RFC-002-A21 | ADR | Phase-1 TemplateV3 minimal key set + strict-key posture | ratified | [[ADR-010-templatev3-minimal-key-set|ADR-010]] |
 
 Renumbering note: items 6, 9, and 11 of the original flat 1–19 list were tech-specs,
 so the IDs above are not the old ordinals (old 6 → S1, 9 → S2, 11 → S3; old 7+
@@ -819,6 +836,11 @@ enumerate deferred decisions the body previously mentioned only generically
 (§5.3 projections, §11 issue-class granularity, §14/§14.1 search, §15 input-schema
 derivation); S3's scope was extended to cover the per-template checker enable
 surface. Every body reference was rewritten accordingly.
+
+Rows A19–A21 were added 2026-10-09 and ratified in the same pass: the Phase-1 scope
+decisions discovered while planning SPEC-002's implementation (document-shape timing,
+sweep-checker placement, V3 key set), researched in [[rfc-002-phase1-scope-log|the
+Phase-1 scope run]].
 
 ## 19. Risks
 
