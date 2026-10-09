@@ -40,7 +40,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-07T19:09:11Z"
+updated: "2026-10-09T16:51:04Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -332,7 +332,7 @@ RFC-001 §7 carries with two changes: the required-presence gate is the schema's
 `required` (no separate pre-gate), and **no mutation step exists** — validation either
 passes and the bytes are written, or fails and nothing is written. Error merge (schema
 violations by keyword + JSON Pointer; CEL failures by rule ID; one exit-1 report) and the
-`runTemplateValidations` widening carry unchanged (RFC-002-S1).
+`runTemplateValidations` widening carry unchanged ([[SPEC-002-structured-validation-report|SPEC-002]]).
 
 ## 8. The write path: input = output (D3, P6)
 
@@ -793,7 +793,7 @@ it is the last document approved, and this table is its progress tracker.
 | RFC-002-A3 | ADR | cel-go upgrade (v0.28.0 → v0.32.x, `cel.dev/cel-go`) + extension set | ratified | [[ADR-004-cel-go-upgrade-pinned-extensions|ADR-004]] |
 | RFC-002-A4 | ADR | Date bridge determinism + `template write` static temporal check; duration seam | ratified | [[ADR-005-date-bridge-determinism|ADR-005]] |
 | RFC-002-A5 | ADR | Closed function registry: contents, selection syntax, per-function cost treatment; cache key | proposed | — |
-| RFC-002-S1 | SPEC | Structured validation report (widened `runTemplateValidations`) | proposed | — |
+| RFC-002-S1 | SPEC | Structured validation report (widened `runTemplateValidations`) | ratified | [[SPEC-002-structured-validation-report|SPEC-002]] |
 | RFC-002-A6 | ADR | Document builder rewrite (typed structs, one parse, line conventions) | proposed | — |
 | RFC-002-A7 | ADR | Derived-view versioning (`schema_version` marker) | proposed | — |
 | RFC-002-S2 | SPEC | (a′) AST-derived exclusions — implementation tech-spec | proposed | — |
