@@ -50,6 +50,7 @@
 - [JSON ⇄ CEL seam: core pipeline deep-dive](kb/research/seam-core-pipeline.md) — Deep-dive on where a combined frontmatter+body JSON view and schema validation can run; 8 of 22 shipped CEL rules read body-derived views, so derived keys must stay output-only on write.
 - [Seam periphery — JSON Schema / CEL coexistence across akb subsystems](kb/research/seam-periphery.md) — Read-only survey of subsystems outside the core pipeline (search, link graph, lint, raw, index, log, git): where a JSON-Schema/CEL seam could attach and where it cannot.
 - [Synthesis — openness audit vs RFC-001](kb/research/synthesis-openness.md) — Synthesis of the four openness-audit seams: classifies every mandate as structurally required, opinionated-but-load-bearing, or historical accident, and reframes RFC-001 into RFC-002.
+- [Phase-1 scope recon — code surface and rule consumers](kb/research/rfc-002-phase1-scope-code-surface.md) — Recon of today's CEL page-map shape, word_count/char_count/raw consumers, required-gate coupling, loader leniency, lint interface, template inventory, and write/read flags.
 
 ## Rfcs
 
