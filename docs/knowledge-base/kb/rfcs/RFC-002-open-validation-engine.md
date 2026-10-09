@@ -34,6 +34,9 @@ spawns:
 - RFC-002-S3
 - RFC-002-S4
 - RFC-002-S5
+- RFC-002-S6
+- RFC-002-S7
+- RFC-002-S8
 status: draft
 steward: pete
 summary: Make akb an unopinionated validation-and-persistence engine — JSON Schema 2020-12 and CEL as its only validators, byte-faithful writes, every other mandate removed, demoted, or made configurable.
@@ -44,7 +47,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-09T19:08:49Z"
+updated: "2026-10-09T19:55:02Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -763,7 +766,8 @@ its storage plumbing to be designed twice, and it gifts this RFC the first behav
   ([[ADR-009-phase1-sweep-schema-checker|ADR-009]]). Phase-1 scope is bounded by
   [[ADR-008-phase1-current-document-shape|ADR-008]] (current document shape — no flatten,
   no `word_count` registry, no `write --json`) and
-  [[ADR-010-templatev3-minimal-key-set|ADR-010]] (minimal V3 key set).
+  [[ADR-010-templatev3-minimal-key-set|ADR-010]] (minimal V3 key set); tech-specs
+  RFC-002-S6/S7/S8 (§18).
 - **Phase 2 — write-path honesty + JSON I/O:** input=output (injection/re-marshal/state
   deletion removed); approve unbundled; `read/write --json`; `--input-schema` export;
   round-trip invariant tests; date bridge (declared temporal coercion); the §8.4
@@ -801,34 +805,37 @@ name. Lifecycle:
 This RFC remains `status: draft` until every row below is `ratified` or `dropped` —
 it is the last document approved, and this table is its progress tracker.
 
-| ID | Kind | Candidate | Status | Resolves-as |
-|---|---|---|---|---|
-| RFC-002-A1 | ADR | Validator library (santhosh v6 recommended) + `format` assertion policy | ratified | [[ADR-003-santhosh-v6-format-assertion|ADR-003]] |
-| RFC-002-A2 | ADR | `schema.frontmatter` retirement + migration (`akb template migrate`?) | ratified | [[ADR-006-schema-frontmatter-retirement|ADR-006]] |
-| RFC-002-A3 | ADR | cel-go upgrade (v0.28.0 → v0.32.x, `cel.dev/cel-go`) + extension set | ratified | [[ADR-004-cel-go-upgrade-pinned-extensions|ADR-004]] |
-| RFC-002-A4 | ADR | Date bridge determinism + `template write` static temporal check; duration seam | ratified | [[ADR-005-date-bridge-determinism|ADR-005]] |
-| RFC-002-A5 | ADR | Closed function registry: contents, selection syntax, per-function cost treatment; cache key | proposed | — |
-| RFC-002-S1 | SPEC | Structured validation report (widened `runTemplateValidations`) | ratified | [[SPEC-002-structured-validation-report|SPEC-002]] |
-| RFC-002-A6 | ADR | Document builder rewrite (typed structs, one parse, line conventions) | proposed | — |
-| RFC-002-A7 | ADR | Derived-view versioning (`schema_version` marker) | proposed | — |
-| RFC-002-S2 | SPEC | (a′) AST-derived exclusions — implementation tech-spec | proposed | — |
-| RFC-002-A8 | ADR | (a) inline parser + wikilink test re-homing | proposed | — |
-| RFC-002-S3 | SPEC | `kb.*` execution model (fact surface, freshness, cost semantics) | proposed | — |
-| RFC-002-A9 | ADR | `index.md` retirement mechanics + renderer grammar | proposed | — |
-| RFC-002-A10 | ADR | Log operation enum + `log.md` heading grammar (the parse contract, distinct from the enum) | proposed | — |
-| RFC-002-A11 | ADR | `--frontmatter` fate | proposed | — |
-| RFC-002-A12 | ADR | Sweep draft-awareness | proposed | — |
-| RFC-002-A13 | ADR | Config schema (full field list, strictness mode) | proposed | — |
-| RFC-002-A14 | ADR | CEL→schema portability report (optional, diagnostics-only) | proposed | — |
-| RFC-002-A15 | ADR | `state_field` semantics (approve/list/`--all-drafts` over a configurable key) | proposed | — |
-| RFC-002-A16 | ADR | D17 mechanics: creation-role declaration (schema annotation vs config key), normalization, `COALESCE` fallback, mixed-declaration KB semantics | proposed | — |
-| RFC-002-A17 | ADR | Projection declaration syntax + registry (§5.3) | proposed | — |
-| RFC-002-A18 | ADR | Lint per-issue-class granularity (issue typing for checkers; audit G4) | proposed | — |
-| RFC-002-S4 | SPEC | Search: `search.index_fields` DDL + rebuild, `--tag` matching semantics, `documents.updated` disposition | proposed | — |
-| RFC-002-S5 | SPEC | Input-schema derivation mechanics (normalization, reference keyword-walk) | proposed | — |
-| RFC-002-A19 | ADR | Phase-1 document shape: validate the current shape; flatten, renames, `word_count` registry, `write --json` ship with the flatten's cohort | ratified | [[ADR-008-phase1-current-document-shape|ADR-008]] |
-| RFC-002-A20 | ADR | Sweep-time schema checker ships in Phase 1; `required_fields` retained until the Phase-3 registry | ratified | [[ADR-009-phase1-sweep-schema-checker|ADR-009]] |
-| RFC-002-A21 | ADR | Phase-1 TemplateV3 minimal key set + strict-key posture | ratified | [[ADR-010-templatev3-minimal-key-set|ADR-010]] |
+| ID | Kind | Phase | Candidate | Status | Resolves-as |
+|---|---|---|---|---|---|
+| RFC-002-A1 | ADR | 1 | Validator library (santhosh v6 recommended) + `format` assertion policy | ratified | [[ADR-003-santhosh-v6-format-assertion|ADR-003]] |
+| RFC-002-A2 | ADR | 1 | `schema.frontmatter` retirement + migration (`akb template migrate`?) | ratified | [[ADR-006-schema-frontmatter-retirement|ADR-006]] |
+| RFC-002-A3 | ADR | 1 | cel-go upgrade (v0.28.0 → v0.32.x, `cel.dev/cel-go`) + extension set | ratified | [[ADR-004-cel-go-upgrade-pinned-extensions|ADR-004]] |
+| RFC-002-A4 | ADR | 1 + 2 | Date bridge determinism + `template write` static temporal check; duration seam | ratified | [[ADR-005-date-bridge-determinism|ADR-005]] |
+| RFC-002-A5 | ADR | 4 | Closed function registry: contents, selection syntax, per-function cost treatment; cache key | proposed | — |
+| RFC-002-S1 | SPEC | 1 + 2 | Structured validation report (widened `runTemplateValidations`) | ratified | [[SPEC-002-structured-validation-report|SPEC-002]] |
+| RFC-002-A6 | ADR | 3 | Document builder rewrite (typed structs, one parse, line conventions) | proposed | — |
+| RFC-002-A7 | ADR | 3 | Derived-view versioning (`schema_version` marker) | proposed | — |
+| RFC-002-S2 | SPEC | 3 | (a′) AST-derived exclusions — implementation tech-spec | proposed | — |
+| RFC-002-A8 | ADR | 4 | (a) inline parser + wikilink test re-homing | proposed | — |
+| RFC-002-S3 | SPEC | 4 | `kb.*` execution model (fact surface, freshness, cost semantics) | proposed | — |
+| RFC-002-A9 | ADR | 3 | `index.md` retirement mechanics + renderer grammar | proposed | — |
+| RFC-002-A10 | ADR | 3 | Log operation enum + `log.md` heading grammar (the parse contract, distinct from the enum) | proposed | — |
+| RFC-002-A11 | ADR | 2 | `--frontmatter` fate | proposed | — |
+| RFC-002-A12 | ADR | 3 | Sweep draft-awareness | proposed | — |
+| RFC-002-A13 | ADR | 3 | Config schema (full field list, strictness mode) | proposed | — |
+| RFC-002-A14 | ADR | 4 | CEL→schema portability report (optional, diagnostics-only) | proposed | — |
+| RFC-002-A15 | ADR | 2 | `state_field` semantics (approve/list/`--all-drafts` over a configurable key) | proposed | — |
+| RFC-002-A16 | ADR | 3 | D17 mechanics: creation-role declaration (schema annotation vs config key), normalization, `COALESCE` fallback, mixed-declaration KB semantics | proposed | — |
+| RFC-002-A17 | ADR | 3 | Projection declaration syntax + registry (§5.3) | proposed | — |
+| RFC-002-A18 | ADR | 3 | Lint per-issue-class granularity (issue typing for checkers; audit G4) | proposed | — |
+| RFC-002-S4 | SPEC | 3 | Search: `search.index_fields` DDL + rebuild, `--tag` matching semantics, `documents.updated` disposition | proposed | — |
+| RFC-002-S5 | SPEC | 2 | Input-schema derivation mechanics (normalization, reference keyword-walk) | proposed | — |
+| RFC-002-S6 | SPEC | 1 | TemplateV3 core format + loader: minimal key set (ADR-010), strict keys, `type`/`title` un-routing (D10), embedded template conversion — drafts as SPEC-003 | proposed | — |
+| RFC-002-S7 | SPEC | 1 | Schema-pass integration: document construction, pipeline placement, compiled-schema cache, error-tree → SPEC-002 report mapping, pre-gate removal, sweep checker (ADR-009) — drafts as SPEC-004 | proposed | — |
+| RFC-002-S8 | SPEC | 1 | `template write` schema obligations: mockup-vs-schema proofs, `FAILS:` parser (ADR-006 N7), overlap warning, ADR-005 static-check wiring — drafts as SPEC-005 | proposed | — |
+| RFC-002-A19 | ADR | 1 | Phase-1 document shape: validate the current shape; flatten, renames, `word_count` registry, `write --json` ship with the flatten's cohort | ratified | [[ADR-008-phase1-current-document-shape|ADR-008]] |
+| RFC-002-A20 | ADR | 1 | Sweep-time schema checker ships in Phase 1; `required_fields` retained until the Phase-3 registry | ratified | [[ADR-009-phase1-sweep-schema-checker|ADR-009]] |
+| RFC-002-A21 | ADR | 1 | Phase-1 TemplateV3 minimal key set + strict-key posture | ratified | [[ADR-010-templatev3-minimal-key-set|ADR-010]] |
 
 Renumbering note: items 6, 9, and 11 of the original flat 1–19 list were tech-specs,
 so the IDs above are not the old ordinals (old 6 → S1, 9 → S2, 11 → S3; old 7+
@@ -841,7 +848,12 @@ surface. Every body reference was rewritten accordingly.
 Rows A19–A21 were added 2026-10-09 and ratified in the same pass: the Phase-1 scope
 decisions discovered while planning SPEC-002's implementation (document-shape timing,
 sweep-checker placement, V3 key set), researched in [[rfc-002-phase1-scope-log|the
-Phase-1 scope run]].
+Phase-1 scope run]]. Rows S6–S8 and the **Phase** column were added later the same day:
+S6–S8 enumerate the Phase-1 tech-specs scoped by ADR-008/009/010 (drafting as
+SPEC-003/004/005), and the Phase column maps every candidate to the §17 phase that
+ships it. Two mixed rows: A4 ships its static temporal check in Phase 1 and the
+coercion bridge in Phase 2 (§17), and S1's report internals land in Phase 1 while its
+stdout-emission acceptance criteria land with Phase 2's `write --json` (ADR-008).
 
 ## 19. Risks
 
