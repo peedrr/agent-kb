@@ -20,7 +20,7 @@ tags:
 - research-log
 title: RFC-002-S1 research log — structured validation report (SPEC-002)
 type: research
-updated: "2026-10-07T19:18:27Z"
+updated: "2026-10-09T16:35:10Z"
 ---
 # LOG — RFC-002-S1
 
@@ -169,3 +169,11 @@ and commit it to the KB via `akb` (AKB_KB set).
     santhosh v6 error types (a1 research); a2/a3/a4 error-bearing findings; json-cel research.
   - adr-conventions → adr-conventions.md: ADR-003..006 decisions + Origin-recording convention;
     SPEC-001 structural conventions; index.md/log.md entry style.
+
+## Pages
+
+Findings reports filed from this run (ADR-007):
+
+- [[rfc-002-s1-code-recon]] — read-only recon of akb's validation error machinery: runTemplateValidations, ValidationError, write-path sentinels, classifyExit.
+- [[rfc-002-s1-research-extract]] — verbatim extraction of the RFC-001 merged-error-model requirements and prior a1–a4 error findings constraining SPEC-002.
+- [[rfc-002-s1-adr-conventions]] — conventions and governing decisions (ADR-003..006, SPEC-001) for authoring the SPEC-002 page.
