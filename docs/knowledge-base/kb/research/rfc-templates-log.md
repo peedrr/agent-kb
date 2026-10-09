@@ -18,7 +18,7 @@ tags:
 - process
 title: Research run log — RFC format for agents (rfc-templates)
 type: research
-updated: "2026-10-02"
+updated: "2026-10-09T16:35:15Z"
 ---
 # LOG — rfc-templates research run
 
@@ -280,3 +280,17 @@ session start).
 NEXT: requirements AGREED (interview 2026-10-02) → full fanout launched (4 deep lanes,
 async) → synthesis → decision fork(s) per decision-forms (EARS-2119 recommendation +
 authority-role resolution) → lighter audit → deliverables.
+
+## Pages
+
+Reports filed from this run (ADR-007):
+
+- [[rfc-templates-report]] — findings report: the RFC authoring contract (closed-world frontmatter, human-only ratification, derived staleness postures).
+- [[rfc-templates-synthesis]] — coordinator's design analysis of the RFC as deliberation-stage process unit; ratified forks F1–F5.
+- [[rfc-templates-recon-landscape]] — web recon: published RFC/proposal templates mapped by revision lifecycle.
+- [[rfc-templates-recon-local]] — local recon: the owner's akb RFC-001/002 exemplars and the RFC doc type's missing committed home.
+- [[rfc-templates-lane-agent-era]] — deep lane: the 2026 agent-era RFC literature.
+- [[rfc-templates-lane-deliberation]] — deep lane: deliberation, comment disposition, and the human-only ratification gate.
+- [[rfc-templates-lane-lifecycle]] — deep lane: proposal lifecycle, IETF's 185-day expiry, derived staleness postures.
+- [[rfc-templates-lane-verify]] — verification lane: four IETF and KEP/kepval items re-checked against primaries.
+- [[rfc-templates-audit-report]] — independent audit of this run: 18 claims verified, 18 supported, 0 corrected, 0 killed.
