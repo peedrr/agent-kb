@@ -18,7 +18,7 @@ tags:
 - rfc-format
 title: Lane lifecycle — proposal expiry, staleness, and abandonment mechanics (rfc-templates)
 type: research
-updated: "2026-10-01"
+updated: "2026-10-09T16:35:05Z"
 ---
 # Research: proposal lifecycle, expiry & staleness mechanics (lane-lifecycle)
 
@@ -384,7 +384,7 @@ verify (see Missing evidence), i.e. the state may be aspirational.
 
 Store six statuses; derive one posture; **the clock never writes a status.**
 
-```
+```yaml
 status: draft | review | accepted | implemented | superseded | abandoned
 steward: <name|agent>            # required, non-empty, exactly one accountable party
 superseded_by: <id>              # required iff status == superseded
@@ -397,7 +397,7 @@ disposition_requested_at: <ts>   # finding 1's "Publication Requested" analogue
 
 Derived, never stored (CEL — pure function of document + now):
 
-```
+```cel
 is_overdue    = has(review_by) && now > review_by
 is_suspended  = has(disposition_requested_at) && status in ["review","accepted"]
 is_stale      = status in ["review","accepted"] && is_overdue && !is_suspended
