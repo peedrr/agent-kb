@@ -3,6 +3,7 @@ author: pi/session
 created: "2026-10-02"
 grammar: 1
 id: RFC-003
+is_draft: false
 provenance: agent-drafted
 scope:
 - docs/knowledge-base/**
