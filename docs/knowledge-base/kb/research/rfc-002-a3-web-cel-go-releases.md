@@ -19,7 +19,7 @@ tags:
 - adr-004
 title: cel-go v0.28.0 → v0.32.x upgrade research (long-form)
 type: research
-updated: "2026-10-06"
+updated: "2026-10-09T16:35:05Z"
 ---
 # cel-go v0.28.0 → v0.32.x upgrade research (long-form)
 
@@ -62,7 +62,7 @@ Evidence labels used:
   single-package move.
 - **No `replace` directive is required** for a normal mono-consumer upgrade — but `replace` will NOT work as a way to
   keep the old path at v0.32.0. The failure mode seen across the ecosystem is a resolution error, not a version error:
-  ```
+  ```text
   go: github.com/google/cel-go@v0.32.0: parsing go.mod:
       module declares its path as: cel.dev/cel-go
               but was required as: github.com/google/cel-go
@@ -86,7 +86,7 @@ Evidence labels used:
 
 ### 1.3 cel.dev/expr pairing
 - `cel.dev/cel-go v0.32.0`'s own `go.mod` (tag v0.32.0, fetched raw):
-  ```
+  ```gomod
   module cel.dev/cel-go
   go 1.23.0
   require (
@@ -276,7 +276,7 @@ Evidence labels used:
   `minUnixTime`/`maxUnixTime` overflow check — i.e. pure Go leniency
   ([common/types/string.go @ v0.28.0](https://raw.githubusercontent.com/cel-expr/cel-go/v0.28.0/common/types/string.go)).
 - **v0.32.0 code (after)**: same function now
-  ```
+  ```go
   case TimestampType:
       str := s.Value().(string)
       if !isStrictRFC3339(str) {
