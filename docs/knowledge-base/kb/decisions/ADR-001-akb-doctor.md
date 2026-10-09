@@ -1,16 +1,26 @@
 ---
+created: "2026-10-01"
 grammar: 1
-type: adr
 id: ADR-001
-title: KB Diagnosis and Repair Live in a Dedicated akb Doctor Command
-summary: A new akb doctor command owns diagnosis and repair of nonconformant KBs; remediation text across akb names an akb command, never raw git or hand-edited config.
-tags: [doctor, repair, conformance, agent-ux, error-handling]
-status: proposed
-created: 2026-10-01
-updated: 2026-10-01
+is_draft: false
 provenance: agent-drafted
-scope: ["cmd/akb/**", "internal/storage/**"]
-revisit: ["akb doctor --fix is asked to convert a base's versioning mode", "an embedded base whose host repository is gone needs an automated repair path"]
+revisit:
+- akb doctor --fix is asked to convert a base's versioning mode
+- an embedded base whose host repository is gone needs an automated repair path
+scope:
+- cmd/akb/**
+- internal/storage/**
+status: proposed
+summary: A new akb doctor command owns diagnosis and repair of nonconformant KBs; remediation text across akb names an akb command, never raw git or hand-edited config.
+tags:
+- doctor
+- repair
+- conformance
+- agent-ux
+- error-handling
+title: KB Diagnosis and Repair Live in a Dedicated akb Doctor Command
+type: adr
+updated: "2026-10-01"
 ---
 
 # ADR-001: KB Diagnosis and Repair Live in a Dedicated akb Doctor Command
