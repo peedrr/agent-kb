@@ -1,31 +1,31 @@
 ---
 anchors:
-- checked_at: "2026-10-07T17:55:40Z"
+- checked_at: "2026-10-07T20:37:58Z"
   claim: REQ-001
-  evidence: "resolved at write.go:603 during read-only recon 2026-10-07: collects all CEL failures into []cel.ValidationError, prints stderr lines, returns data-free validationFailure{} — the widening point"
+  evidence: resolves at write.go:603 at d380b05; collects all CEL failures into []cel.ValidationError and returns data-free validationFailure{} — the widening point; go test ./cmd/akb/... PASS 2026-10-07
   kind: local
   path: cmd/akb/write.go
-  state: unverified
+  state: live
   symbol: runTemplateValidations
   verify:
     check: go test ./cmd/akb/...
     method: check
-- checked_at: "2026-10-07T17:55:40Z"
+- checked_at: "2026-10-07T20:37:58Z"
   claim: REQ-004
-  evidence: "resolved at errors.go:11 during read-only recon 2026-10-07: row source type {RuleID, Message, Line, Severity}; no JSON tags today"
+  evidence: "resolves at errors.go:11 at d380b05: row source type {RuleID, Message, Line, Severity}, no JSON tags today; go test ./internal/cel/... PASS 2026-10-07"
   kind: local
   path: internal/cel/errors.go
-  state: unverified
+  state: live
   symbol: ValidationError
   verify:
     check: go test ./internal/cel/...
     method: check
-- checked_at: "2026-10-07T17:55:40Z"
+- checked_at: "2026-10-07T20:37:58Z"
   claim: REQ-009
-  evidence: "resolved at main.go:78 during read-only recon 2026-10-07: maps validationFailure to exit 1 and reports nothing further — the print-then-return contract the report must preserve"
+  evidence: "resolves at main.go:79 at d380b05 (span moved from :78, claim holds): maps validationFailure to exit 1 and reports nothing further; go test ./cmd/akb/... PASS 2026-10-07"
   kind: flow
   path: cmd/akb/main.go
-  state: unverified
+  state: live
   symbol: classifyExit
   verify:
     check: go test ./cmd/akb/...
@@ -35,20 +35,22 @@ grammar: 1
 id: SPEC-002
 kind: change
 provenance: agent-drafted
+ratified_by:
+- Pete Hope
 scope:
 - cmd/akb/**
 - internal/**
-status: proposed
+status: active
 title: Write-Time Validation Failures Merge Into One Structured Report
 type: spec
-updated: "2026-10-07T19:01:06Z"
+updated: "2026-10-09T16:50:57Z"
 verified:
-  at: "2026-10-07T17:55:40Z"
+  at: "2026-10-07T20:37:58Z"
   branch: main
-  commit: fc08a201e17beae3e6195f94ec832bbb7c7127a9
-  method: manual-review
+  commit: d380b05b56e1d61e4f9fb3fa8e3f3904baedeed2
+  method: symbol-resolve+blame-trace
   next_review_by: "2027-01-05"
-  state: unverified
+  state: live
 ---
 
 # SPEC-002: Write-Time Validation Failures Merge Into One Structured Report
@@ -61,7 +63,9 @@ verified:
 Origin: [[RFC-002-open-validation-engine|RFC-002]] candidate RFC-002-S1 (RFC §7 carries the
 merged error model and names this SPEC; §18 governs this record's lifecycle), researched
 2026-10-07 in the research session ([[rfc-002-s1-log]]); drafting decisions (report surface; mockup-attribution
-exclusion) ratified by Pete Hope 2026-10-07 via decision form.
+exclusion) ratified by Pete Hope 2026-10-07 via decision form. Ratified
+2026-10-07 by Pete Hope; per the RFC-002 §18 lifecycle the RFC's S1 row moves to ratified as
+SPEC-002 and its body references are rewritten on that ratification.
 
 ## Why
 
@@ -103,11 +107,11 @@ report instead of two divergent error vocabularies.
   template-required keys before CEL runs; RFC-002 §7 folds this gate into the schema pass,
   whose `required` failures become schema rows of the report.
 - No machine-readable failure output exists: `validationFailure` carries no payload,
-  `cel.ValidationError` has no JSON tags, and `classifyExit` (cmd/akb/main.go:78) maps the
+  `cel.ValidationError` has no JSON tags, and `classifyExit` (cmd/akb/main.go:79) maps the
   sentinel to exit 1 and reports nothing further (print-then-return).
-- `approve` reuses the sentinel: `approveAllDraftPages` (cmd/akb/approve.go:265) matches it
+- `approve` reuses the sentinel: `approveAllDraftPages` (cmd/akb/approve.go:266) matches it
   with `errors.As` to treat a refused draft as non-fatal-per-page, and `requiredFieldsRefusal`
-  (cmd/akb/approve.go:220) deliberately reuses write's refusal wording.
+  (cmd/akb/approve.go:221) deliberately reuses write's refusal wording.
 - The only structured-report precedent is `lint --json`: `{issues: [{check, rule_id?, message,
   path, severity}], summary: {total, pages_checked, by_check}}` (internal/lint/engine.go:17,28;
   cmd/akb/lint.go:220), frozen by N5.
@@ -227,8 +231,8 @@ same `[rule_id] message` lines that markdown-mode `akb write` prints for the sam
 - `validationFailure` remains an `errors.As`-matchable sentinel; `classifyExit` maps it to
   exit 1 and prints nothing further, so failure output is never doubled.
 - `approveAllDraftPages` continues to treat a refused page as non-fatal-per-page via the same
-  sentinel match (cmd/akb/approve.go:265), and approve's refusal wording continues to match
-  write's (cmd/akb/approve.go:220).
+  sentinel match (cmd/akb/approve.go:266), and approve's refusal wording continues to match
+  write's (cmd/akb/approve.go:221).
 - Markdown-mode `write`/`append` failure output stays human-readable stderr lines only.
 - The first CEL compile error still aborts as an exit-2 akb fault before any rule evaluation.
 - Within the evaluated layer, every failed and every unevaluable rule is still collected and
@@ -306,6 +310,8 @@ depends_on:
 
 - 2026-10-07 · SPEC-002 · ∅ → proposed · authored from RFC-002 §7/§18 plus owner decision-form
   ratifications (surface, mockup scope) · evidence: [[rfc-002-s1-log]]
+- 2026-10-07 · SPEC-002 · proposed → active · owner ratification (Pete Hope) after verification
+  sweep · evidence: anchors resolve at d380b05; `go test ./cmd/akb/ ./internal/cel/ -count=1` PASS
 
 ## Revisit Triggers
 
@@ -321,13 +327,13 @@ depends_on:
 
 ## Evidence Appendix
 
-At `verified.commit` fc08a201e17beae3e6195f94ec832bbb7c7127a9:
+At `verified.commit` d380b05b56e1d61e4f9fb3fa8e3f3904baedeed2:
 
 - Write path: cmd/akb/write.go:603-651 (`runTemplateValidations`), :522-526 (required-field
   pre-gate), :529 (call site), :598-602 (deliberate lint/write divergence comment);
   cmd/akb/append.go:225 (call site); cmd/akb/required_fields.go:18,32.
-- Sentinels and exit contract: cmd/akb/main.go:27 (codes), :53 (`validationFailure`), :78-91
-  (`classifyExit`); cmd/akb/approve.go:220,233,265.
+- Sentinels and exit contract: cmd/akb/main.go:26-28 (codes), :53 (`validationFailure`), :79
+  (`classifyExit`); cmd/akb/approve.go:221,266.
 - CEL layer: internal/cel/errors.go:11-21; internal/cel/engine.go:41,64,86-102 (compile,
   evaluate, panic/cost recovery).
 - Structured-report precedent: internal/lint/engine.go:17,28 (`LintIssue`/`LintReport`);
