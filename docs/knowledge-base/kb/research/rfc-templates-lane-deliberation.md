@@ -18,7 +18,7 @@ tags:
 - rfc-format
 title: Lane deliberation — disposition of comments and ratification semantics (rfc-templates)
 type: research
-updated: "2026-10-01"
+updated: "2026-10-09T16:35:05Z"
 ---
 # Research: deliberation, disposition-of-comments, and ratification semantics for an agent-consumed RFC format
 
@@ -197,7 +197,7 @@ should be treated as direct prior art.
 14. **orfc (`github.com/titunian/rfc`) really does pull review comments back as machine-parseable blocks.** [direct]
     repo cloned + `packages/cli/src/commands/pull.ts` read this run. Emitted shape:
 
-    ```
+    ```markdown
     <!-- RFC FEEDBACK
     This document contains reviewer comments in <!-- [COMMENT] --> blocks.
     Revise the RFC addressing all comments, then remove the comment blocks. -->
