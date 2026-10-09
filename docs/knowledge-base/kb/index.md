@@ -52,6 +52,7 @@
 - [Synthesis — openness audit vs RFC-001](kb/research/synthesis-openness.md) — Synthesis of the four openness-audit seams: classifies every mandate as structurally required, opinionated-but-load-bearing, or historical accident, and reframes RFC-001 into RFC-002.
 - [Phase-1 scope recon — code surface and rule consumers](kb/research/rfc-002-phase1-scope-code-surface.md) — Recon of today's CEL page-map shape, word_count/char_count/raw consumers, required-gate coupling, loader leniency, lint interface, template inventory, and write/read flags.
 - [Phase-1 scope recon — test pinning, frontmatter types, call sites](kb/research/rfc-002-phase1-scope-test-pinning.md) — Recon of flatten-vs-current-shape test churn, goccy frontmatter value types, the complete BuildPage/BuildOldPage call-site list, and the approve-wording testscript coverage gap.
+- [Phase-1 scope research run — LOG](kb/research/rfc-002-phase1-scope-log.md) — Run log for the RFC-002 Phase-1 scope research — four owner-ratified scope decisions filed as ADR-008/009/010, with the evidence index, decision record, and parked items.
 
 ## Rfcs
 
