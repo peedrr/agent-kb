@@ -21,7 +21,7 @@ tags:
 - audit
 title: Openness audit — document model & markdown parsing architecture
 type: research
-updated: "2026-09-27"
+updated: "2026-10-09T16:35:05Z"
 ---
 # OPENNESS AUDIT — Seam: Document Model & Markdown Parsing Architecture
 
@@ -139,7 +139,7 @@ Owner's claim verified and made precise. `internal/markdown/wikilink.go` is **93
 
 ## Consumer trace
 
-```
+```text
 body (post-frontmatter) ──┬─→ frontmatter.Parse (goldmark+frontmatter ext)  [write.go:189,312,359; append.go:149; lint.go:120; approve.go:139]
                           └─→ goldmark.New().Parser().Parse(body)            [write.go:508; append.go:205; templates_write.go:342; lint/cel.go:60; pagebuilder.go:112]
                                   └─ cel.BuildPage ─→ page map ─→ CEL rules (validations write-time; lint_rules sweep-time)
