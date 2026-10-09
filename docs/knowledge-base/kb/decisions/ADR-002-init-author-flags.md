@@ -4,6 +4,7 @@ deciders:
 - Pete Hope
 grammar: 1
 id: ADR-002
+is_draft: false
 provenance: agent-drafted
 revisit:
 - scaffolding agents are found to pass the author flags reflexively, baking ephemeral identities into bases
