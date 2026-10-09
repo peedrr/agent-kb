@@ -11,6 +11,7 @@
 - [Research Reports Are First-Class Pages, Not Raw Sources or Chat Residue](kb/decisions/ADR-007-research-reports-first-class.md) — Agent-generated research reports and run logs are first-class research pages under kb/research/; raw/ holds external sources only; KB pages never cite files that do not travel with the KB.
 - [The RFC-002 Flattened Document Model Is Not Phase-1 Scope](kb/decisions/ADR-008-phase1-current-document-shape.md) — Phase 1 validates today's document shape (content.raw, ast.*); the section-5 flatten, derived.* renames, word_count registry, and write --json all ship with the flatten's later cohort.
 - [Phase 1 Ships the Sweep-Time Schema Checker and Keeps required_fields](kb/decisions/ADR-009-phase1-sweep-schema-checker.md) — A built-in schema lint checker ships with Phase 1 (before cel_lint, one shared now); required_fields stays registered until the Phase-3 registry subsumes it, so by_check never loses a key.
+- [Phase-1 TemplateV3 Recognizes Six Keys and Hard-Rejects the Rest](kb/decisions/ADR-010-templatev3-minimal-key-set.md) — Phase-1 TemplateV3 recognizes exactly name, description, dir, schema, validations, lint_rules; template write hard-rejects any other key with a self-sufficient message, and load warns only.
 
 ## Researchs
 
