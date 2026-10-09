@@ -20,7 +20,7 @@ tags:
 - rfc-002
 title: TemplateV2 to V3 Migration Recon (RFC-002-A2)
 type: research
-updated: "2026-10-06"
+updated: "2026-10-09T16:35:05Z"
 ---
 # Recon: TemplateV2 → V3 migration (RFC-002-A2)
 
@@ -65,7 +65,7 @@ No `Type`/`Enum` checking, no CEL compile at load, no unknown-key rejection.
 Both reject if any top-level key **`required` / `optional` / `body`** is present (`:74`, `:463`).
 
 **Exact message shape** (the precedent RFC-002 cites), quoting `internal/template/template.go:77`:
-```
+```text
 parse %s: Template format has changed. Please update to the new schema.
 ```
 
@@ -92,7 +92,7 @@ Wired automatically: `test/integration_test.go:44-46` runs `testscript.Run` with
 - `cmd/akb/templates_write.go:152-156` (pass-mockup gate)
 
 **Exact behavior confirmed:** all missing fields listed in one message; `validationFailure` → `classifyExit` `errors.As` (`main.go:89`) → **exit 1**, no extra report (command already printed). Message shape (`required_fields.go:33-35`):
-```
+```text
 missing required frontmatter field(s): a, b (declared required by template "rfc")
 ```
 Only **presence** is checked; values/types/enums are left to CEL rules (comment `required_fields.go:18-19`). Gate runs **before** CEL validations (`write.go:520-527`, then `runTemplateValidations`).
