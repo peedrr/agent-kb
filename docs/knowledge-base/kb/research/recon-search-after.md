@@ -21,7 +21,7 @@ tags:
 - database
 title: "Recon: how akb search --after <date> behaves"
 type: research
-updated: "2026-09-27"
+updated: "2026-10-09T16:35:06Z"
 ---
 # Recon: how `akb search --after <date>` behaves (read-only)
 
@@ -54,7 +54,7 @@ Trace, end to end:
 
 **Confirmed: the column is index time, never the page's frontmatter `created`.** `akb write` does inject `created: <time.Now().UTC().Format(time.RFC3339)>` into frontmatter when absent (`cmd/akb/write.go:377-379`), but that value never leaves the file — the index call at `write.go:553` passes only title/body/tags/summary/type. Live proof:
 
-```
+```text
 page frontmatter: created: 2020-01-01   →  documents row: created="2026-09-27 19:13:19"
 search "zzprobe" --after 2021-01-01     →  HIT   (page declared 2020)
 search "zzprobe" --after 2030-01-01     →  (empty)
@@ -62,7 +62,7 @@ search "zzprobe" --after 2030-01-01     →  (empty)
 
 **Rebuild resets every row's `created` to rebuild time — confirmed.** `RebuildIndex` runs `DELETE FROM pages` (`sqlite.go:227`) then `DELETE FROM documents` (`sqlite.go:230`) and re-inserts every file through `IndexPageTx` (`sqlite.go:284`), so `created` is rewritten to `datetime('now')` for *all* rows. Probe:
 
-```
+```text
 UPDATE documents SET created='2019-05-05 08:00:00'   → search --after 2020-01-01 : empty
 akb index rebuild                                    → created="2026-09-27 19:13:31", id 1→2
                                                        search --after 2020-01-01 : HIT
