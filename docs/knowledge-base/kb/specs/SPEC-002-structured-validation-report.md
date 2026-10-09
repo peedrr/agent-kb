@@ -33,6 +33,7 @@ anchors:
 created: "2026-10-07"
 grammar: 1
 id: SPEC-002
+is_draft: false
 kind: change
 provenance: agent-drafted
 ratified_by:
