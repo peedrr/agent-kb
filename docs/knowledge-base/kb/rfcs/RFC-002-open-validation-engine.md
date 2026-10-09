@@ -3,6 +3,7 @@ author: pete
 created: "2026-09-27"
 grammar: 1
 id: RFC-002
+is_draft: false
 provenance: agent-drafted
 scope:
 - "**"
