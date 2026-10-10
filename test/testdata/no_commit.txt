@@ -37,6 +37,23 @@ stdout 'Deleted kb/notes/nocommit-note.md'
 exec git log --oneline
 cmp stdout initial-commits.txt
 
+# --- Delete (committing) a page written with --no-commit ---
+stdin ../note-input.md
+exec akb --no-commit write untracked-note.md
+stdout 'Written to kb/notes/untracked-note.md'
+
+exists kb/notes/untracked-note.md
+
+# The page was never tracked by git; the committing delete still succeeds.
+exec akb delete notes/untracked-note.md
+stdout 'Deleted kb/notes/untracked-note.md'
+
+! exists kb/notes/untracked-note.md
+
+# No commit is created: the page was never tracked by git.
+exec git log --oneline
+cmp stdout initial-commits.txt
+
 # --- Write without --no-commit DOES create a commit ---
 stdin ../commit-note-input.md
 exec akb write commit-note.md
