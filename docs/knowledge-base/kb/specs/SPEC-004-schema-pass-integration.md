@@ -110,7 +110,7 @@ Non-goals:
 - Document flattening, `derived.*`, `word_count()`, `write --json` stdout emission (ADR-008; SPEC-002 phases it).
 - Date-bridge coercion of CEL values (ADR-005, Phase 2).
 - Unknown-format warnings at `template write` (SPEC-005 owns the surface; this SPEC only keeps validation lenient).
-- Git-state preflight ordering (merge/identity checks) — parked to ADR-011 and its post-RFC-002 work unit; this SPEC makes no preflight claims.
+- Git-state preflight ordering (merge/identity checks) — owned by ADR-011 (validate-first ordering and the full `--no-commit` git-state bypass, landed ahead of Phase 1); this SPEC makes no preflight claims.
 
 ## Current Behaviour
 
@@ -260,8 +260,9 @@ contains nested maps and anchors, compilation MUST succeed and assert as written
 - The `template write` PASS-mockup required-field check MUST NOT change (SPEC-005 owns it).
 - Exit-code classes MUST NOT change: validation refusal exit 1, usage exit 2 with `usage:`,
   akb fault exit 2 with `internal:`, other command failure exit 1 with `Error:`.
-- Git-state preflight placement and `--no-commit` semantics MUST NOT change (ADR-011's work
-  unit owns them).
+- Git-state preflight placement and `--no-commit` semantics MUST NOT change from their ADR-011
+  behaviour: validation first, the git-state preflight immediately before the storage mutation
+  it guards, and `--no-commit` skipping every git-state check.
 
 ## Decisions and Rejected Alternatives
 
@@ -270,8 +271,8 @@ contains nested maps and anchors, compilation MUST succeed and assert as written
   SPEC-003 AC-007 and `internal/cel` stays CEL-only.
 - The cache is one mutex-guarded instance shared by the write path and the sweep checker,
   per ADR-003 I8's "compile once keyed by template identity".
-- Git-state preflight ordering is parked to ADR-011 and its post-RFC-002 work unit; this SPEC
-  neither reorders nor amends preflight behavior.
+- Git-state preflight ordering is owned by ADR-011 (ratified and landed ahead of Phase 1);
+  this SPEC neither reorders nor amends preflight behavior.
 - Rejected: validating the CEL page map instead of a dedicated document. The page map is
   date-coerced; ADR-005 N3 and ADR-008 I1 require raw values. Do not re-propose unless ADR-005
   or ADR-008 is amended.
@@ -292,8 +293,8 @@ contains nested maps and anchors, compilation MUST succeed and assert as written
   (no CGO locally). The mutex requirement above covers `Compile`, not `Validate`.]
 - OQ-1 (RESOLVED 2026-10-10): an earlier draft required moving the merge/identity preflight
   ahead of validation. Owner decision: parked out of SPEC-004 — ADR-011 records the
-  validate-first ordering and the full `--no-commit` git-state bypass as a post-RFC-002 work
-  unit across all mutating commands.
+  validate-first ordering and the full `--no-commit` git-state bypass as a standalone work
+  unit across all mutating commands (ratified and landed the same day).
 - OQ-2 (RESOLVED 2026-10-10): owner ratified REQ-021 as written — malformed template schema is
   an internal fault (exit 2) on the write path and a degraded per-page issue in the sweep.
   Template-write-time schema exercise (mockup-vs-schema proofs) is SPEC-005/S8 scope; until it
@@ -327,13 +328,14 @@ blocks: [SPEC-005]
 - 2026-10-10 · drafted at c8bac2e from the rfc-002-s7 research run · state: proposed.
 - 2026-10-10 · preflight-ordering requirement removed after owner review · parked to ADR-011.
 - 2026-10-10 · malformed-schema surfacing ratified by owner (exit 2 internal + sweep degrade) · REQ-021 finalized.
+- 2026-10-10 · ADR-011 ratified and its reorder work unit landed · Preserved Behaviour preflight line restated against the ADR-011 behaviour; the landing revisit trigger discharged.
 
 ## Revisit Triggers
 
 - SPEC-003 amendment of REQ-007 (loader pass-through) — re-check this SPEC's compile-site design.
 - `go.mod` — any change to the santhosh-tekuri/jsonschema version (re-run the libs-verify probes).
 - RFC-002 §7 pipeline text or ADR-008 document-shape cohort — re-check REQ-001/REQ-004.
-- ADR-011's reorder work unit landing — re-check the Preserved Behaviour preflight line.
+- ADR-011 amendment or supersession — re-check the Preserved Behaviour preflight line.
 
 ## Evidence Appendix
 
@@ -374,4 +376,4 @@ Discard log:
   contains zero concurrency text; the mutex requirement stands on source evidence instead.
 - "Early merge/identity preflight in write/append (draft REQ-007 v1)" — withdrawn after owner
   review 2026-10-10; the uniform validate-first ordering and full `--no-commit` bypass belong
-  to ADR-011 and its post-RFC-002 work unit, not to this SPEC.
+  to ADR-011 (since ratified and landed), not to this SPEC.

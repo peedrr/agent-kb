@@ -74,7 +74,7 @@ scope:
 status: completed
 title: Init Selects the KB Versioning Mode and Resolves Commit Identity
 type: spec
-updated: "2026-10-01T16:23:16Z"
+updated: "2026-10-10T20:25:41Z"
 verified:
   at: "2026-10-01T16:22:52Z"
   branch: main
@@ -133,7 +133,7 @@ REQ-012: WHEN a complete `--author-name`/`--author-email` pair names an identity
 REQ-013: WHILE a committing command runs, the system MUST resolve commit identity in precedence order: `AKB_AUTHOR_*` environment, then `git-author`/`git-email` in `akb.yaml`, then git-native resolution.
 REQ-014: WHEN a committing command takes its identity from the environment or `akb.yaml`, the system MUST export both `GIT_AUTHOR_*` and `GIT_COMMITTER_*` to the git subprocess.
 REQ-015: IF a committing command cannot resolve a commit identity, THEN the system MUST refuse with exit 2 before any file mutation, naming the `AKB_AUTHOR_*` environment variables and `akb.yaml` `git-author`/`git-email` as remedies.
-REQ-016: WHEN a merge is in progress in the host repository, conflicted or clean, the system MUST block its commit before writing anything.
+REQ-016: WHEN a merge is in progress in the host repository, conflicted or clean, the system MUST block its commit before writing anything. (Amended by [[ADR-011-validation-before-git-preflight|ADR-011]]: the requirement guards the commit; an invocation passed `--no-commit` attempts no commit and therefore runs no git-state check at all. Unchanged for committing invocations.)
 REQ-017: WHEN `akb init .` runs, the system MUST derive the base name from the directory basename and report the adopted name in the exit-0 output.
 REQ-018: WHERE `--no-commit` is passed to `akb init`, the system MUST leave the scaffolded base staged but uncommitted.
 
@@ -235,6 +235,7 @@ depends_on: []
 - 2026-10-01 · re-verified + anchor REQ-012 · live → live · re-stamp at HEAD 04a38b0 (was 5c0857b): all six anchor symbols resolve at their claimed paths, claims confirmed against the bodies · evidence: `go test ./internal/storage/... ./internal/config/...` green, `go test ./cmd/akb/ -run 'TestInitAuthor|TestInitRecordsTheDefaultIdentity' -count=1` green, `Test/init_identity` PASS
 - 2026-10-01 · amendment REQ-012 + AC-019 + Decisions + anchor REQ-012 · completed → completed · [[ADR-002-init-author-flags]] ratified (deciders: Pete Hope) and implemented: the flag clause of REQ-012 is reversed — a complete `--author-name`/`--author-email` pair is declared, not ambient, and init records it in `akb.yaml`; partial pairs and the ambient sources stay unrecorded · evidence: code change eeebad8 (`initIdentity` records a complete pair; `TestInitAuthorFlagsOutrankEnvironmentAndGitConfig`, `TestInitPartialAuthorFlagIsNotRecorded`, `TestInitAuthorFlagsWithNoCommitLeaveTheCommitToTheCaller` reworked; `Test/init_identity` extended with complete-pair, partial-pair, and `--no-git` flag cases)
 - 2026-10-01 · re-verified · live → live · re-stamp at HEAD eeebad8 (was 04a38b0): all six anchor symbols resolve at their claimed paths (`initIdentity` now init.go:229, `ResolveInitIdentity` now identity.go:121 — doc-comment growth), claims confirmed against the bodies · evidence: `go test ./cmd/akb/ ./internal/... ./test/ -count=1` green, `golangci-lint run ./...` 0 issues
+- 2026-10-10 · amendment REQ-016 · completed → completed · [[ADR-011-validation-before-git-preflight|ADR-011]] ratified and implemented: the merge preflight guards the commit, so a `--no-commit` invocation attempts no commit and runs no git-state check at all; REQ-016 annotated with the carve-out, unchanged for committing invocations
 
 ## Revisit Triggers
 

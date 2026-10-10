@@ -7,11 +7,11 @@ provenance: agent-drafted
 revisit:
 - a mutating command gains a validation step whose feedback depends on git state — ordering I1 needs re-examination for that command
 - git merge semantics change to include unstaged paths in a merge commit — the N2 bypass loses its safety argument
-- the post-RFC-002 reorder work unit lands — the transitional inconsistency named in Consequences must be gone
+- the reorder work unit lands — the transitional inconsistency named in Consequences must be gone
 scope:
 - cmd/akb/**
 - internal/storage/**
-status: proposed
+status: accepted
 summary: All mutating commands validate first and run the git-state preflight (merge, identity) immediately before the storage mutation; --no-commit skips every git-state check, not just identity.
 tags:
 - rfc-002
@@ -36,7 +36,7 @@ updated: "2026-10-10"
 > §7 literal merge-check-first order and the working-tree-protection reading of the merge guard,
 > to achieve validation feedback on the artifact the author controls before environmental
 > refusals that may clear on their own, accepting that a `--no-commit` write can land in a
-> merging working tree and that RFC-002 §7's pipeline text needs amendment, because the time an
+> merging working tree and that RFC-002 §7's pipeline text is amended to the true position, because the time an
 > agent spends fixing a validation error is exactly the window in which another agent's merge
 > finishes, and a flag that promises no commit makes git-state preconditions irrelevant.
 
@@ -53,6 +53,11 @@ write. The current code does neither: `write`/`append` preflight late by acciden
 `store.Write`), the other mutating commands preflight early on purpose, and
 `Store.Preflight` runs `checkMergeState` before its `noCommit` short-circuit
 (`internal/storage/mode.go:115` vs `:118`).
+
+This amends [[SPEC-001-init-versioning|SPEC-001]] REQ-016 ("WHEN a merge is in progress … the
+system MUST block its commit before writing anything") for the `--no-commit` case: the
+requirement guards the commit, and an invocation that attempts no commit has nothing to guard,
+so it runs no git-state check at all. REQ-016 stands unchanged for committing invocations.
 
 ## Invariants
 
@@ -140,8 +145,10 @@ tree: git never sweeps unstaged paths into a merge commit.
   unstaged and outside the merge, but an operator resolving the merge sees unfamiliar untracked
   changes. Accepted: the mitigation is git's own isolation plus the flag being opt-in.
 - Bad, because nine commands' preflight call sites move and `Store.Preflight` changes contract;
-  this is a dedicated post-RFC-002 work unit, not folded into SPEC-004. Accepted: until it
-  lands, the codebase remains in the transitional inconsistency this ADR names.
+  this is a standalone work unit, not folded into SPEC-004 and unordered relative to RFC-002 —
+  nothing in it depends on the RFC's phases. Accepted: it lands on its own ahead of Phase-1
+  implementation, and until it does the codebase remains in the transitional inconsistency this
+  ADR names.
 - Neutral, because RFC-002 §7's pipeline text is amended to state the git-state preflight in
   its true position — immediately before the storage mutation — rather than first.
 
@@ -151,3 +158,5 @@ tree: git never sweeps unstaged paths into a merge commit.
 - Research: [[rfc-002-s7-nocommit-recon]], [[rfc-002-s7-code-recon]] (D5), [[rfc-002-s7-log]].
 - [[ADR-002-init-author-flags|ADR-002]] (commit-identity resolution the preflight invokes).
 - [[SPEC-004-schema-pass-integration|SPEC-004]] (validation-stage owner; makes no preflight-ordering claims).
+- [[SPEC-001-init-versioning|SPEC-001]] REQ-016/AC-016 (the landed merge-preflight requirement
+  this ADR amends for the `--no-commit` case).

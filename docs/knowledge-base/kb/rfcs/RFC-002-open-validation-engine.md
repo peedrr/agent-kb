@@ -47,7 +47,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-10T19:49:02Z"
+updated: "2026-10-10T20:25:41Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -735,7 +735,9 @@ After all demotions, akb mandates exactly: the `.agent-kb/akb.yaml` marker; `kb/
 template (the selector — the one write-time refusal); git versioning per the
 **init-versioning spec** ([[SPEC-001-init-versioning|SPEC-001]], lands before
 this RFC's phases — D-seq): `versioning: git|none`, and in git mode auto-commit with
-`--no-commit` escape, merge preflight (conflicted *and* clean-merge detection), and the
+`--no-commit` escape (which skips every git-state check, merge preflight included —
+[[ADR-011-validation-before-git-preflight|ADR-011]]), merge preflight (conflicted *and*
+clean-merge detection, run only when a commit will be attempted — ADR-011), and the
 spec §6 identity chain (env `AKB_AUTHOR_*` → `akb.yaml` `git-author`/`git-email` →
 git-native; repo config is never written — replacing today's `-c user.name=akb
 -c user.email=akb@local` per-invocation fallback, audit M29/C3); in **non-git mode**
@@ -841,7 +843,7 @@ it is the last document approved, and this table is its progress tracker.
 | RFC-002-A19 | ADR | 1 | Phase-1 document shape: validate the current shape; flatten, renames, `word_count` registry, `write --json` ship with the flatten's cohort | ratified | [[ADR-008-phase1-current-document-shape|ADR-008]] |
 | RFC-002-A20 | ADR | 1 | Sweep-time schema checker ships in Phase 1; `required_fields` retained until the Phase-3 registry | ratified | [[ADR-009-phase1-sweep-schema-checker|ADR-009]] |
 | RFC-002-A21 | ADR | 1 | Phase-1 TemplateV3 minimal key set + strict-key posture | ratified | [[ADR-010-templatev3-minimal-key-set|ADR-010]] |
-| RFC-002-A22 | ADR | post | Git-state preflight ordering: every mutating command validates first and runs the merge/identity preflight immediately before its storage mutation; `--no-commit` bypasses all git-state checks; implementation across all mutating commands is a post-RFC-002 work unit | proposed | [[ADR-011-validation-before-git-preflight|ADR-011]] |
+| RFC-002-A22 | ADR | — | Git-state preflight ordering: every mutating command validates first and runs the merge/identity preflight immediately before its storage mutation; `--no-commit` bypasses all git-state checks — implemented as a standalone work unit ahead of Phase 1, unordered relative to this RFC's phases | ratified | [[ADR-011-validation-before-git-preflight|ADR-011]] |
 
 Renumbering note: items 6, 9, and 11 of the original flat 1–19 list were tech-specs,
 so the IDs above are not the old ordinals (old 6 → S1, 9 → S2, 11 → S3; old 7+
@@ -867,6 +869,12 @@ needed were owner-ratified in the same pass and researched in [[rfc-002-s6-log|t
 run]]: the conversion corpus is all six templates (the two embedded plus this repo's four KB
 templates), the loader hands `schema` through uncompiled to the schema pass, and the
 conversion is format-only with the embedded example restructure held to Phase 4 (§17).
+
+Row A22 was ratified 2026-10-10 as [[ADR-011-validation-before-git-preflight|ADR-011]] and
+implemented the same day as a standalone work unit ahead of Phase 1: the reorder touches
+nothing this RFC's phases touch (the only file overlap with SPEC-004 is `templates_write.go`,
+in disjoint regions), so the UX fix was not held hostage to the phase plan. §7's pipeline text
+already states the resulting order, and §16 records the `--no-commit` carve-out.
 
 ## 19. Risks
 
