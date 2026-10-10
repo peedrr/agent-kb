@@ -109,9 +109,11 @@ func (g *GitProvider) Read(_ context.Context, path string) ([]byte, error) {
 	return data, nil
 }
 
-// Delete removes a file and commits the change. An invocation that leaves its
-// commit to the caller (--no-commit) attempts no commit, so it skips the merge
-// check that guards one: under the store lock it only performs the filesystem
+// Delete removes a file and commits the change. A file git never tracked has
+// nothing to stage or commit, so deleting one is a filesystem-only removal
+// that leaves the repository unchanged. An invocation that leaves its commit
+// to the caller (--no-commit) attempts no commit, so it skips the merge check
+// that guards one: under the store lock it only performs the filesystem
 // remove, and the file lands unstaged.
 func (g *GitProvider) Delete(_ context.Context, path string) error {
 	return g.withRepoLock(func() error {
@@ -136,6 +138,17 @@ func (g *GitProvider) Delete(_ context.Context, path string) error {
 		}
 
 		if g.noCommit {
+			return nil
+		}
+
+		// A page git never tracked has nothing to stage: the removal is not in
+		// the index, and `git add` rejects the path because the worktree no
+		// longer holds a file for it.
+		tracked, err := RunGit(g.kbRoot, "git ls-files "+filepath.ToSlash(relPath), "ls-files", "--", relPath)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(tracked) == "" {
 			return nil
 		}
 

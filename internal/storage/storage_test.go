@@ -462,6 +462,47 @@ func TestGitProvider_Delete(t *testing.T) {
 	})
 }
 
+func TestGitProvider_Delete_Untracked(t *testing.T) {
+	tmpDir := initGitRepo(t)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
+
+	p := NewGitProvider(tmpDir, false)
+	ctx := context.Background()
+
+	// A page written with the commit left to the caller lands in the worktree
+	// untracked, and a later delete must not reach git: it has nothing to stage
+	// or commit.
+	path := filepath.Join(tmpDir, "kb", "untracked-del.md")
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("never committed"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if tracked := mustGitIn(t, tmpDir, "ls-files", "--", "kb/untracked-del.md"); tracked != "" {
+		t.Fatalf("file should be untracked, git ls-files reported %q", tracked)
+	}
+
+	headBefore := mustGitIn(t, tmpDir, "rev-parse", "HEAD")
+	countBefore := len(strings.Split(mustGitIn(t, tmpDir, "log", "--oneline"), "\n"))
+
+	if err := p.Delete(ctx, path); err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("file should not exist after delete")
+	}
+
+	if headAfter := mustGitIn(t, tmpDir, "rev-parse", "HEAD"); headAfter != headBefore {
+		t.Errorf("HEAD changed: before=%s, after=%s", headBefore, headAfter)
+	}
+	countAfter := len(strings.Split(mustGitIn(t, tmpDir, "log", "--oneline"), "\n"))
+	if countAfter != countBefore {
+		t.Errorf("commit count changed: before=%d, after=%d", countBefore, countAfter)
+	}
+}
+
 func TestGitProvider_Delete_NoCommit(t *testing.T) {
 	tmpDir := initGitRepo(t)
 	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
