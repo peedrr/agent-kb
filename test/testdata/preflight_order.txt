@@ -66,6 +66,14 @@ exists kb/decisions/adr/no-commit-write.md
 exec git rev-parse HEAD
 cmp stdout head-before.txt
 
+# The write reaches the working tree only: the page is untracked in the
+# merging host repository and git's index never records it.
+cd $WORK/host
+exec git status --porcelain --untracked-files=all -- docs/kb/decisions/adr/no-commit-write.md
+stdout '^\?\? docs/kb/decisions/adr/no-commit-write\.md$'
+! exec git ls-files --error-unmatch docs/kb/decisions/adr/no-commit-write.md
+cd docs
+
 # (c) A committing write still refuses before writing: the merge belongs to the
 # host project, and the refusal names that repository and that merge.
 stdin ../../valid-adr.md
