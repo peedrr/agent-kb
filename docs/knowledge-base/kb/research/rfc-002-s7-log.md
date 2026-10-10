@@ -21,7 +21,7 @@ tags:
 - run-log
 title: RFC-002-S7 run log — schema-pass integration research, SPEC-004 and ADR-011 drafting
 type: research
-updated: "2026-10-10"
+updated: "2026-10-10T19:50:39Z"
 ---
 
 ## Filed pages
@@ -77,7 +77,9 @@ Research COMPLETE (5/5 child reports). SPEC-004 draft v2 complete. ADR-011 draft
 - OQ-2 RESOLVED (owner, 2026-10-10): Option A — malformed template schema = exit 2 `internal:` fault on write path + per-page degrade in sweep. Owner's condition #1 confirmed correct (inter-phase HEAD risk acceptable; S8 is Phase 1 so window is small); condition #2 corrected (CEL mockups exercise at template-write; schema block NOT exercised there until SPEC-005) — owner ratified Option A after the correction. REQ-021 finalized + sweep-degrade sentence added.
 - FILING WAVE STAGING (all checks done): `akb template get rfc`/`adr` contracts retrieved; 3 frontmatter blocks prepared (libs-verify.fm, spec-conventions.fm, nocommit-recon.fm); rfc-extract/prior-research/code-recon carry valid frontmatter (prior-research gained created/updated; code-recon summary trimmed to 192); drafts verified free of `.pi/` citations; approve each new page with --no-commit during wave.
 - `rfc-002-prep` child (66fbbfe2, async): preparing rfc-002-updated.md — 5 edits: (A) §7 pipeline text → git-state preflight immediately before storage write, note ADR-011; (B) S7 row resolves-as → SPEC-004; (C) new row RFC-002-A22 → ADR-011 work unit; (D) D-register entry if present; (E) updated bump.
-- FILING ORDER (when child lands): research/rfc-002-s7-{rfc-extract,prior-research,code-recon,libs-verify,spec-conventions,nocommit-recon}.md → research/rfc-002-s7-log.md (hub w/ wikilinks) → decisions/ADR-011-validation-before-git-preflight.md → RFC-002 overwrite → SPEC-004 LAST (no --no-commit = the wave's one commit). Then akb lint, resolve, request ratification of SPEC-004 + ADR-011 (both proposed; owner-only move to active/accepted).
+- `rfc-002-prep` child (66fbbfe2, DONE): rfc-002-updated.md prepared; coordinator verified diff (5 hunks: updated bump, §7 pipeline, S7 resolves-as, A22 row; no D-register exists — §18 table serves that role) and fixed 2 wikilink-consistency nits (resolves-as links for SPEC-004/ADR-011).
+- FILING WAVE COMPLETE (2026-10-10): 6 research pages + log hub + ADR-011 + RFC-002 overwrite + SPEC-004 all written and approved; index adds for all 8 new pages. Commits: 76776f0 (approve SPEC-004 + index), e5cd42b (index add SPEC-004), + coordinator manual commit of the staged remainder (akb's committing commands commit only their own paths; --no-commit stages — wave landed as 3 commits instead of the intended 1; noted for future runs). `akb lint`: 0 errors, 3 PRE-EXISTING warnings (ADR-001/RFC-003 orphans, s6-gapfill code-block language) — wave introduced none. All wikilinks resolve.
+- RUN COMPLETE — awaiting owner ratification: SPEC-004 (proposed → active), ADR-011 (proposed → accepted). Both owner-only moves.
 
 ## Key findings
 - **S7 definition** (RFC-002 §18 row, `rfcs/RFC-002-open-validation-engine.md:834`): "Schema-pass integration: document construction, pipeline placement, compiled-schema cache, error-tree → SPEC-002 report mapping, pre-gate removal, sweep checker (ADR-009) — drafts as SPEC-004." [via prior-research.md]
