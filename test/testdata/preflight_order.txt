@@ -88,7 +88,7 @@ stderr '^usage: write page: merge in progress in repository '${WORK@R}'/host \(o
 # merge that would have guarded the commit of a successful delete.
 exec bash -c 'akb delete notes/nope.md; echo "akb-exit=$?"'
 stdout '^akb-exit=1$'
-stderr 'page not found: notes/nope\.md\. Use .akb list. to see available pages'
+stderr 'page not found: notes/nope\.md\. Use ''akb list'' to see available pages'
 ! stderr 'merge in progress'
 
 -- base-file.txt --
