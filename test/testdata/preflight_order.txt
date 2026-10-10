@@ -1,0 +1,133 @@
+# A host merge in progress no longer masks the report of the page the author
+# controls, and no longer refuses a write that attempts no commit. The four
+# behaviors below run against one host repository carrying a clean merge.
+
+env GIT_CONFIG_COUNT=2
+env GIT_CONFIG_KEY_0=user.name
+env GIT_CONFIG_VALUE_0=ambient
+env GIT_CONFIG_KEY_1=user.email
+env GIT_CONFIG_VALUE_1=ambient@local
+
+mkdir host
+cd host
+exec git init -q
+cp ../base-file.txt base.txt
+exec git add base.txt
+exec git commit -m 'host base'
+
+exec akb init docs --embed
+stdout '^Initialized KB "docs" at .*/host/docs$'
+
+# The adr template carries the write-time rules the pin below fails and the
+# valid page satisfies.
+cd docs
+exec akb template get adr --full --examples
+cp stdout .agent-kb/templates/adr.yaml
+exec akb template get adr --example --examples
+cp stdout .agent-kb/templates/adr_pass.md
+exec git add .agent-kb/templates
+exec git commit -m 'seed adr template'
+
+# Both branches advance, so the merge is a real one; --no-commit stops it
+# cleanly, with no conflict to resolve.
+cd $WORK/host
+exec git checkout -b feature
+cp ../feature-file.txt feature.txt
+exec git add feature.txt
+exec git commit -m 'feature work'
+exec git checkout -
+cp ../base-advance.txt base.txt
+exec git add base.txt
+exec git commit -m 'advance the base branch'
+exec git merge --no-commit feature
+
+cd docs
+exec git rev-parse HEAD
+cp stdout head-before.txt
+
+# (a) The page's own rules are evaluated first, so a page that fails them
+# reports the rules it failed and exits 1 — not the merge refusal, which would
+# exit 2 and hide the rules behind the state of the repository.
+stdin ../../invalid-adr.md
+exec bash -c 'akb write adr/missing-context.md; echo "akb-exit=$?"'
+stdout '^akb-exit=1$'
+stderr '\[require_context\] page must have a .## Context. heading'
+! stderr 'merge in progress'
+! stderr 'usage:'
+! exists kb/decisions/adr/missing-context.md
+
+# (b) A write that leaves its commit to the caller attempts no commit, so the
+# merge is not its precondition: the page is written and HEAD does not move.
+stdin ../../valid-adr.md
+exec bash -c 'akb write adr/no-commit-write.md --no-commit; echo "akb-exit=$?"'
+stdout '^akb-exit=0$'
+stdout '^Written to kb/decisions/adr/no-commit-write\.md$'
+exists kb/decisions/adr/no-commit-write.md
+exec git rev-parse HEAD
+cmp stdout head-before.txt
+
+# (c) A committing write still refuses before writing: the merge belongs to the
+# host project, and the refusal names that repository and that merge.
+stdin ../../valid-adr.md
+exec bash -c 'akb write adr/refused-write.md; echo "akb-exit=$?"'
+stdout '^akb-exit=2$'
+stderr '^usage: write page: merge in progress in repository '${WORK@R}'/host \(outside the knowledge base, in: [^)]+\): akb commits are blocked until it is completed or aborted\. This merge belongs to the host project — do not resolve it from the KB; retry later or surface to the user\.$'
+! stderr 'internal:'
+! exists kb/decisions/adr/refused-write.md
+
+# (d) A command whose preflight sits immediately before its mutation reports
+# the precondition it reached first: the page it was asked to delete, not the
+# merge that would have guarded the commit of a successful delete.
+exec bash -c 'akb delete notes/nope.md; echo "akb-exit=$?"'
+stdout '^akb-exit=1$'
+stderr 'page not found: notes/nope\.md\. Use .akb list. to see available pages'
+! stderr 'merge in progress'
+
+-- base-file.txt --
+The host project's base revision.
+-- base-advance.txt --
+The host project advanced its base branch.
+-- feature-file.txt --
+The host project's feature work.
+-- invalid-adr.md --
+---
+type: adr
+title: Missing Context
+summary: ADR without context section
+tags: [test]
+status: proposed
+deciders: team
+created: "2026-01-01"
+updated: "2026-09-01"
+---
+
+# Missing Context
+
+## Decision
+
+We decided something.
+-- valid-adr.md --
+---
+type: adr
+title: Use SQLite for the Index
+summary: We decided to keep the search index in SQLite so it stays rebuildable from the pages alone.
+tags: [search, sqlite]
+status: proposed
+deciders: akb maintainers
+created: 2026-01-01
+updated: 2026-01-02
+---
+
+# Use SQLite for the Index
+
+## Context
+
+Every page is a markdown file on disk, so the search index has to be rebuildable from those files alone. The background notes for the storage layer live in [[sqlite-notes]], and the ranking behavior behind the choice is described there in more detail than this record needs to repeat.
+
+## Decision
+
+Use SQLite with FTS5 as the single search index beside the knowledge base.
+
+## Consequences
+
+Full-text search is fast and the index is a single file that travels with the base. A rebuild re-derives the whole index from the page bodies without touching the pages themselves.
