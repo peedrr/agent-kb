@@ -110,19 +110,24 @@ func runTemplateDelete(_ *cobra.Command, args []string) error {
 		}
 		defer repoLock.Release()
 
-		// The commit identity and the merge state the removal's commit needs
-		// are checked before any template file is removed, so a refusal leaves
-		// them all as they were.
-		if err := store.Preflight(); err != nil {
-			return fmt.Errorf("commit preflight: %w", err)
-		}
-
+		// Containment for every path the removal touches is checked before the
+		// preflight below, so no path guard runs after the git-state check.
 		for _, relPath := range templateCommitPaths(name) {
 			removalPath := filepath.Join(kbRoot, relPath)
 			if err := path.AssertContained(kbRoot, removalPath); err != nil {
 				return fmt.Errorf("resolve template path: %w", err)
 			}
-			if err := os.Remove(removalPath); err != nil && !os.IsNotExist(err) {
+		}
+
+		// The commit identity and the merge state the removal's commit needs
+		// are checked immediately before the first template file is removed, so
+		// a refusal leaves them all as they were.
+		if err := store.Preflight(); err != nil {
+			return fmt.Errorf("commit preflight: %w", err)
+		}
+
+		for _, relPath := range templateCommitPaths(name) {
+			if err := os.Remove(filepath.Join(kbRoot, relPath)); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("delete file %s: %w", filepath.Base(relPath), err)
 			}
 		}

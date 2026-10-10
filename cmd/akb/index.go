@@ -141,12 +141,6 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 	}
 	defer repoLock.Release()
 
-	// The commit identity and the merge state the entry's commit needs are
-	// checked before kb/index.md is touched, so a refusal leaves it as it was.
-	if err := store.Preflight(); err != nil {
-		return fmt.Errorf("commit preflight: %w", err)
-	}
-
 	// Resolve the full file path
 	cleanPath := strings.TrimPrefix(entryPath, "kb/")
 
@@ -209,6 +203,13 @@ func runIndexAdd(_ *cobra.Command, args []string) error {
 		Title:   fm.Title,
 		Summary: summary,
 		Type:    fm.Type,
+	}
+
+	// The commit identity and the merge state the entry's commit needs are
+	// checked after the page is read and parsed and immediately before
+	// kb/index.md is touched, so a refusal leaves it as it was.
+	if err := store.Preflight(); err != nil {
+		return fmt.Errorf("commit preflight: %w", err)
 	}
 
 	if err := index.AddEntry(kbRoot, entry); err != nil {
@@ -292,13 +293,14 @@ func runIndexRemove(_ *cobra.Command, args []string) error {
 		}
 	}
 
+	oldContent, _ := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
+
 	// The commit identity and the merge state the removal's commit needs are
-	// checked before kb/index.md is touched, so a refusal leaves it as it was.
+	// checked immediately before kb/index.md is touched, so a refusal leaves it
+	// as it was.
 	if err := store.Preflight(); err != nil {
 		return fmt.Errorf("commit preflight: %w", err)
 	}
-
-	oldContent, _ := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
 
 	if err := index.RemoveEntry(kbRoot, relPath); err != nil {
 		return fmt.Errorf("remove entry: %w", err)
@@ -346,14 +348,14 @@ func runIndexRebuild(_ *cobra.Command, _ []string) error {
 	}
 	defer repoLock.Release()
 
+	oldContent, _ := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
+
 	// The commit identity and the merge state the rebuild's commit needs are
-	// checked before kb/index.md and the search index are rebuilt, so a refusal
-	// leaves both as they were.
+	// checked immediately before the search database the rebuild writes is
+	// opened and kb/index.md is rewritten, so a refusal leaves both as they were.
 	if err := store.Preflight(); err != nil {
 		return fmt.Errorf("commit preflight: %w", err)
 	}
-
-	oldContent, _ := os.ReadFile(indexPath) //nolint:gosec // path validated by ResolveKBPath
 
 	// Open or create search database
 	sqlDB, err := openOrCreateSearchDB(kbRoot)
