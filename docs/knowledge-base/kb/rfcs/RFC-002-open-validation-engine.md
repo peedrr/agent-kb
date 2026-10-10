@@ -47,7 +47,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-10T17:15:23Z"
+updated: "2026-10-10T19:49:02Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -332,10 +332,15 @@ lint_rules: []              # UNCHANGED: CEL, sweep-time; gains kb.* in Phase 4 
 ## 7. Validation pipeline (write/append)
 
 ```text
-merge-conflict check → selector gate (type names a template; template loaded with its
+selector gate (type names a template; template loaded with its
   projections/functions declarations) → build document (frontmatter + content parse,
-  goldmark parse, declared projections materialized) → JSON Schema → CEL validations → write
+  goldmark parse, declared projections materialized) → JSON Schema → CEL validations →
+  git-state preflight (merge state, commit identity) → write
 ```
+
+The git-state preflight (merge state, commit identity) is a storage-side concern: it
+runs immediately before the write, after both validators — an ordering recorded in
+[[ADR-011-validation-before-git-preflight|ADR-011]].
 
 The build step is explicit because the schema may constrain the materialized document
 (`contains` over `derived.ast.headings`) — validation cannot precede materialization,
@@ -831,11 +836,12 @@ it is the last document approved, and this table is its progress tracker.
 | RFC-002-S4 | SPEC | 3 | Search: `search.index_fields` DDL + rebuild, `--tag` matching semantics, `documents.updated` disposition | proposed | — |
 | RFC-002-S5 | SPEC | 2 | Input-schema derivation mechanics (normalization, reference keyword-walk) | proposed | — |
 | RFC-002-S6 | SPEC | 1 | TemplateV3 core format + loader: minimal key set (ADR-010), strict keys, `type`/`title` un-routing (D10), embedded template conversion | ratified | [[SPEC-003-templatev3-format-loader|SPEC-003]] |
-| RFC-002-S7 | SPEC | 1 | Schema-pass integration: document construction, pipeline placement, compiled-schema cache, error-tree → SPEC-002 report mapping, pre-gate removal, sweep checker (ADR-009) — drafts as SPEC-004 | proposed | — |
+| RFC-002-S7 | SPEC | 1 | Schema-pass integration: document construction, pipeline placement, compiled-schema cache, error-tree → SPEC-002 report mapping, pre-gate removal, sweep checker (ADR-009) — drafts as SPEC-004 | proposed | [[SPEC-004-schema-pass-integration|SPEC-004]] |
 | RFC-002-S8 | SPEC | 1 | `template write` schema obligations: mockup-vs-schema proofs, `FAILS:` parser (ADR-006 N7), overlap warning, ADR-005 static-check wiring — drafts as SPEC-005 | proposed | — |
 | RFC-002-A19 | ADR | 1 | Phase-1 document shape: validate the current shape; flatten, renames, `word_count` registry, `write --json` ship with the flatten's cohort | ratified | [[ADR-008-phase1-current-document-shape|ADR-008]] |
 | RFC-002-A20 | ADR | 1 | Sweep-time schema checker ships in Phase 1; `required_fields` retained until the Phase-3 registry | ratified | [[ADR-009-phase1-sweep-schema-checker|ADR-009]] |
 | RFC-002-A21 | ADR | 1 | Phase-1 TemplateV3 minimal key set + strict-key posture | ratified | [[ADR-010-templatev3-minimal-key-set|ADR-010]] |
+| RFC-002-A22 | ADR | post | Git-state preflight ordering: every mutating command validates first and runs the merge/identity preflight immediately before its storage mutation; `--no-commit` bypasses all git-state checks; implementation across all mutating commands is a post-RFC-002 work unit | proposed | [[ADR-011-validation-before-git-preflight|ADR-011]] |
 
 Renumbering note: items 6, 9, and 11 of the original flat 1–19 list were tech-specs,
 so the IDs above are not the old ordinals (old 6 → S1, 9 → S2, 11 → S3; old 7+
