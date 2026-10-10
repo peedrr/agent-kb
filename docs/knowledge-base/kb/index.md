@@ -12,6 +12,7 @@
 - [The RFC-002 Flattened Document Model Is Not Phase-1 Scope](kb/decisions/ADR-008-phase1-current-document-shape.md) — Phase 1 validates today's document shape (content.raw, ast.*); the section-5 flatten, derived.* renames, word_count registry, and write --json all ship with the flatten's later cohort.
 - [Phase 1 Ships the Sweep-Time Schema Checker and Keeps required_fields](kb/decisions/ADR-009-phase1-sweep-schema-checker.md) — A built-in schema lint checker ships with Phase 1 (before cel_lint, one shared now); required_fields stays registered until the Phase-3 registry subsumes it, so by_check never loses a key.
 - [Phase-1 TemplateV3 Recognizes Six Keys and Hard-Rejects the Rest](kb/decisions/ADR-010-templatev3-minimal-key-set.md) — Phase-1 TemplateV3 recognizes exactly name, description, dir, schema, validations, lint_rules; template write hard-rejects any other key with a self-sufficient message, and load warns only.
+- [Validation Precedes Git-State Checks and --no-commit Skips Them Entirely](kb/decisions/ADR-011-validation-before-git-preflight.md) — All mutating commands validate first and preflight git state immediately before the storage mutation; --no-commit skips every git-state check.
 
 ## Researchs
 
@@ -61,6 +62,13 @@
 - [RFC-002-S6 requirement extraction — RFC-002 sections, ADR-010, SPEC format contract](kb/research/rfc-002-s6-rfc-extract.md) — Requirement extraction for RFC-002-S6 (SPEC-003): RFC-002 section-anchored requirements, S6/S7/S8 boundaries, ADR-010 verbatim invariants, SPEC format contract.
 - [Library feasibility for a strict TemplateV3 loader — goccy v1.19.2 and santhosh v6.0.3](kb/research/rfc-002-s6-gapfill-libs.md) — Library feasibility for RFC-002-S6 (SPEC-003): goccy/go-yaml v1.19.2 unknown-key limits and santhosh jsonschema v6.0.3 compile surface, verified at pinned versions.
 - [RFC-002-S6 research run log — SPEC-003 TemplateV3 format and loader](kb/research/rfc-002-s6-log.md) — Run log for RFC-002-S6: recon fanout, owner-ratified scope forks (six-template corpus, opaque schema passthrough, format-only conversion), and the SPEC-003 filing record.
+- [RFC-002-S7 extraction — S7 scope, SPEC-004 context, prior-run characterization](kb/research/rfc-002-s7-rfc-extract.md) — Verbatim RFC-002-S7 scope, S1-S6 boundaries, SPEC inventory confirming SPEC-004 absent, S7 deliverables and parked questions.
+- [RFC-002-S7 prior-research coverage map — all existing RFC-002 validation-engine research](kb/research/rfc-002-s7-prior-research.md) — Coverage map of all 46 prior RFC-002 research pages plus the specs/ADR/RFC landscape, so the S7 run repeats nothing.
+- [RFC-002-S7 code recon — write/append pipeline, document construction, pre-gate, lint attachment](kb/research/rfc-002-s7-code-recon.md) — Current-tree attachment points for the SPEC-004 schema pass: pipeline order, document shape, pre-gate anatomy, lint model, test fallout.
+- [RFC-002-S7 libs-verify — santhosh-tekuri/jsonschema v6.0.3 API surface verification](kb/research/rfc-002-s7-libs-verify.md) — Module-source and runtime-probe verification of the santhosh jsonschema v6.0.3 API surface SPEC-004 codes against.
+- [RFC-002-S7 spec-conventions — spec page contract, house anatomy, SPEC-002 report contract](kb/research/rfc-002-s7-spec-conventions.md) — Spec page contract, SPEC-003 house anatomy, SPEC-002 report-row contract, and research filing conventions for authoring SPEC-004.
+- [RFC-002-S7 run log — schema-pass integration research, SPEC-004 and ADR-011 drafting](kb/research/rfc-002-s7-log.md) — Hub log of the rfc-002-s7 run: S7 scope, findings, owner forks OQ-1/OQ-2, and the filing record for SPEC-004 and ADR-011.
+- [RFC-002-S7 nocommit-recon — --no-commit vs merge and identity preflight behavior](kb/research/rfc-002-s7-nocommit-recon.md) — Recon: the no-commit flag skips only identity resolution; the merge check always runs in git mode; ModeNone bases are fully git-free.
 
 ## Rfcs
 
