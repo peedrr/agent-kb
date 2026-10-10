@@ -47,11 +47,15 @@ func NewGitProvider(kbRoot string, noCommit bool) *GitProvider {
 	return &GitProvider{kbRoot: kbRoot, noCommit: noCommit}
 }
 
-// WriteWithCommitMsg writes data and commits with a custom message.
+// WriteWithCommitMsg writes data and commits with a custom message. An
+// invocation that leaves its commit to the caller (--no-commit) attempts no
+// commit, so it skips the merge check that guards one and only writes its file.
 func (g *GitProvider) WriteWithCommitMsg(_ context.Context, path string, data []byte, commitMsg string) error {
 	return g.withRepoLock(func() error {
-		if err := g.checkMergeConflicts(); err != nil {
-			return err
+		if !g.noCommit {
+			if err := g.checkMergeConflicts(); err != nil {
+				return err
+			}
 		}
 
 		identity, err := g.commitIdentity()
@@ -104,11 +108,15 @@ func (g *GitProvider) Read(_ context.Context, path string) ([]byte, error) {
 	return data, nil
 }
 
-// Delete removes a file and commits the change.
+// Delete removes a file and commits the change. An invocation that leaves its
+// commit to the caller (--no-commit) attempts no commit, so it skips the merge
+// check that guards one and only removes its file.
 func (g *GitProvider) Delete(_ context.Context, path string) error {
 	return g.withRepoLock(func() error {
-		if err := g.checkMergeConflicts(); err != nil {
-			return err
+		if !g.noCommit {
+			if err := g.checkMergeConflicts(); err != nil {
+				return err
+			}
 		}
 
 		identity, err := g.commitIdentity()

@@ -485,3 +485,36 @@ func TestStoreCommitRejectsCleanInProgressMerge(t *testing.T) {
 		t.Errorf("error = %q, want %q", err, want)
 	}
 }
+
+// TestStoreWriteWithNoCommitSkipsMergeCheck asserts a --no-commit invocation
+// writes while the repository carries a merge in progress: no commit is
+// attempted, so the Store's preflight and the provider both skip the merge
+// check instead of refusing the write.
+func TestStoreWriteWithNoCommitSkipsMergeCheck(t *testing.T) {
+	repo, _ := repoWithInProgressMerge(t, false)
+	writeKBConfig(t, repo, config.VersioningGit)
+
+	store, err := OpenStore(repo, true)
+	if err != nil {
+		t.Fatalf("OpenStore: %v", err)
+	}
+
+	headBefore := mustGitIn(t, repo, "rev-parse", "HEAD")
+
+	rel := "kb/notes/page.md"
+	page := filepath.Join(repo, rel)
+	if err := store.Write(context.Background(), page, []byte("page body\n")); err != nil {
+		t.Fatalf("Write with --no-commit under a merge in progress: %v", err)
+	}
+
+	data, err := os.ReadFile(page) //nolint:gosec // test reading a path inside its temp repository
+	if err != nil {
+		t.Fatalf("read page: %v", err)
+	}
+	if string(data) != "page body\n" {
+		t.Errorf("page content = %q, want %q", string(data), "page body\n")
+	}
+	if headAfter := mustGitIn(t, repo, "rev-parse", "HEAD"); headAfter != headBefore {
+		t.Errorf("the --no-commit write moved HEAD from %s to %s", headBefore, headAfter)
+	}
+}

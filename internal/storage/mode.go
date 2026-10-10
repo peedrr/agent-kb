@@ -105,18 +105,19 @@ func (s *Store) Mode() Mode {
 // written: a repository without a merge in progress, which would refuse the
 // commit the mutation ends in, and a commit identity to record. A base that is
 // not versioned in git has neither to check, and an invocation that leaves the
-// commit to its caller (--no-commit) records no identity either. Commands call
-// it before their first mutation; the commit steps themselves check again under
-// the lock.
+// commit to its caller (--no-commit) neither commits nor records an identity:
+// both return before any git invocation, the --no-commit invocation before the
+// merge check as well. Commands call it before their first mutation; the commit
+// steps themselves check again under the lock.
 func (s *Store) Preflight() error {
 	if s.mode == ModeNone {
 		return nil
 	}
-	if err := checkMergeState(s.kbRoot); err != nil {
-		return err
-	}
 	if s.noCommit {
 		return nil
+	}
+	if err := checkMergeState(s.kbRoot); err != nil {
+		return err
 	}
 	return s.resolveIdentity()
 }
