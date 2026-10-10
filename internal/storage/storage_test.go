@@ -342,17 +342,14 @@ func TestGitProvider_Write_NoCommit(t *testing.T) {
 			t.Errorf("content = %q, want %q", string(data), "no commit")
 		}
 
-		// Verify file is staged (git add was run)
-		gitStatus := exec.Command( //nolint:gosec // test helper launching akb binary
-			"git", "status", "--porcelain")
-		gitStatus.Dir = tmpDir
-		out, err = gitStatus.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git status failed: %v", err)
+		// Verify the no-commit path never staged the file: git reports it
+		// untracked, and nothing is staged under its path.
+		status := mustGitIn(t, tmpDir, "status", "--porcelain", "--untracked-files=all")
+		if !strings.Contains(status, "?? kb/no-commit.md") {
+			t.Errorf("file should be untracked, got status: %q", status)
 		}
-		statusLines := strings.TrimSpace(string(out))
-		if !strings.Contains(statusLines, "kb/no-commit.md") {
-			t.Errorf("file should be staged, got status: %q", statusLines)
+		if staged := mustGitIn(t, tmpDir, "diff", "--cached", "--name-only", "--", "kb/no-commit.md"); staged != "" {
+			t.Errorf("no-commit write staged %q, want the file unstaged", staged)
 		}
 
 		// Verify no new commit was made
@@ -495,6 +492,12 @@ func TestGitProvider_Delete_NoCommit(t *testing.T) {
 		// Verify file is gone
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Error("file should not exist after delete")
+		}
+
+		// Verify the no-commit path never staged the removal: the index still
+		// holds the file exactly as HEAD recorded it.
+		if staged := mustGitIn(t, tmpDir, "diff", "--cached", "--name-only", "--", "kb/no-commit-del.md"); staged != "" {
+			t.Errorf("no-commit delete staged %q, want the removal unstaged", staged)
 		}
 
 		// Verify no new commit was made

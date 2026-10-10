@@ -489,7 +489,7 @@ func TestStoreCommitRejectsCleanInProgressMerge(t *testing.T) {
 // TestStoreWriteWithNoCommitSkipsMergeCheck asserts a --no-commit invocation
 // writes while the repository carries a merge in progress: no commit is
 // attempted, so the Store's preflight and the provider both skip the merge
-// check instead of refusing the write.
+// check instead of refusing the write, and the file lands unstaged.
 func TestStoreWriteWithNoCommitSkipsMergeCheck(t *testing.T) {
 	repo, _ := repoWithInProgressMerge(t, false)
 	writeKBConfig(t, repo, config.VersioningGit)
@@ -516,5 +516,9 @@ func TestStoreWriteWithNoCommitSkipsMergeCheck(t *testing.T) {
 	}
 	if headAfter := mustGitIn(t, repo, "rev-parse", "HEAD"); headAfter != headBefore {
 		t.Errorf("the --no-commit write moved HEAD from %s to %s", headBefore, headAfter)
+	}
+	// The write must not stage its file: nothing enters the index for it.
+	if staged := mustGitIn(t, repo, "diff", "--cached", "--name-only", "--", rel); staged != "" {
+		t.Errorf("the --no-commit write staged %q, want nothing in the index for %s", staged, rel)
 	}
 }

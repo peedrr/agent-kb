@@ -49,7 +49,8 @@ func NewGitProvider(kbRoot string, noCommit bool) *GitProvider {
 
 // WriteWithCommitMsg writes data and commits with a custom message. An
 // invocation that leaves its commit to the caller (--no-commit) attempts no
-// commit, so it skips the merge check that guards one and only writes its file.
+// commit, so it skips the merge check that guards one: under the store lock it
+// only performs the filesystem write, and the file lands unstaged.
 func (g *GitProvider) WriteWithCommitMsg(_ context.Context, path string, data []byte, commitMsg string) error {
 	return g.withRepoLock(func() error {
 		if !g.noCommit {
@@ -76,12 +77,12 @@ func (g *GitProvider) WriteWithCommitMsg(_ context.Context, path string, data []
 			return fmt.Errorf("resolve relative path: %w", err)
 		}
 
-		if err := g.gitAdd(relPath); err != nil {
-			return err
-		}
-
 		if g.noCommit {
 			return nil
+		}
+
+		if err := g.gitAdd(relPath); err != nil {
+			return err
 		}
 
 		return g.gitCommit(commitMsg, relPath, identity)
@@ -110,7 +111,8 @@ func (g *GitProvider) Read(_ context.Context, path string) ([]byte, error) {
 
 // Delete removes a file and commits the change. An invocation that leaves its
 // commit to the caller (--no-commit) attempts no commit, so it skips the merge
-// check that guards one and only removes its file.
+// check that guards one: under the store lock it only performs the filesystem
+// remove, and the file lands unstaged.
 func (g *GitProvider) Delete(_ context.Context, path string) error {
 	return g.withRepoLock(func() error {
 		if !g.noCommit {
@@ -133,12 +135,12 @@ func (g *GitProvider) Delete(_ context.Context, path string) error {
 			return fmt.Errorf("resolve relative path: %w", err)
 		}
 
-		if err := g.gitAdd(relPath); err != nil {
-			return err
-		}
-
 		if g.noCommit {
 			return nil
+		}
+
+		if err := g.gitAdd(relPath); err != nil {
+			return err
 		}
 
 		commitMsg := fmt.Sprintf("akb: delete %s", filepath.ToSlash(relPath))
