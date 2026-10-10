@@ -44,3 +44,11 @@ Backfill closeout (ADR-007): verified akb approve is body-safe for reports quoti
 
 parseEntryLine fixed (internal/index/index.go): title/path boundary now parsed from the LAST '](' and the summary separator only after the path; hostile-title regression tests pin the renderer contract. Real-KB lint now exits 0 with zero index_consistency phantoms. The 'rebuild only, never index add' doctrine is relaxed — index add is safe again. Note: the fix is source work awaiting owner commit; this KB's binary (bin/akb) carries it, the PATH install may not. RFC-002 Phase 3 still deletes this parse path entirely (index.md becomes write-only derived).
 
+## 2026-10-09 plan | SPEC-003 TemplateV3 format + loader
+
+Drafted specs/SPEC-003-templatev3-format-loader.md (proposed change SPEC; RFC-002 candidate RFC-002-S6); scope forks ratified by owner in .pi/research/rfc-002-s6
+
+## 2026-10-09 ingest
+
+Filed RFC-002-S6 research run as 4 byte-faithful research pages + run log under kb/research/ (run: rfc-002-s6, informs SPEC-003)
+

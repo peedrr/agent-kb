@@ -56,6 +56,11 @@
 - [Phase-1 scope recon — code surface and rule consumers](kb/research/rfc-002-phase1-scope-code-surface.md) — Recon of today's CEL page-map shape, word_count/char_count/raw consumers, required-gate coupling, loader leniency, lint interface, template inventory, and write/read flags.
 - [Phase-1 scope recon — test pinning, frontmatter types, call sites](kb/research/rfc-002-phase1-scope-test-pinning.md) — Recon of flatten-vs-current-shape test churn, goccy frontmatter value types, the complete BuildPage/BuildOldPage call-site list, and the approve-wording testscript coverage gap.
 - [Phase-1 scope research run — LOG](kb/research/rfc-002-phase1-scope-log.md) — Run log for the RFC-002 Phase-1 scope research — four owner-ratified scope decisions filed as ADR-008/009/010, with the evidence index, decision record, and parked items.
+- [RFC-002-S6 prior-research extraction — ratified decisions and open gaps](kb/research/rfc-002-s6-prior-research.md) — Prior-research extraction for RFC-002-S6 (SPEC-003): ratified ADR-006/008/010 invariants, S1 conventions, and the open gaps that drove the run's decision forks.
+- [RFC-002-S6 code recon — TemplateV2 loader, key inventory, un-routing blast radius](kb/research/rfc-002-s6-code-recon.md) — Code recon for RFC-002-S6 (SPEC-003): TemplateV2 loader architecture, key-to-consumer inventory, embedded corpus, type/title routing blast radius, and test pinning.
+- [RFC-002-S6 requirement extraction — RFC-002 sections, ADR-010, SPEC format contract](kb/research/rfc-002-s6-rfc-extract.md) — Requirement extraction for RFC-002-S6 (SPEC-003): RFC-002 section-anchored requirements, S6/S7/S8 boundaries, ADR-010 verbatim invariants, SPEC format contract.
+- [Library feasibility for a strict TemplateV3 loader — goccy v1.19.2 and santhosh v6.0.3](kb/research/rfc-002-s6-gapfill-libs.md) — Library feasibility for RFC-002-S6 (SPEC-003): goccy/go-yaml v1.19.2 unknown-key limits and santhosh jsonschema v6.0.3 compile surface, verified at pinned versions.
+- [RFC-002-S6 research run log — SPEC-003 TemplateV3 format and loader](kb/research/rfc-002-s6-log.md) — Run log for RFC-002-S6: recon fanout, owner-ratified scope forks (six-template corpus, opaque schema passthrough, format-only conversion), and the SPEC-003 filing record.
 
 ## Rfcs
 
@@ -67,4 +72,5 @@
 
 - [Init Selects the KB Versioning Mode and Resolves Commit Identity](kb/specs/SPEC-001-init-versioning.md) — Make `akb init` choose the KB's versioning mode explicitly — embed in the host's history, a repository of its own, or none — and resolve commit identity from the environment, `akb.yaml`, then git, never from config akb writes.
 - [Write-Time Validation Failures Merge Into One Structured Report](kb/specs/SPEC-002-structured-validation-report.md) — Merge every write-time schema and CEL validation failure into one ordered report — one JSON object on stdout under `akb write --json`, exit 1.
+- [Templates Adopt a Strict Six-Key V3 Format With a JSON Schema Block](kb/specs/SPEC-003-templatev3-format-loader.md) — SPEC-003 (RFC-002-S6): Templates adopt a strict six-key V3 format with a JSON Schema block — loader strictness, type/title un-routing, six-template conversion.
 

@@ -47,7 +47,7 @@ tags:
 - openness
 title: The Open Validation Engine — JSON Schema + CEL as akb's only validators
 type: rfc
-updated: "2026-10-09T19:55:02Z"
+updated: "2026-10-10T17:15:23Z"
 ---
 
 # RFC-002: The Open Validation Engine — JSON Schema + CEL as akb's only validators
@@ -830,7 +830,7 @@ it is the last document approved, and this table is its progress tracker.
 | RFC-002-A18 | ADR | 3 | Lint per-issue-class granularity (issue typing for checkers; audit G4) | proposed | — |
 | RFC-002-S4 | SPEC | 3 | Search: `search.index_fields` DDL + rebuild, `--tag` matching semantics, `documents.updated` disposition | proposed | — |
 | RFC-002-S5 | SPEC | 2 | Input-schema derivation mechanics (normalization, reference keyword-walk) | proposed | — |
-| RFC-002-S6 | SPEC | 1 | TemplateV3 core format + loader: minimal key set (ADR-010), strict keys, `type`/`title` un-routing (D10), embedded template conversion — drafts as SPEC-003 | proposed | — |
+| RFC-002-S6 | SPEC | 1 | TemplateV3 core format + loader: minimal key set (ADR-010), strict keys, `type`/`title` un-routing (D10), embedded template conversion | ratified | [[SPEC-003-templatev3-format-loader|SPEC-003]] |
 | RFC-002-S7 | SPEC | 1 | Schema-pass integration: document construction, pipeline placement, compiled-schema cache, error-tree → SPEC-002 report mapping, pre-gate removal, sweep checker (ADR-009) — drafts as SPEC-004 | proposed | — |
 | RFC-002-S8 | SPEC | 1 | `template write` schema obligations: mockup-vs-schema proofs, `FAILS:` parser (ADR-006 N7), overlap warning, ADR-005 static-check wiring — drafts as SPEC-005 | proposed | — |
 | RFC-002-A19 | ADR | 1 | Phase-1 document shape: validate the current shape; flatten, renames, `word_count` registry, `write --json` ship with the flatten's cohort | ratified | [[ADR-008-phase1-current-document-shape|ADR-008]] |
@@ -854,6 +854,13 @@ SPEC-003/004/005), and the Phase column maps every candidate to the §17 phase t
 ships it. Two mixed rows: A4 ships its static temporal check in Phase 1 and the
 coercion bridge in Phase 2 (§17), and S1's report internals land in Phase 1 while its
 stdout-emission acceptance criteria land with Phase 2's `write --json` (ADR-008).
+
+Row S6 was ratified 2026-10-10 as [[SPEC-003-templatev3-format-loader|SPEC-003]], and its
+body reference was rewritten from the candidate ID. The three Phase-1 scope forks that SPEC
+needed were owner-ratified in the same pass and researched in [[rfc-002-s6-log|the RFC-002-S6
+run]]: the conversion corpus is all six templates (the two embedded plus this repo's four KB
+templates), the loader hands `schema` through uncompiled to the schema pass, and the
+conversion is format-only with the embedded example restructure held to Phase 4 (§17).
 
 ## 19. Risks
 
