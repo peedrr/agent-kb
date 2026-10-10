@@ -2,6 +2,25 @@
 
 Behavior changes and fixes worth acting on. Versions before 0.18.0 predate this file.
 
+## [0.24.0] — 2026-10-10
+
+### Changed
+
+- **Validation errors now precede merge and identity refusals on every mutating command.**
+  A command validates page content and its own preconditions first and runs the git-state
+  preflight — the merge guard and the commit-identity resolution — immediately before the
+  storage mutation it guards, instead of ahead of its validation. A page that fails
+  validation reports its rule errors first even when the host repository carries a merge in
+  progress or no source names a commit identity, so feedback concerns the artifact the
+  author controls and a transient merge no longer masks it. Committing invocations behave
+  as before: a host merge in progress still blocks them before anything is written.
+
+- **`--no-commit` is a complete git-state bypass.** The merge guard protects the commit, so
+  an invocation that attempts no commit skips every git-state check rather than the commit
+  identity alone. Such a write lands unstaged in the working tree — including a merging
+  one, where it stays outside the merge — and a base versioned `none` continues to invoke
+  no git at all.
+
 ## [0.23.1] — 2026-10-09
 
 ### Fixed

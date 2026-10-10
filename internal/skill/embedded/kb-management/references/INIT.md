@@ -211,13 +211,19 @@ possible: pick the one the user asked for and run it alone.
 
 ## A host merge in progress blocks the KB
 
-Committing commands preflight the repository that hosts the KB before they write
-anything, and refuse while that repository carries a merge in progress — even a
-merge whose conflicts are already resolved:
+Committing commands preflight the repository that hosts the KB immediately
+before their storage mutation and refuse while that repository carries a merge
+in progress — even a merge whose conflicts are already resolved. The refusal
+protects the commit the invocation would make, and so applies to committing
+invocations:
 
 ```
 usage: write page: merge in progress in repository /abs/path/to/host-project (outside the knowledge base, in: hostnotes.txt): akb commits are blocked until it is completed or aborted. This merge belongs to the host project — do not resolve it from the KB; retry later or surface to the user.
 ```
+
+An invocation with `--no-commit` attempts no commit, so it skips the guard
+entirely: the write proceeds and lands **unstaged in the merging working tree**
+— outside the merge, and visible to whoever resolves it.
 
 The merge is the host project's work: **do not resolve it from the KB.** Report
 the blockage, retry after the merge is completed or aborted, or surface it to
