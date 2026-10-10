@@ -437,11 +437,11 @@ func TestWriteNoCommit(t *testing.T) {
 	}
 
 	cmd = exec.Command( //nolint:gosec // test helper launching akb binary
-		"git", "status", "--porcelain")
+		"git", "status", "--porcelain", "--untracked-files=all")
 	cmd.Dir = kbRoot
 	statusOut, _ := cmd.Output()
-	if !strings.Contains(string(statusOut), "nocommit.md") {
-		t.Errorf("expected uncommitted file in git status, got: %s", string(statusOut))
+	if !strings.Contains(string(statusOut), "?? kb/notes/nocommit.md") {
+		t.Errorf("expected untracked file in git status, got: %s", string(statusOut))
 	}
 }
 
