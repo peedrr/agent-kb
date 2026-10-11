@@ -1,5 +1,5 @@
 # A host merge in progress no longer masks the report of the page the author
-# controls, and no longer refuses a write that attempts no commit. The four
+# controls, and no longer refuses a write that attempts no commit. The
 # behaviors below run against one host repository carrying a clean merge.
 
 env GIT_CONFIG_COUNT=2
@@ -90,6 +90,45 @@ exec bash -c 'akb delete notes/nope.md; echo "akb-exit=$?"'
 stdout '^akb-exit=1$'
 stderr 'page not found: notes/nope\.md\. Use ''akb list'' to see available pages'
 ! stderr 'merge in progress'
+
+# (e) index add reads and parses the page before its preflight: a page that
+# does not exist is reported, not the merge.
+exec bash -c 'akb index add notes/nope.md sum; echo "akb-exit=$?"'
+stdout '^akb-exit=1$'
+stderr 'read file'
+! stderr 'merge in progress'
+
+# (f) index add with --no-commit records the entry without reaching the merge
+# guard; the committing index remove that follows refuses on the merge before
+# kb/index.md is touched, and the entry stays.
+exec bash -c 'akb index add decisions/adr/no-commit-write.md sum --no-commit; echo "akb-exit=$?"'
+stdout '^akb-exit=0$'
+exec bash -c 'akb index remove decisions/adr/no-commit-write.md; echo "akb-exit=$?"'
+stdout '^akb-exit=2$'
+stderr 'merge in progress in repository'
+exec grep -c no-commit-write kb/index.md
+stdout '^1$'
+
+# (g) index rebuild has no page precondition; its preflight guards the rewrite
+# of kb/index.md. A committing rebuild refuses on the merge; one that leaves
+# its commit to the caller rewrites the index.
+exec bash -c 'akb index rebuild; echo "akb-exit=$?"'
+stdout '^akb-exit=2$'
+stderr 'merge in progress in repository'
+exec bash -c 'akb index rebuild --no-commit; echo "akb-exit=$?"'
+stdout '^akb-exit=0$'
+
+# (h) template delete checks its own preconditions first: a template that does
+# not exist is reported, not the merge; an existing one is refused on the
+# merge before any template file is removed.
+exec bash -c 'akb template delete nope --force; echo "akb-exit=$?"'
+stdout '^akb-exit=1$'
+stderr 'template "nope" not found'
+! stderr 'merge in progress'
+exec bash -c 'akb template delete adr --force; echo "akb-exit=$?"'
+stdout '^akb-exit=2$'
+stderr 'merge in progress in repository'
+exists .agent-kb/templates/adr.yaml
 
 -- base-file.txt --
 The host project's base revision.
