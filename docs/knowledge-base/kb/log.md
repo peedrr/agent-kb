@@ -52,3 +52,7 @@ Drafted specs/SPEC-003-templatev3-format-loader.md (proposed change SPEC; RFC-00
 
 Filed RFC-002-S6 research run as 4 byte-faithful research pages + run log under kb/research/ (run: rfc-002-s6, informs SPEC-003)
 
+## 2026-10-11 update
+
+Regenerate index: ADR-011 entry summary synced to the accepted page; research entries re-sorted into canonical order
+
