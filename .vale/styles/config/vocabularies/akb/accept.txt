@@ -54,6 +54,20 @@ approvers?
 worktrees?
 iff
 nonconformant
+# Tool names (pi-lens/dev toolchain) and platform terms:
+gopls
+yamllint
+nixd
+shellcheck
+shfmt
+zizmor
+opengrep
+marksman
+gofmt
+fmt
+glibc
+deps
+justfile
 # Author names referenced in ADRs:
 (?i)santhosh
 (?i)lemieux
