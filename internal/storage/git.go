@@ -110,11 +110,12 @@ func (g *GitProvider) Read(_ context.Context, path string) ([]byte, error) {
 }
 
 // Delete removes a file and commits the change. A file git never tracked has
-// nothing to stage or commit, so deleting one is a filesystem-only removal
-// that leaves the repository unchanged. An invocation that leaves its commit
-// to the caller (--no-commit) attempts no commit, so it skips the merge check
-// that guards one: under the store lock it only performs the filesystem
-// remove, and the file lands unstaged.
+// nothing to stage; its commit records the managed files the command staged
+// for the deletion, and a deletion that staged none leaves the repository
+// unchanged. An invocation that leaves its commit to the caller (--no-commit)
+// attempts no commit, so it skips the merge check that guards one: under the
+// store lock it only performs the filesystem remove, and the file lands
+// unstaged.
 func (g *GitProvider) Delete(_ context.Context, path string) error {
 	return g.withRepoLock(func() error {
 		if !g.noCommit {
@@ -141,19 +142,18 @@ func (g *GitProvider) Delete(_ context.Context, path string) error {
 			return nil
 		}
 
-		// A page git never tracked has nothing to stage: the removal is not in
-		// the index, and `git add` rejects the path because the worktree no
-		// longer holds a file for it.
+		// A page git never tracked has nothing to stage: `git add` rejects the
+		// path because the worktree no longer holds a file for it. The commit
+		// still runs — the command may have staged managed files the deletion
+		// changed, and commitPaths keeps the untracked page out of it.
 		tracked, err := RunGit(g.kbRoot, "git ls-files "+filepath.ToSlash(relPath), "ls-files", "--", relPath)
 		if err != nil {
 			return err
 		}
-		if strings.TrimSpace(tracked) == "" {
-			return nil
-		}
-
-		if err := g.gitAdd(relPath); err != nil {
-			return err
+		if strings.TrimSpace(tracked) != "" {
+			if err := g.gitAdd(relPath); err != nil {
+				return err
+			}
 		}
 
 		commitMsg := fmt.Sprintf("akb: delete %s", filepath.ToSlash(relPath))
@@ -614,9 +614,10 @@ func (g *GitProvider) gitCommit(msg string, relPath string, identity *Identity) 
 		return err
 	}
 	if len(paths) == 0 {
-		// The operation recorded nothing git can commit; report that instead of
-		// committing changes staged by something else.
-		return fmt.Errorf("git commit: nothing to commit for %s", filepath.ToSlash(relPath))
+		// A delete of a page git never recorded, whose command staged no
+		// managed file, leaves the repository unchanged; a write always staged
+		// its target and never reaches this branch.
+		return nil
 	}
 
 	args, env := commitArgs(identity, msg, paths)

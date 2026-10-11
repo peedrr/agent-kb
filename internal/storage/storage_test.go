@@ -503,6 +503,51 @@ func TestGitProvider_Delete_Untracked(t *testing.T) {
 	}
 }
 
+func TestGitProvider_Delete_Untracked_CommitsStagedManagedFiles(t *testing.T) {
+	tmpDir := initGitRepo(t)
+	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal
+
+	p := NewGitProvider(tmpDir, false)
+	ctx := context.Background()
+
+	// The page was never tracked, but the command staged the managed files the
+	// deletion changed: the delete's commit records exactly those and leaves
+	// nothing staged behind.
+	path := filepath.Join(tmpDir, "kb", "untracked-del.md")
+	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("never committed"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(tmpDir, "kb", "log.md")
+	if err := os.WriteFile(logPath, []byte("# Log\n\n- deleted untracked-del\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	mustGitIn(t, tmpDir, "add", "kb/log.md")
+
+	if err := p.Delete(ctx, path); err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Error("file should not exist after delete")
+	}
+	if subject := mustGitIn(t, tmpDir, "log", "-1", "--format=%s"); subject != "akb: delete kb/untracked-del.md" {
+		t.Errorf("commit subject = %q, want %q", subject, "akb: delete kb/untracked-del.md")
+	}
+	committed := mustGitIn(t, tmpDir, "show", "--name-only", "--pretty=format:", "HEAD")
+	if !strings.Contains(committed, "kb/log.md") {
+		t.Errorf("commit should record kb/log.md, recorded %q", committed)
+	}
+	if strings.Contains(committed, "untracked-del.md") {
+		t.Errorf("commit should not record the untracked page, recorded %q", committed)
+	}
+	if staged := mustGitIn(t, tmpDir, "diff", "--cached", "--name-only"); staged != "" {
+		t.Errorf("delete left staged changes: %q", staged)
+	}
+}
+
 func TestGitProvider_Delete_NoCommit(t *testing.T) {
 	tmpDir := initGitRepo(t)
 	defer os.RemoveAll(tmpDir) //nolint:errcheck // test cleanup — failure is non-fatal

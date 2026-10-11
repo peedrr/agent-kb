@@ -54,9 +54,17 @@ stdout 'Deleted kb/notes/untracked-note.md'
 
 ! exists kb/notes/untracked-note.md
 
-# No commit is created: the page was never tracked by git.
-exec git log --oneline
-cmp stdout initial-commits.txt
+# The page was never tracked, so it contributes nothing; the delete's commit
+# records the managed files the deletion changed.
+exec git log --oneline -1
+stdout '^[0-9a-f]+ akb: delete kb/notes/untracked-note\.md$'
+exec git show --name-only --pretty=format: HEAD
+stdout 'kb/log\.md'
+! stdout 'untracked-note'
+
+# The commit leaves nothing staged behind.
+exec git status --porcelain
+! stdout '^[MADRC]'
 
 # --- Write without --no-commit DOES create a commit ---
 stdin ../commit-note-input.md
