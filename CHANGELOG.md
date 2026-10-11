@@ -13,13 +13,15 @@ Behavior changes and fixes worth acting on. Versions before 0.18.0 predate this 
   validation reports its rule errors first even when the host repository carries a merge in
   progress or no source names a commit identity, so feedback concerns the artifact the
   author controls and a transient merge no longer masks it. Committing invocations behave
-  as before: a host merge in progress still blocks them before anything is written.
+  as before: a host merge in progress still blocks them before anything is written
+  (`akb init` writes the new base first and refuses only its commit step).
 
 - **`--no-commit` is a complete git-state bypass.** The merge guard protects the commit, so
   an invocation that attempts no commit skips every git-state check rather than the commit
-  identity alone. Such a write lands unstaged in the working tree — including a merging
-  one, where it stays outside the merge — and a base versioned `none` continues to invoke
-  no git at all.
+  identity alone. `akb init --no-commit` excepted — it stages the new base and leaves the
+  commit to the caller — such a write lands unstaged in the working tree, including a
+  merging one, where it stays outside the merge; a base versioned `none` continues to
+  invoke no git at all.
 
 ## [0.23.1] — 2026-10-09
 

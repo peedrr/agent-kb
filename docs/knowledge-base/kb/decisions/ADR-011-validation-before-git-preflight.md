@@ -21,7 +21,7 @@ tags:
 - ux
 title: Validation Precedes Git-State Checks and --no-commit Skips Them Entirely
 type: adr
-updated: "2026-10-10"
+updated: "2026-10-11"
 ---
 
 # ADR-011: Validation Precedes Git-State Checks and --no-commit Skips Them Entirely
@@ -66,7 +66,8 @@ so it runs no git-state check at all. REQ-016 stands unchanged for committing in
 - **I2**: The git-state preflight MUST run immediately before the storage mutation it guards;
   the system MUST NOT run a git-state preflight before validation.
 - **I3**: WHEN `--no-commit` is passed, the system MUST skip every git-state check; the system
-  MUST perform only the filesystem write under the store lock.
+  MUST perform only the filesystem write under the store lock (`akb init` excepted — see
+  Exceptions).
 - **I4**: The internal preflight inside `store.Write`/`WriteWithCommitMsg` MUST remain as the
   last-line safety net for every path, including paths that preflighted earlier.
 - **I5**: `versioning: none` bases MUST remain free of git invocations, as they are today.
@@ -85,7 +86,10 @@ so it runs no git-state check at all. REQ-016 stands unchanged for committing in
 ## Exceptions
 
 `akb init` is excepted: its identity flow (`ResolveInitIdentity`) is creation-time configuration
-of a new base, not a mutation of an existing one. No other waivers are permitted.
+of a new base, not a mutation of an existing one; its preflight guards only the commit that
+records the base, which runs after the base's files are written; and its `--no-commit` form
+stages the new base's paths for the caller's commit instead of leaving them unstaged (I3).
+No other waivers are permitted.
 
 ## Verification
 
@@ -142,8 +146,9 @@ tree: git never sweeps unstaged paths into a merge commit.
 - Good, because `--no-commit` becomes a complete git bypass, matching operator expectation and
   making agent scratch writes independent of repository state.
 - Bad, because a `--no-commit` write can now land in a merging working tree; the files stay
-  unstaged and outside the merge, but an operator resolving the merge sees unfamiliar untracked
-  changes. Accepted: the mitigation is git's own isolation plus the flag being opt-in.
+  unstaged and outside the merge (`akb init --no-commit` excepted — it stages the new base for
+  the caller's commit), but an operator resolving the merge sees unfamiliar untracked changes.
+  Accepted: the mitigation is git's own isolation plus the flag being opt-in.
 - Bad, because nine commands' preflight call sites move and `Store.Preflight` changes contract;
   this is a standalone work unit, not folded into SPEC-004 and unordered relative to RFC-002 —
   nothing in it depends on the RFC's phases. Accepted: it lands on its own ahead of Phase-1

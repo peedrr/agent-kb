@@ -223,7 +223,10 @@ usage: write page: merge in progress in repository /abs/path/to/host-project (ou
 
 An invocation with `--no-commit` attempts no commit, so it skips the guard
 entirely: the write proceeds and lands **unstaged in the merging working tree**
-— outside the merge, and visible to whoever resolves it.
+— outside the merge, and visible to whoever resolves it. `akb init --no-commit`
+is the exception: it **stages** the new base's paths and leaves the commit to
+the caller, so a caller that finishes the host merge with a plain `git commit`
+sweeps them in.
 
 The merge is the host project's work: **do not resolve it from the KB.** Report
 the blockage, retry after the merge is completed or aborted, or surface it to

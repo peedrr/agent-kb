@@ -104,7 +104,7 @@ These rules apply to ALL KB operations. The reference files assume you know thes
 1. **Never edit the index or log directly.** Use `akb index` and `akb log` commands only.
 2. **Never edit the raw manifest directly.** Use `akb raw sync` only.
 3. **Raw sources are immutable.** Once stored via `akb raw write`, never modify them.
-4. **Batch writes with `--no-commit`.** All write commands auto-commit by default. Use `--no-commit` on all but the last in a batch to avoid one commit per operation. It also bypasses the merge guard: an invocation that attempts no commit is never refused for a host merge in progress, and its write lands unstaged in the merging working tree.
+4. **Batch writes with `--no-commit`.** All write commands auto-commit by default. Use `--no-commit` on all but the last in a batch to avoid one commit per operation. It also bypasses the merge guard: an invocation that attempts no commit is never refused for a host merge in progress, and its write lands unstaged in the merging working tree. `akb init --no-commit` is the exception: it stages the new base and leaves the commit to the caller.
 5. **Wikilinks:** Prefer `[[path-form]]` (e.g., `[[concepts/attention]]`). Short names (`[[attention]]`) are supported but may be ambiguous.
 6. **Drafts:** New pages are drafts by default. Use `akb approve` to publish.
 7. **Always check the template before writing a page.** Run `akb template get <type>` before `akb write`. Writing without understanding requirements causes validation failures.
