@@ -83,6 +83,18 @@
               # task runner (build/test/lint/release recipes)
               just
 
+              # pi-lens toolchain: working binaries for the lanes whose
+              # pi-lens-managed glibc prebuilts cannot execute on NixOS
+              # (pi-lens falls back to PATH when its managed copy fails).
+              # marksman: markdown LSP; shellcheck: bash-ls diagnostics lane;
+              # zizmor: GitHub Actions security aux; typos-lsp: spell-check
+              # aux; vale: prose lint for the docs.
+              marksman
+              shellcheck
+              zizmor
+              typos-lsp
+              vale
+
               self.formatter.${system}
               self.nixLsp.${system}
 
