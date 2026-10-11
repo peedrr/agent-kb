@@ -32,6 +32,12 @@ test-integration:
 lint:
     golangci-lint run ./...
 
+# Prose lint (Vale): tracked markdown prose surfaces only. Run `vale sync`
+# after changing Packages in .vale.ini; tune rules in .vale.ini, project
+# vocabulary in .vale/styles/config/vocabularies/akb/.
+vale:
+    vale $(git ls-files '*.md' ':!:.pi/')
+
 # Remove build output
 clean:
     rm -rf bin/

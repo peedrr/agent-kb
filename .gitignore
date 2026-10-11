@@ -58,3 +58,7 @@ ehthumbs.db
 
 # coordinator runtime artifacts
 /err*.txt
+
+# Vale: synced style packages (vocabulary stays tracked)
+.vale/styles/*
+!.vale/styles/config/

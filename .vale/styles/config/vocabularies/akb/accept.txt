@@ -1,0 +1,60 @@
+# agent-kb project vocabulary. Case-sensitive regexes, one per line;
+# casing here is enforced corpus-wide by Vale.Terms.
+akb
+agent-kb
+frontmatter
+wikilinks?
+testscripts?
+(?i)cel
+(?i)json
+(?i)yaml
+(?i)adr
+(?i)repo
+SQLite
+FTS5
+BM25
+goldmark
+Cobra
+Markdown
+GitHub
+OpenStore
+GitProvider
+AKB_KB
+golangci
+testscript
+# Terms of art that Microsoft.Terms tries to "correct":
+agents?
+Agent
+specs?
+SPEC
+KB
+# Technical vocabulary harvested from the first full-corpus run:
+mockups?
+config
+enums?
+validators?
+stderr
+stdout
+stdin
+env
+hardcoded
+ADRs?
+RFCs?
+goccy
+unmarshal(l?ed|ing)?
+funcs
+eval
+protovalidate
+linkgraph
+substring
+old_page
+dogfood(ing)?
+lint_rules
+approvers?
+worktrees?
+iff
+nonconformant
+# Author names referenced in ADRs:
+(?i)santhosh
+(?i)lemieux
+(?i)philcalcado

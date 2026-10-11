@@ -1,0 +1,8 @@
+# House style: these fire Vale.Avoid at ERROR level. Keep short and
+# defensible — every entry is a potential merge blocker.
+utilize
+utilizes
+leverage
+leverages
+in order to
+it should be noted
