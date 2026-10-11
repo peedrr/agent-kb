@@ -1,0 +1,17 @@
+---
+# Dependabot keeps the SHA-pinned actions in .github/workflows/ current.
+# Monthly, all action updates batched into a single PR; CI validates it.
+# The 7-day cooldown means a release must age a week before it's proposed,
+# so a compromised release published and pulled within days never reaches us
+# (zizmor dependabot-cooldown).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
