@@ -37,6 +37,10 @@ stdout 'Deleted kb/notes/nocommit-note.md'
 exec git log --oneline
 cmp stdout initial-commits.txt
 
+# The deletion touches only the working tree: no managed file is staged.
+exec git status --porcelain
+! stdout '^[MADRC]'
+
 # --- Delete (committing) a page written with --no-commit ---
 stdin ../note-input.md
 exec akb --no-commit write untracked-note.md

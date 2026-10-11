@@ -74,14 +74,15 @@ func init() {
 
 // pageWriteState describes what the write step left behind when a database
 // step after it fails: the commit funnel records the page before the search
-// and link-graph updates run, so the page is already on its branch, unless
-// --no-commit left it staged or the base is not versioned in git at all.
+// and link-graph updates run, so the page is already committed, unless
+// --no-commit left it uncommitted and unstaged or the base is not versioned in
+// git at all.
 func pageWriteState(mode storage.Mode) string {
 	if mode == storage.ModeNone {
 		return "page file written (unversioned KB)"
 	}
 	if noCommit {
-		return "page file written and staged but not committed (--no-commit)"
+		return "page file written but not committed (--no-commit)"
 	}
 	return "page file committed to git"
 }

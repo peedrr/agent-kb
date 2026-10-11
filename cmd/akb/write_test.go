@@ -197,8 +197,9 @@ func assertRecentTimestamp(t *testing.T, value string) {
 
 // TestPageWriteStateIsModeAccurate pins the state a failed index step reports
 // per versioning mode: a git-versioned base names the commit of the page, and
-// the staged state --no-commit leaves, while a base that is not versioned in
-// git names the plain write because there is no commit to describe.
+// the uncommitted, unstaged state --no-commit leaves, while a base that is not
+// versioned in git names the plain write because there is no commit to
+// describe.
 func TestPageWriteStateIsModeAccurate(t *testing.T) {
 	origNoCommit := noCommit
 	t.Cleanup(func() { noCommit = origNoCommit })
@@ -209,8 +210,8 @@ func TestPageWriteStateIsModeAccurate(t *testing.T) {
 	}
 
 	noCommit = true
-	if got := pageWriteState(storage.ModeGit); got != "page file written and staged but not committed (--no-commit)" {
-		t.Errorf("pageWriteState(git, --no-commit) = %q, want the staged state", got)
+	if got := pageWriteState(storage.ModeGit); got != "page file written but not committed (--no-commit)" {
+		t.Errorf("pageWriteState(git, --no-commit) = %q, want the uncommitted state", got)
 	}
 	// --no-commit is a no-op in a base that is not versioned in git, so the
 	// mode decides the report there.
@@ -1461,24 +1462,28 @@ func TestWriteLinkFailureAfterCommitReportsRemediation(t *testing.T) {
 	}
 }
 
-// TestWriteNoCommitIndexFailureReportsStagedState pins that a database failure
-// after --no-commit reports the page as staged instead of claiming a commit.
-func TestWriteNoCommitIndexFailureReportsStagedState(t *testing.T) {
+// TestWriteNoCommitIndexFailureReportsUncommittedState pins that a database
+// failure after --no-commit reports the page as written but not committed,
+// never as staged, and never as committed to git.
+func TestWriteNoCommitIndexFailureReportsUncommittedState(t *testing.T) {
 	kbRoot := writeSetupTestKB(t)
 	defer writeCleanup(kbRoot)
 
 	installSearchDBStatement(t, kbRoot, abortDocumentInsertSQL)
 
-	content := "---\ntype: note\ntitle: Staged Failure\nsummary: test\ntags: test\n---\nBody."
-	out, err := writeRun(kbRoot, "staged-failure.md", content, "--no-commit")
+	content := "---\ntype: note\ntitle: Uncommitted Failure\nsummary: test\ntags: test\n---\nBody."
+	out, err := writeRun(kbRoot, "uncommitted-failure.md", content, "--no-commit")
 	if err == nil {
 		t.Fatalf("expected akb write --no-commit to fail when the document insert is aborted, got: %s", out)
 	}
 	if strings.Contains(out, "committed to git") {
 		t.Errorf("--no-commit must not claim the page is committed to git, got: %s", out)
 	}
-	if !strings.Contains(out, "staged but not committed") {
-		t.Errorf("expected the error to report the staged page, got: %s", out)
+	if !strings.Contains(out, "page file written but not committed (--no-commit)") {
+		t.Errorf("expected the error to report the uncommitted page, got: %s", out)
+	}
+	if strings.Contains(out, "staged") {
+		t.Errorf("--no-commit must not report the page as staged, got: %s", out)
 	}
 	if !strings.Contains(out, "akb index rebuild") {
 		t.Errorf("expected the error to carry the rebuild remediation, got: %s", out)

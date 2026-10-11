@@ -449,18 +449,37 @@ func TestDeleteFileStepFailureAfterIndexRemovalReportsRemediation(t *testing.T) 
 }
 
 // TestDeleteFailureRemediationIsModeAccurate pins the remediation a failed file
-// step reports per versioning mode: a git-versioned base points at the staged
-// deletion to finish by hand, while a base that is not versioned in git has no
-// repository, so no git step is named.
+// step reports per mode: a git-versioned base whose deletion is committed
+// points at the staged deletion to finish by hand, while --no-commit runs no
+// commit step and stages nothing, and a base that is not versioned in git has
+// no repository, so both name only the rebuild of the derived records.
 func TestDeleteFailureRemediationIsModeAccurate(t *testing.T) {
+	origNoCommit := noCommit
+	t.Cleanup(func() { noCommit = origNoCommit })
+
 	const gitRemediation = "the page was already removed from the search index and link graph but its file removal or its commit did not complete; if the page file still exists, run `akb index rebuild` to rebuild the search index and link graph; if the file is gone, run `git status` and commit the staged deletion manually"
+	const rebuildOnlyRemediation = "the page was already removed from the search index and link graph but its file removal did not complete; if the page file still exists, run `akb index rebuild` to rebuild the search index and link graph"
+
+	noCommit = false
 	if got := deleteFailureRemediation(storage.ModeGit); got != gitRemediation {
 		t.Errorf("git-mode remediation = %q, want %q", got, gitRemediation)
 	}
+	if got := deleteFailureRemediation(storage.ModeNone); got != rebuildOnlyRemediation {
+		t.Errorf("non-git remediation = %q, want %q", got, rebuildOnlyRemediation)
+	}
 
-	const noneRemediation = "the page was already removed from the search index and link graph but its file removal did not complete; if the page file still exists, run `akb index rebuild` to rebuild the search index and link graph"
-	if got := deleteFailureRemediation(storage.ModeNone); got != noneRemediation {
-		t.Errorf("non-git remediation = %q, want %q", got, noneRemediation)
+	noCommit = true
+	got := deleteFailureRemediation(storage.ModeGit)
+	if got != rebuildOnlyRemediation {
+		t.Errorf("git-mode --no-commit remediation = %q, want %q", got, rebuildOnlyRemediation)
+	}
+	for _, unwanted := range []string{"git", "commit", "staged"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("git-mode --no-commit remediation names %q, which --no-commit does not produce: %q", unwanted, got)
+		}
+	}
+	if got := deleteFailureRemediation(storage.ModeNone); got != rebuildOnlyRemediation {
+		t.Errorf("non-git --no-commit remediation = %q, want %q", got, rebuildOnlyRemediation)
 	}
 }
 
