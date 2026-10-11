@@ -205,7 +205,9 @@ func (s *Store) List(ctx context.Context, dir string, ext string) ([]string, err
 
 // StageFiles stages the given base-relative paths for the commit that follows
 // them. It is the staging step of the commit funnel, so it takes the same
-// preflight: a base that is not versioned in git stages nothing.
+// preflight: a base that is not versioned in git stages nothing. An invocation
+// that leaves its commit to the caller (--no-commit) still stages — `akb init
+// --no-commit` relies on it to hand the new base to the caller staged.
 func (s *Store) StageFiles(paths ...string) error {
 	if s.mode == ModeNone {
 		return nil
@@ -231,9 +233,10 @@ func (s *Store) Commit(commitMsg string, paths ...string) error {
 
 // NothingToCommit reports whether committing the given base-relative paths
 // would record nothing. A base that is not versioned in git has recorded
-// nothing and will record nothing, so the answer is always yes.
+// nothing and will record nothing, and an invocation that commits nothing
+// (--no-commit) has no empty commit to avoid, so the answer is always yes.
 func (s *Store) NothingToCommit(paths ...string) (bool, error) {
-	if s.mode == ModeNone {
+	if s.mode == ModeNone || s.noCommit {
 		return true, nil
 	}
 	return NothingToCommit(s.kbRoot, paths...)

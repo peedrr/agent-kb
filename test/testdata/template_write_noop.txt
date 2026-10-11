@@ -54,9 +54,9 @@ stderr 'pass mockup no longer validates'
 ! stderr 'unchanged'
 
 # A first write with the persistent --no-commit flag leaves the template files
-# uncommitted. A byte-identical --force --no-commit re-run must still exit 0
-# without reaching git with an empty change set, and must leave the installed
-# files untouched.
+# uncommitted. A byte-identical --force --no-commit re-run is a no-op answered
+# from the files alone: exit 0, the 'unchanged' message, no git invocation,
+# and the installed files untouched and still untracked.
 cd ..
 exec akb init nocommit-kb
 cd nocommit-kb
@@ -74,10 +74,11 @@ cmp stdout history-nocommit.txt
 exec git status --porcelain -- .agent-kb/templates
 stdout '\?\? .agent-kb/templates/'
 exec akb --no-commit template write note --template note.yaml --pass note_pass.md --fail ../note-fail.md --force
-stdout 'Template .note. written'
-! stderr 'nothing to commit'
+stdout 'Template .note. unchanged'
 exec git log --oneline
 cmp stdout history-nocommit.txt
+exec git status --porcelain -- .agent-kb/templates
+stdout '\?\? .agent-kb/templates/'
 cmp note.yaml .agent-kb/templates/note.yaml
 cmp note_pass.md .agent-kb/templates/note_pass.md
 cmp ../note-fail.md .agent-kb/templates/note_fail.md

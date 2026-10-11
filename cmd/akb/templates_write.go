@@ -270,8 +270,10 @@ func runTemplatesWrite(_ *cobra.Command, args []string) error {
 	// nothing, so it succeeds without reaching git with an empty change set and
 	// without resolving the commit identity the preflight below requires. The
 	// check runs after every mockup validation above and under the lock, so the
-	// content it compares is the content the commit below would record. --force
-	// skips the overwrite confirmation only; validation has already run.
+	// content it compares is the content the commit below would record. Under
+	// --no-commit the store answers from the files alone: no commit will be
+	// attempted, so git is not consulted. --force skips the overwrite
+	// confirmation only; validation has already run.
 	if templateExists && templateFilesMatch(templatesDir, name, tmplData, passData, failData) {
 		recordEmpty, err := store.NothingToCommit(templateCommitPaths(name)...)
 		if err != nil {
