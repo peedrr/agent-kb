@@ -9,8 +9,8 @@ build: just build
 vet: go vet ./...
 lint: just lint
 fmt: test -z "$(gofmt -l .)"
-test: go test ./...
-test-integration: go test ./test/ -test.v
+test: go test -count=1 ./...
+test-integration: go test -count=1 ./test/ -test.v
 
 ## SYMBOL-TOOLS
 No symbol-navigation MCP is configured for this project — use `rg`/`grep`
